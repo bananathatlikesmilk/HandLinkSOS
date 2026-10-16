@@ -1,0 +1,84 @@
+import { expect, test } from '@playwright/test';
+import { headers, login, provision, sos } from './incident-fixture';
+import { addNotes, ageRequest, provider, providerState } from './ai-fixture';
+
+test('local AI preview requires consent; reviewed summary survives reload and failed replacement', async ({
+	page,
+	request
+}) => {
+	test.setTimeout(90000);
+	provider();
+	const caller = await provision(),
+		dispatcher = await provision('dispatcher');
+	await login(request, caller);
+	await login(page.request, dispatcher);
+	const created = await request.post('/api/incidents', { headers, data: sos(caller.profileId) });
+	expect(created.ok()).toBe(true);
+	const id = (await created.json()).incident.id;
+	const confirmed = await page.request.post(`/api/staff/incidents/${id}/confirm`, {
+		headers,
+		data: { verballyConfirmed: true }
+	});
+	expect(confirmed.ok()).toBe(true);
+	await addNotes(
+		page.request,
+		id,
+		'Casey Reyes reports chest pain. Call casey@example.com at +639171234567. Dispatch assistance requested.'
+	);
+	await page.goto('/dispatch/reports');
+	const panel = page.getByRole('region', { name: 'AI report summary', exact: true });
+	await expect(panel).toBeVisible();
+	await expect(panel).toContainText('processed by Ollama on the HandLink server');
+	await expect(panel).not.toContainText('OpenAI');
+	await panel.getByRole('button', { name: 'Prepare notes for AI', exact: true }).click();
+	const notes = panel.getByLabel('Notes approved for AI', { exact: true });
+	await expect(notes).not.toHaveValue(/Casey|Reyes|casey@example\.com|639171234567/);
+	const generate = panel.getByRole('button', { name: 'Generate AI draft', exact: true });
+	await expect(generate).toBeDisabled();
+	const consent = panel.getByRole('checkbox', {
+		name: 'I reviewed this text and removed identifying or unnecessary private information',
+		exact: true
+	});
+	await consent.check();
+	await notes.fill((await notes.inputValue()).replace('Dispatch assistance requested.', ''));
+	await expect(consent).not.toBeChecked();
+	await expect(generate).toBeDisabled();
+	await consent.check();
+	await generate.click();
+	await expect(panel.getByText('AI-generated draft', { exact: true })).toBeVisible();
+	expect(providerState().calls).toBe(1);
+	await panel.getByRole('button', { name: 'Approve summary', exact: true }).click();
+	await expect(panel.getByText('Dispatcher-reviewed AI summary', { exact: true })).toBeVisible();
+	const saved = (await (await page.request.get(`/api/staff/reports/${id}`)).json()).ai.summary;
+	expect(saved.reviewedAt).toBeTruthy();
+	await page.reload();
+	await expect(panel.getByText('Dispatcher-reviewed AI summary', { exact: true })).toBeVisible();
+	await expect(panel.getByText(saved.summary, { exact: true })).toBeVisible();
+
+	ageRequest(saved.requestId);
+	provider('failure');
+	await panel.getByRole('button', { name: 'Prepare notes for AI', exact: true }).click();
+	await consent.check();
+	page.on('dialog', (dialog) => dialog.accept());
+	const attempts: string[] = [];
+	page.on('request', (outgoing) => {
+		if (outgoing.method() === 'POST' && outgoing.url().endsWith(`/reports/${id}/summary`))
+			attempts.push(outgoing.postDataJSON().requestId);
+	});
+	await generate.click();
+	await expect(panel.getByRole('alert')).toBeVisible();
+	await expect(panel.getByText(saved.summary, { exact: true })).toBeVisible();
+	await expect(panel.getByText('Dispatcher-reviewed AI summary', { exact: true })).toBeVisible();
+	const afterFailure = (await (await page.request.get(`/api/staff/reports/${id}`)).json()).ai
+		.summary;
+	expect(afterFailure).toEqual(saved);
+	expect(attempts).toHaveLength(1);
+	ageRequest(attempts[0]);
+	provider();
+	await expect(generate).toBeEnabled();
+	await generate.click();
+	await expect(panel.getByText('AI-generated draft', { exact: true })).toBeVisible();
+	expect(attempts).toHaveLength(2);
+	expect(attempts[1]).not.toBe(attempts[0]);
+	expect(providerState().calls).toBe(1);
+});

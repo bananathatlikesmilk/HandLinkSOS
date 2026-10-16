@@ -1,0 +1,40 @@
+node_modules
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/.svelte-kit-tests
+/.serena
+/build
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+# Playwright
+test-results
+# SQLite
+*.db
+.db-backups/
+*.sqlite
+*.db-wal
+*.db-shm
+*.sqlite-wal
+*.sqlite-shm
+
+# Native signing and Firebase configuration
+*.jks
+*.keystore
+android/app/google-services.json
