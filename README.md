@@ -47,6 +47,15 @@ docker compose -f compose.production.yaml up -d --no-build --force-recreate app
 
 If using the published image instead of building on the server, set the GitHub Actions repository variable `DOCKER_ORIGIN` to the same public HTTPS URL before publishing. SMTP credentials belong in the deployment environment and are supplied at runtime.
 
+If a hosted POST returns `403` with `Request origin is not allowed.` while `/api/auth/get-session` returns `404`, check the image's build origin. Changing only the server's `.env` does not rebuild an image pulled from Docker Hub. Set the GitHub repository's **Settings > Secrets and variables > Actions > Variables > DOCKER_ORIGIN** to the exact public origin, rerun the publish workflow, then pull and recreate the app:
+
+```sh
+docker compose -f compose.production.yaml pull app
+docker compose -f compose.production.yaml up -d --no-build --force-recreate app
+```
+
+For builds on the server, use `docker compose -f compose.production.yaml up --build -d app` instead. Startup now checks that the built origin equals runtime `ORIGIN` and stops with a clear mismatch message before running migrations if they differ.
+
 AI summaries call Ollama at `127.0.0.1:11434`. With Docker's default bridge network, that address belongs to the container. To use Ollama on this computer without exposing its API, enable **host networking** in Docker Desktop Settings > Resources > Network. Replace `ports` in the Compose service with `network_mode: host`, then recreate the container. Requires Docker Desktop 4.34 or later. See [local AI setup](docs/ai-summaries.md) for model installation. Model inference is separate from building the web image.
 
 Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
