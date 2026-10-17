@@ -7,7 +7,7 @@ RUN corepack prepare pnpm@11.9.0 --activate
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
-RUN pnpm install --frozen-lockfile
+RUN npm_config_nodedir=/usr/local pnpm install --frozen-lockfile
 
 COPY . .
 RUN DATABASE_URL=/tmp/build.db \
