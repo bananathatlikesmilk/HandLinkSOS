@@ -10,14 +10,18 @@ docker compose up --build -d
 
 Open <http://localhost:3000>. Compose reads credentials from `.env`, sets the container database path, and overrides the development origin. For a different public URL, set `DOCKER_ORIGIN` in `.env` and rerun `docker compose up --build -d`. SvelteKit 3 embeds the server origin during the build, so changing it requires rebuilding. For a plain `docker build`, pass `--build-arg ORIGIN=https://your-domain.example` and set the same `ORIGIN` when running the image. Use HTTPS outside localhost for camera and location features.
 
-The container starts as a non-root user, applies the existing Drizzle migrations, then starts the production Node server. The named `handlink-data` volume holds a **new, separate database**, plus backups made before subsequent migrations. Your existing `local.db` is not copied into the image. `docker compose down` keeps this volume; `docker compose down -v` deletes it and its data.
+Startup prepares ownership of `/app/data`, then drops to the non-root `node` user before applying the existing Drizzle migrations and starting the production Node server. The named `handlink-data` volume holds a **new, separate database**, plus backups made before subsequent migrations. Your existing `local.db` is not copied into the image. `docker compose down` keeps this volume; `docker compose down -v` deletes it and its data.
+
+Linux bind mounts such as `./data:/app/data` are also supported. Startup creates the backup directory and gives UID/GID `1000:1000` ownership of the mounted data, including existing SQLite files. It preserves database contents. Mount only the dedicated HandLink data directory there. If your platform requires `user: '1000:1000'`, prepare that ownership on the host first; startup cannot repair it without root. Read-only mounts are unsupported.
+
+For a custom Compose deployment using `ORIGIN` (including Cloudflare Tunnel), also pass the same value in `services.app.build.args.ORIGIN`. Setting only the runtime environment does not update SvelteKit 3's built-in origin. Rebuild and recreate the app after pulling these source changes; restarting or pulling an older published image does not include the fix.
 
 ```sh
 # View startup and migration logs
 docker compose logs -f app
 
 # Provision the first administrator (interactive, password hidden)
-docker compose exec app node scripts/create-admin.mjs
+docker compose exec --user node app node scripts/create-admin.mjs
 
 # Stop the app while keeping its database
 docker compose down

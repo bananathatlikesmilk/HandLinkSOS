@@ -24,7 +24,8 @@ ENV NODE_ENV=production \
     DATABASE_URL=/app/data/local.db
 
 WORKDIR /app
-RUN mkdir -p /app/data/.db-backups \
+RUN apk add --no-cache su-exec \
+    && mkdir -p /app/data/.db-backups \
     && ln -s /app/data/.db-backups /app/.db-backups \
     && chown -R node:node /app
 
@@ -38,8 +39,6 @@ COPY --chown=node:node scripts/migrate.mjs scripts/create-admin.mjs scripts/expi
 
 RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
     && chmod +x /usr/local/bin/docker-entrypoint.sh
-
-USER node
 
 EXPOSE 3000
 
