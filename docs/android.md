@@ -1,5 +1,13 @@
 # Android phone testing
 
+## Current online test APK
+
+The debug APK rebuilt on 18 October 2026 targets `https://thebois.fyi/user`. Its embedded server URL and APK signature were verified. This build needs internet access and the deployed backend; it does not need USB forwarding or a local development server. Install the updated APK over the previous localhost build before disconnecting USB.
+
+To reproduce this target, set `HANDLINK_MOBILE_SERVER_URL=https://thebois.fyi` in the terminal environment before running `pnpm android:prepare`, then build the APK. Running preparation without that variable selects localhost again. The localhost instructions below apply only to builds prepared for USB testing.
+
+The public site served HandLink pages during verification. Its `/api/push/devices` endpoint returned 404 at that time, so the deployed backend still needed the push integration update. Changing the APK URL does not deploy backend code or configure the remote server's private Firebase credentials.
+
 This project now includes a Capacitor 8 Android client (`com.handlink.sos`), native permission-aware GPS, and an opt-in foreground location service. The client loads the existing SvelteKit server so login, database access, and validation remain on the computer/server. No database or SMTP secrets are bundled into Android assets.
 
 A debug APK was built and its signature verified on 17 October 2026 using Java 21, Android SDK 36, and Gradle 8.14.3. Native Java/Kotlin compilation passed. The localhost release guard was exercised and correctly rejected a release pre-build. Physical-phone behavior, permission flows, and screen-off reliability still require device testing; compilation and simulated bridge tests do not establish those results.

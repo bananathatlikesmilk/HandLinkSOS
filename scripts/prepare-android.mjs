@@ -10,9 +10,14 @@ const result = spawnSync(process.execPath, [cli, 'sync', 'android'], {
 });
 if (result.error) throw result.error;
 if (result.status) process.exit(result.status);
-console.log(
-	'Android client prepared. Start pnpm dev, connect the phone by USB, and run adb reverse tcp:5173 tcp:5173.'
-);
+console.log(`Android client prepared for ${new URL('/user', server).href}.`);
+if (new URL(server).protocol === 'http:') {
+	console.log('Start pnpm dev, connect the phone by USB, and run adb reverse tcp:5173 tcp:5173.');
+} else {
+	console.log(
+		'The phone needs internet access to the HTTPS server. USB forwarding is not required.'
+	);
+}
 console.log(
 	'Then open Android Studio with pnpm android:open and install the debug app on your phone.'
 );

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { LockKeyhole } from '@lucide/svelte';
-	import { resolve } from '$app/paths';
+	import { asset, resolve } from '$app/paths';
 	let {
 		large = false,
 		href = '/dispatch/login'
@@ -9,7 +9,7 @@
 </script>
 
 <a class="staff-brand" class:large href={resolve(href)} aria-label="HandLink home">
-	<span class="emblem" aria-hidden="true"><span></span><span></span><span></span></span>
+	<img class="emblem" src={asset('logo.png')} alt="" width="3543" height="3543" />
 	<span>HandLink</span><LockKeyhole size={large ? 27 : 22} strokeWidth={1.1} aria-hidden="true" />
 </a>
 
@@ -25,30 +25,13 @@
 		text-decoration: none;
 	}
 	.emblem {
-		position: relative;
+		display: block;
 		width: 25px;
 		height: 33px;
+		flex-shrink: 0;
 		margin-right: 4px;
-	}
-	.emblem span {
-		position: absolute;
-		left: 4px;
-		width: 17px;
-		height: 17px;
-		transform: rotate(45deg);
-		border: 1px dotted #d7ccc6;
-	}
-	.emblem span:nth-child(1) {
-		top: 1px;
-		background: #777772;
-	}
-	.emblem span:nth-child(2) {
-		top: 8px;
-		background: #f28a73;
-	}
-	.emblem span:nth-child(3) {
-		top: 15px;
-		background: #c6382b;
+		object-fit: contain;
+		mix-blend-mode: screen;
 	}
 	.large {
 		font-size: 34px;
@@ -59,19 +42,5 @@
 		flex-basis: 100%;
 		height: 100px;
 		margin: 0 0 16px;
-	}
-	.large .emblem span {
-		width: 54px;
-		height: 54px;
-		left: calc(50% - 27px);
-	}
-	.large .emblem span:nth-child(1) {
-		top: 0;
-	}
-	.large .emblem span:nth-child(2) {
-		top: 22px;
-	}
-	.large .emblem span:nth-child(3) {
-		top: 44px;
 	}
 </style>
