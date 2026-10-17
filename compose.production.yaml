@@ -4,8 +4,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        ORIGIN: ${ORIGIN:?Set ORIGIN in .env}
     init: true
     expose:
       - '3000'

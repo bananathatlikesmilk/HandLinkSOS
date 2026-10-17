@@ -8,13 +8,13 @@ Start Docker Desktop with Linux containers. Create `.env` from `.env.example` if
 docker compose up --build -d
 ```
 
-Open <http://localhost:3000>. Compose reads credentials from `.env`, sets the container database path, and overrides the development origin. For a different public URL, set `DOCKER_ORIGIN` in `.env` and rerun `docker compose up --build -d`. SvelteKit 3 embeds the server origin during the build, so changing it requires rebuilding. For a plain `docker build`, pass `--build-arg ORIGIN=https://your-domain.example` and set the same `ORIGIN` when running the image. Use HTTPS outside localhost for camera and location features.
+Open the URL set by `ORIGIN` in `.env` (use `http://localhost:3000` for local Docker). Compose reads credentials and the public origin from `.env` and sets the container database path. `ORIGIN` is read at runtime; the same image supports different domains without rebuilding. Recreate the container after changing `.env`. Use HTTPS outside localhost for camera and location features.
 
 Startup prepares ownership of `/app/data`, then drops to the non-root `node` user before applying the existing Drizzle migrations and starting the production Node server. The named `handlink-data` volume holds a **new, separate database**, plus backups made before subsequent migrations. Your existing `local.db` is not copied into the image. `docker compose down` keeps this volume; `docker compose down -v` deletes it and its data.
 
 Linux bind mounts such as `./data:/app/data` are also supported. Startup creates the backup directory and gives UID/GID `1000:1000` ownership of the mounted data, including existing SQLite files. It preserves database contents. Mount only the dedicated HandLink data directory there. If your platform requires `user: '1000:1000'`, prepare that ownership on the host first; startup cannot repair it without root. Read-only mounts are unsupported.
 
-For a custom Compose deployment using `ORIGIN` (including Cloudflare Tunnel), also pass the same value in `services.app.build.args.ORIGIN`. Setting only the runtime environment does not update SvelteKit 3's built-in origin. Rebuild and recreate the app after pulling these source changes; restarting or pulling an older published image does not include the fix.
+The runtime launcher (`pnpm start` or `node scripts/start-server.mjs`) reads `ORIGIN`, then sets the adapter's request origin before each request. It overwrites incoming origin-routing headers with server-owned values while preserving browser `Origin` checks, authentication, and the adapter's graceful shutdown. No origin build argument or GitHub Actions origin variable is needed. Do not bypass the launcher with `node build`.
 
 ```sh
 # View startup and migration logs
@@ -45,16 +45,14 @@ When changing only SMTP values, recreate the app to load them; restarting an exi
 docker compose -f compose.production.yaml up -d --no-build --force-recreate app
 ```
 
-If using the published image instead of building on the server, set the GitHub Actions repository variable `DOCKER_ORIGIN` to the same public HTTPS URL before publishing. SMTP credentials belong in the deployment environment and are supplied at runtime.
-
-If a hosted POST returns `403` with `Request origin is not allowed.` while `/api/auth/get-session` returns `404`, check the image's build origin. Changing only the server's `.env` does not rebuild an image pulled from Docker Hub. Set the GitHub repository's **Settings > Secrets and variables > Actions > Variables > DOCKER_ORIGIN** to the exact public origin, rerun the publish workflow, then pull and recreate the app:
+For an existing deployment, publish or build the updated image once to get the runtime launcher. When using Docker Hub, pull it and recreate the app:
 
 ```sh
 docker compose -f compose.production.yaml pull app
 docker compose -f compose.production.yaml up -d --no-build --force-recreate app
 ```
 
-For builds on the server, use `docker compose -f compose.production.yaml up --build -d app` instead. Startup now checks that the built origin equals runtime `ORIGIN` and stops with a clear mismatch message before running migrations if they differ.
+For builds on the server, use `docker compose -f compose.production.yaml up --build -d app` instead. After this update, changing the domain requires only updating `ORIGIN` in `.env` and recreating the app. SMTP credentials also remain runtime settings.
 
 AI summaries call Ollama at `127.0.0.1:11434`. With Docker's default bridge network, that address belongs to the container. To use Ollama on this computer without exposing its API, enable **host networking** in Docker Desktop Settings > Resources > Network. Replace `ports` in the Compose service with `network_mode: host`, then recreate the container. Requires Docker Desktop 4.34 or later. See [local AI setup](docs/ai-summaries.md) for model installation. Model inference is separate from building the web image.
 

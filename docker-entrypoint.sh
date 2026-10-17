@@ -28,16 +28,5 @@ if [ -e "$DATABASE_URL" ] && { [ ! -r "$DATABASE_URL" ] || [ ! -w "$DATABASE_URL
     exit 1
 fi
 
-# SvelteKit 3 embeds paths.origin in the image. A runtime-only change would
-# otherwise start successfully but reject same-origin writes and auth routes.
-node --input-type=module <<'JS'
-import { origin } from './build/adapter-node.js';
-if (origin !== process.env.ORIGIN) {
-    console.error(`Origin mismatch: image was built for ${origin ?? '(unset)'}, but ORIGIN is ${process.env.ORIGIN}.`);
-    console.error('Rebuild with --build-arg ORIGIN matching the public URL. For GitHub Actions, set the DOCKER_ORIGIN repository variable before publishing.');
-    process.exit(1);
-}
-JS
-
 node scripts/migrate.mjs
 exec "$@"

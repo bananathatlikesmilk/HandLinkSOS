@@ -32,8 +32,6 @@ jobs:
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
-          build-args: |
-            ORIGIN=${{ vars.DOCKER_ORIGIN || 'http://localhost:3000' }}
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/handlink-sos:latest
             ${{ secrets.DOCKER_USERNAME }}/handlink-sos:sha-${{ github.sha }}

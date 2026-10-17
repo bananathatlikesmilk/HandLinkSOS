@@ -1,9 +1,6 @@
 services:
   app:
-    build:
-      context: .
-      args:
-        ORIGIN: ${DOCKER_ORIGIN:-http://localhost:3000}
+    build: .
     image: handlink-sos:local
     init: true
     ports:
@@ -12,7 +9,7 @@ services:
       - .env
     environment:
       DATABASE_URL: /app/data/local.db
-      ORIGIN: ${DOCKER_ORIGIN:-http://localhost:3000}
+      ORIGIN: ${ORIGIN:-http://localhost:3000}
     volumes:
       - handlink-data:/app/data
 
