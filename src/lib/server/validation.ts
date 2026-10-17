@@ -150,8 +150,12 @@ export const locationStartInput = locationSessionInput
 		path: ['recipientUserIds']
 	});
 export const deviceInput = z.strictObject({
-	platform: z.enum(['android', 'ios']),
-	pushToken: z.string().min(20).max(4096)
+	platform: z.literal('android'),
+	pushToken: z
+		.string()
+		.min(20)
+		.max(4096)
+		.regex(/^[A-Za-z0-9_:.-]+$/)
 });
 export const summaryInput = z.strictObject({ summary: z.string().trim().min(1).max(4000) });
 export const aiGenerateInput = z.strictObject({

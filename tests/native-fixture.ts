@@ -14,13 +14,34 @@ export async function installNativeBridge(page: Page) {
 			gpsChecks: 0,
 			dialerAttempts: 0,
 			denyDialer: false,
+			pushPermission: 'prompt',
+			pushRequests: 0,
+			pushRegistrations: 0,
+			pushUnregisters: 0,
+			pushDeny: false,
 			finishStart: null as (() => void) | null
 		};
+		const pushListeners: Record<string, (value: unknown) => void> = {};
 		Object.assign(globalThis, {
 			CapacitorCustomPlatform: { name: 'android' },
 			__handlinkNativeTest: state,
 			Capacitor: {
 				PluginHeaders: [
+					{
+						name: 'PushNotifications',
+						methods: [
+							{ name: 'addListener', rtype: 'callback' },
+							...[
+								'removeListener',
+								'checkPermissions',
+								'requestPermissions',
+								'register',
+								'unregister',
+								'createChannel',
+								'removeAllDeliveredNotifications'
+							].map((name) => ({ name, rtype: 'promise' }))
+						]
+					},
 					{ name: 'HandLinkPhone', methods: [{ name: 'openDialer', rtype: 'promise' }] },
 					{
 						name: 'Geolocation',
@@ -38,7 +59,33 @@ export async function installNativeBridge(page: Page) {
 						]
 					}
 				],
+				nativeCallback(
+					plugin: string,
+					method: string,
+					options: { eventName: string },
+					callback: (value: unknown) => void
+				) {
+					if (plugin === 'PushNotifications' && method === 'addListener')
+						pushListeners[options.eventName] = callback;
+					return 'fixture-listener';
+				},
 				async nativePromise(plugin: string, method: string, options?: { sessionId: string }) {
+					if (plugin === 'PushNotifications') {
+						if (method === 'checkPermissions') return { receive: state.pushPermission };
+						if (method === 'requestPermissions') {
+							state.pushRequests++;
+							state.pushPermission = state.pushDeny ? 'denied' : 'granted';
+							return { receive: state.pushPermission };
+						}
+						if (method === 'register') {
+							state.pushRegistrations++;
+							queueMicrotask(() =>
+								pushListeners.registration?.({ value: 'fixture-push-token-12345678901234567890' })
+							);
+						}
+						if (method === 'unregister') state.pushUnregisters++;
+						return;
+					}
 					if (plugin === 'HandLinkPhone' && method === 'openDialer') {
 						state.dialerAttempts++;
 						if (state.denyDialer) throw new Error('No dialer available.');
@@ -99,6 +146,10 @@ export type NativeTestState = {
 	gpsChecks: number;
 	dialerAttempts: number;
 	denyDialer: boolean;
+	pushRequests: number;
+	pushRegistrations: number;
+	pushUnregisters: number;
+	pushDeny: boolean;
 	deny: boolean;
 	delay: boolean;
 	finishStart: (() => void) | null;

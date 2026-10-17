@@ -1,0 +1,12 @@
+# Optional Firebase extension: use together with compose.production.yaml.
+services:
+  app:
+    environment:
+      FIREBASE_SERVICE_ACCOUNT_FILE: /run/secrets/handlink-firebase.json
+    volumes:
+      - type: bind
+        source: ${FIREBASE_SERVICE_ACCOUNT_FILE:?Set an absolute server credential file path in .env}
+        target: /run/secrets/handlink-firebase.json
+        read_only: true
+        bind:
+          create_host_path: false

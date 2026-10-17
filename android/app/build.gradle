@@ -57,7 +57,9 @@ tasks.register('verifyReleaseServer') {
         }
     }
 }
-tasks.named('preReleaseBuild').configure { dependsOn('verifyReleaseServer') }
+tasks.matching { it.name == 'preReleaseBuild' }.configureEach {
+    dependsOn('verifyReleaseServer')
+}
 
 try {
     def servicesJSON = file('google-services.json')

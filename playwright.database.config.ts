@@ -34,6 +34,7 @@ export default defineConfig({
 			SMTP_USER: '',
 			SMTP_PASSWORD: '',
 			SMTP_FROM: '',
+			FIREBASE_SERVICE_ACCOUNT_FILE: '',
 			OPENAI_API_KEY: '',
 			OPENAI_SUMMARY_MODEL: '',
 			ORIGIN: origin,

@@ -8,7 +8,7 @@ import {
 	text,
 	uniqueIndex
 } from 'drizzle-orm/sqlite-core';
-import { user } from './schema.ts';
+import { user, session } from './schema.ts';
 
 const id = () =>
 	text('id')
@@ -463,6 +463,7 @@ export const device = sqliteTable(
 		userId: accountReference('user_id'),
 		platform: text('platform', { enum: ['android', 'ios'] }).notNull(),
 		pushToken: text('push_token').notNull().unique(),
+		sessionId: text('session_id').references(() => session.id, { onDelete: 'cascade' }),
 		createdAt: created(),
 		revokedAt: integer('revoked_at', { mode: 'timestamp_ms' })
 	},
@@ -495,5 +496,32 @@ export const notification = sqliteTable(
 			'notification_type',
 			sql`${t.type} in ('sos','location_shared','location_expiring','location_expired','trusted_request')`
 		)
+	]
+);
+
+export const pushDelivery = sqliteTable(
+	'push_delivery',
+	{
+		id: id(),
+		notificationId: text('notification_id')
+			.notNull()
+			.references(() => notification.id, { onDelete: 'cascade' }),
+		deviceId: text('device_id')
+			.notNull()
+			.references(() => device.id, { onDelete: 'cascade' }),
+		state: text('state', { enum: ['pending', 'sent', 'skipped', 'failed'] })
+			.notNull()
+			.default('pending'),
+		attempts: integer('attempts').notNull().default(0),
+		nextAttemptAt: integer('next_attempt_at', { mode: 'timestamp_ms' }).notNull(),
+		leaseUntil: integer('lease_until', { mode: 'timestamp_ms' }),
+		acceptedAt: integer('accepted_at', { mode: 'timestamp_ms' }),
+		createdAt: created()
+	},
+	(t) => [
+		uniqueIndex('push_delivery_once').on(t.notificationId, t.deviceId),
+		index('push_delivery_pending').on(t.state, t.nextAttemptAt),
+		check('push_delivery_state', sql`${t.state} in ('pending','sent','skipped','failed')`),
+		check('push_delivery_attempts', sql`${t.attempts} >= 0`)
 	]
 );

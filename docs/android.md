@@ -2,13 +2,13 @@
 
 This project now includes a Capacitor 8 Android client (`com.handlink.sos`), native permission-aware GPS, and an opt-in foreground location service. The client loads the existing SvelteKit server so login, database access, and validation remain on the computer/server. No database or SMTP secrets are bundled into Android assets.
 
-The Android SDK and Java toolchain were not available during implementation. Capacitor sync, TypeScript checks, web regressions, configuration tests, and simulated bridge tests can run here; APK compilation and physical screen-off behavior still require the setup below. A simulated bridge does not verify Java services or Android battery policies.
+A debug APK was built and its signature verified on 17 October 2026 using Java 21, Android SDK 36, and Gradle 8.14.3. Native Java/Kotlin compilation passed. The localhost release guard was exercised and correctly rejected a release pre-build. Physical-phone behavior, permission flows, and screen-off reliability still require device testing; compilation and simulated bridge tests do not establish those results.
 
 ## Install the build tools
 
 1. Install [Android Studio 2025.2.1 or newer](https://developer.android.com/studio).
 2. In Android Studio's SDK Manager, install Android SDK Platform 36, Android SDK Build-Tools, and Android SDK Platform-Tools. Accept SDK licenses yourself in Android Studio.
-3. Use Java 21 or newer. Android Studio includes its Java runtime in its `jbr` folder. Set `JAVA_HOME` to that folder if Java is not on your terminal path.
+3. Use Java 21 for this project. A newer Android Studio can bundle Java 25, which this Gradle 8.14.3 wrapper does not support. Set `JAVA_HOME` to a compatible JDK rather than assuming the bundled `jbr` is compatible.
 4. Set `ANDROID_HOME` to your SDK folder. The usual Windows location is `%LOCALAPPDATA%\Android\Sdk`.
 5. Reopen the terminal and run `pnpm android:doctor`. It reports missing Java, platform 36, or platform tools without printing credentials.
 
@@ -26,6 +26,23 @@ The USB connection and computer server must remain running. The phone's `localho
 
 To target a deployed HTTPS server later, set `HANDLINK_MOBILE_SERVER_URL` for `pnpm android:prepare`. That variable is read by the preparation process, not from the private server `.env`. Remote HTTP, embedded credentials, URL queries, and fragments are rejected. Mixed content is disabled. Main Android network policy blocks cleartext; only debug localhost/127.0.0.1 allow it.
 
+## Build the debug APK
+
+On the workstation used for the verified build, a checksum-verified portable Eclipse Temurin JDK 21 is installed under the current user's local application data. It does not change global Java settings. From the project root, use:
+
+```powershell
+$env:JAVA_HOME = Join-Path $env:LOCALAPPDATA 'HandLink\build-tools\jdk-21.0.12.1+1'
+$env:ANDROID_HOME = Join-Path $env:LOCALAPPDATA 'Android\Sdk'
+pnpm android:prepare
+.\android\gradlew.bat -p android :app:assembleDebug --console=plain
+```
+
+On another computer, set JAVA_HOME to that computer's installed Java 21 folder. SDK components may download during the first build when their licenses are already accepted.
+
+The installable artifact is `android/app/build/outputs/apk/debug/app-debug.apk` (about 4.8 MB for the verified build). It is debug-signed and configured for `http://localhost:5173/user` through USB forwarding. Keep the computer's server and USB forwarding running. Installing the APK alone does not host the backend, database, email delivery, or Ollama on the phone. A public standalone installation still requires a deployed HTTPS backend and a release build.
+
+The first native compilation exposed two build blockers that are now fixed: the release check attaches when Android registers its task, and the main manifest explicitly overrides the generated library's cleartext flag. The debug network configuration continues to permit HTTP only for localhost/127.0.0.1. Release builds still require HTTPS.
+
 ## Use screen-off updates
 
 1. Sign in with a User account in the Android app.
@@ -34,7 +51,7 @@ To target a deployed HTTPS server later, set `HANDLINK_MOBILE_SERVER_URL` for `p
 4. Lock the screen. The native foreground service requests positions at five-minute intervals and sends only fresh positions to the existing owner-only API. Android may delay delivery; it is not an exact five-minute guarantee.
 5. Use **Disable screen-off updates** or the notification's pause action to stop the native service while keeping the sharing session active. Use **Stop sharing** to remove server-side recipient access.
 
-The sharing owner and selected trusted profiles each receive one in-app warning during the final minute. This appears across signed-in User screens and in Notifications. Recipients can open the shared location; the owner can manage sharing. Only currently approved trusted profiles selected for that session qualify, including profiles that are also emergency contacts. Emergency-contact-only recipients and unselected or revoked profiles do not receive this advance warning. The server checks timers every 15 seconds; foreground notification polling can add up to five seconds. Stopped or expired sessions no longer show an active warning. Incoming system notifications for recipients still require the separate background push integration.
+The sharing owner and selected trusted profiles each receive one in-app warning during the final minute. This appears across signed-in User screens and in Notifications. Recipients can open the shared location; the owner can manage sharing. Only currently approved trusted profiles selected for that session qualify, including profiles that are also emergency contacts. Emergency-contact-only recipients and unselected or revoked profiles do not receive this advance warning. The server checks timers every 15 seconds; foreground notification polling can add up to five seconds. Stopped or expired sessions no longer show an active warning. Eligible Android recipients can now opt into Firebase background push in Settings. See [Android push notifications](push-notifications.md) for setup and phone checks.
 
 Migration `0007_location_expiring_notification` expands the allowed notification types and preserves all existing notification fields, read states, indexes, and foreign keys. `pnpm db:migrate` creates a private backup before applying it. If rolling application code back, retain the expanded table constraint; older code ignores the new type. Do not restore an older backup over newer records merely to remove this warning feature.
 
@@ -44,7 +61,7 @@ No passwords or auth tokens are exposed to JavaScript by the custom plugin. Nati
 
 The service requests foreground location permission, not unrestricted Android background location. It starts only from an explicit in-app action and shows an ongoing notification. A short, bounded wake lock covers uploads; no indefinite wake lock is held. It does not restart automatically after Android kills it. Force-stop, revoked permissions, disabled location, battery restrictions, lost USB/network, or a stopped server can interrupt tracking. Reopen the app and explicitly enable the service again after interruption.
 
-When the service is running at expiry, it can show a local timer-ended notification. The existing server expiry worker creates in-app notices for the owner and eligible recipients. This is not incoming push delivery to another closed app. Firebase Cloud Messaging, its Android application configuration, server credentials, device-token APIs, and delivery handling remain a separate integration. Display over other apps remains unconnected. SOS now opens an empty Android dialer after a confirmed save; it does not place a call.
+When the service is running at expiry, it can show a local timer-ended notification. The existing server expiry worker creates in-app notices for the owner and eligible recipients. This local service is separate from the Firebase push integration, which now supports generic SOS and location-sharing alerts for opted-in, authenticated Android installations. Physical-phone receipt still needs testing. Display over other apps remains unconnected. SOS now opens an empty Android dialer after a confirmed save; it does not place a call.
 
 ## Physical-phone checks
 

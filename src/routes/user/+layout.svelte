@@ -9,6 +9,7 @@
 	import { USER_PREVIEW, UserPreview } from '#lib/user/preview.svelte.ts';
 	import UserBrand from '#lib/user/UserBrand.svelte';
 	import LocationPublisher from '#lib/user/LocationPublisher.svelte';
+	import { syncPushAccount } from '#lib/native/push.ts';
 	import type { LayoutProps } from './$types';
 	let { children, data }: LayoutProps = $props();
 	let unreadCount = $state(0);
@@ -25,6 +26,10 @@
 	afterNavigate(() => {
 		preview.loadAccount(data.accountProfile, !!data.account);
 		refreshNotificationsOnNavigate();
+		// This also runs on mount. Permission prompts happen only through the settings opt-in button.
+		void syncPushAccount(authPage ? null : (data.account?.id ?? null)).catch(() => {
+			// Settings show delivery status and let the user retry without disrupting navigation.
+		});
 	});
 	const authPage = $derived(
 		[
@@ -95,6 +100,7 @@
 		window.addEventListener('user-sharing-change', sharingChanged);
 		return () => {
 			stopped = true;
+			void syncPushAccount(null).catch(() => {});
 			refreshNotificationsOnNavigate = () => {};
 			request?.abort();
 			clearInterval(interval);

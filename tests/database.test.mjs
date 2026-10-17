@@ -541,7 +541,7 @@ test('AI summary migration preserves reports and enforces generation/review cons
 		);
 		client
 			.prepare(
-				"UPDATE ai_summary_request SET status='completed',summary='Caller reports chest pain.',finished_at=? WHERE id='request'"
+				"UPDATE ai_summary_request SET status='completed',summary='Caller reports chest pain.',finished_at=max(created_at,?) WHERE id='request'"
 			)
 			.run(Date.now());
 		assert.throws(() =>

@@ -7,6 +7,7 @@
 	import { emptyProfile, getUserPreview } from '#lib/user/preview.svelte.ts';
 	import { accountRequest } from '#lib/user/account.ts';
 	import { getDeviceLocation, disableNativeSharing } from '#lib/native/location.ts';
+	import PushNotificationsControls from '#lib/user/PushNotificationsControls.svelte';
 	const preview = getUserPreview();
 	let privacyOpen = $state(false);
 	let deactivateConfirm = $state(false);
@@ -138,6 +139,7 @@
 	</div>
 	{#if locationMessage}<p class="user-notice mt-4" role="status">{locationMessage}</p>{/if}
 	{#if locationError}<p class="user-error mt-4" role="alert">{locationError}</p>{/if}
+	{#key page.data.account?.id}<PushNotificationsControls disabled={busy} />{/key}
 	{#if privacyOpen}<section
 			id="user-privacy-notice"
 			class="user-panel space-y-4"
@@ -159,8 +161,8 @@
 			</p>
 			<p class="user-copy">
 				Your profile changes are saved to your account. SOS and sharing updates create in-app
-				notifications. Incoming background push is not connected. Calls use the dispatcher's
-				separate phone system; this app does not place calls.
+				notifications. Android phone notifications require delivery setup and your opt-in. Calls use
+				the dispatcher's separate phone system; this app does not place calls.
 			</p>
 			<p class="user-copy">
 				Deactivation blocks account access and keeps existing records. It does not delete your

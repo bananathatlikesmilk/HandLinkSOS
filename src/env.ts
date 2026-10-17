@@ -1,6 +1,11 @@
 import { defineEnvVars } from '@sveltejs/kit/env';
 
 export const variables = defineEnvVars({
+	FIREBASE_SERVICE_ACCOUNT_FILE: {
+		description:
+			'Absolute path to the private Firebase service account JSON. Server only; never package in the APK.',
+		schema: (value) => value
+	},
 	OLLAMA_SUMMARY_MODEL: {
 		description:
 			'Local Ollama summary model. Defaults to qwen2.5:3b. Cloud models are not supported.',
