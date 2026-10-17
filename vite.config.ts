@@ -10,6 +10,7 @@ export default defineConfig({
 	plugins: [
 		tailwindcss(),
 		sveltekit({
+			paths: { origin: process.env.ORIGIN || undefined },
 			// Concurrent test servers must not replace the main app's generated private environment.
 			outDir: isolatedTest ? '.svelte-kit-tests' : '.svelte-kit',
 			compilerOptions: {

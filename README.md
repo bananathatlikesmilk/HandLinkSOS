@@ -8,7 +8,7 @@ Start Docker Desktop with Linux containers. Create `.env` from `.env.example` if
 docker compose up --build -d
 ```
 
-Open <http://localhost:3000>. Compose reads credentials from `.env`, sets the container database path, and overrides the development origin. For a different public URL, change `services.app.environment.ORIGIN` in `compose.yaml` to match it. Use HTTPS outside localhost for camera and location features.
+Open <http://localhost:3000>. Compose reads credentials from `.env`, sets the container database path, and overrides the development origin. For a different public URL, set `DOCKER_ORIGIN` in `.env` and rerun `docker compose up --build -d`. SvelteKit 3 embeds the server origin during the build, so changing it requires rebuilding. For a plain `docker build`, pass `--build-arg ORIGIN=https://your-domain.example` and set the same `ORIGIN` when running the image. Use HTTPS outside localhost for camera and location features.
 
 The container starts as a non-root user, applies the existing Drizzle migrations, then starts the production Node server. The named `handlink-data` volume holds a **new, separate database**, plus backups made before subsequent migrations. Your existing `local.db` is not copied into the image. `docker compose down` keeps this volume; `docker compose down -v` deletes it and its data.
 

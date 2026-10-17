@@ -10,9 +10,10 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 RUN npm_config_nodedir=/usr/local pnpm install --frozen-lockfile
 
 COPY . .
+ARG ORIGIN=http://localhost:3000
 RUN DATABASE_URL=/tmp/build.db \
     BETTER_AUTH_SECRET=build-only-placeholder-secret-do-not-use-in-production \
-    ORIGIN=http://localhost:3000 pnpm build
+    ORIGIN="$ORIGIN" pnpm build
 RUN pnpm prune --prod --ignore-scripts
 
 FROM node:22-alpine AS runtime
