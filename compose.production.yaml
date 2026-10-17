@@ -1,0 +1,35 @@
+services:
+  app:
+    image: bananathatlikesmilk/handlink-sos:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        ORIGIN: ${ORIGIN:?Set ORIGIN in .env}
+    init: true
+    expose:
+      - '3000'
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_URL: /app/data/local.db
+      ORIGIN: ${ORIGIN:?Set ORIGIN in .env}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
+      SMTP_HOST: ${SMTP_HOST:?Set SMTP_HOST in .env}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:?Set SMTP_USER in .env}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:?Set SMTP_PASSWORD in .env}
+      SMTP_FROM: ${SMTP_FROM:?Set SMTP_FROM in .env}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?Set CLOUDFLARE_TUNNEL_TOKEN in .env}
+    depends_on:
+      - app
+    restart: unless-stopped

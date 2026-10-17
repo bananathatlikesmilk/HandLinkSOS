@@ -29,6 +29,24 @@ docker compose down
 
 Admin provisioning still requires email verification and staff MFA. The image excludes local secrets, databases, Android files, and test artifacts. Docker Hub publishing uses the `DOCKER_USERNAME` and `DOCKER_PASSWORD` repository secrets and tags `<DOCKER_USERNAME>/handlink-sos`.
 
+### Hosting through Cloudflare Tunnel
+
+Use `compose.production.yaml` for the hosted app and tunnel. On the server, set `ORIGIN` to your public HTTPS URL, set `BETTER_AUTH_SECRET` and `CLOUDFLARE_TUNNEL_TOKEN`, and configure all five SMTP fields in `.env`. Port 465 uses implicit TLS; port 587 requires STARTTLS. Use your email provider's SMTP credentials and an authorized sender address.
+
+```sh
+docker compose -f compose.production.yaml up --build -d
+```
+
+This configuration keeps the existing `./data` database directory and forwards SMTP settings explicitly to the app. Compose's `.env` file supplies interpolation values; variables are not automatically available inside a container unless its service declares `environment` or `env_file`. Missing SMTP settings cause a clear configuration error before deployment. The tunnel token is passed only to `cloudflared`. Configure the tunnel's service URL as `http://app:3000`.
+
+When changing only SMTP values, recreate the app to load them; restarting an existing container keeps its old environment:
+
+```sh
+docker compose -f compose.production.yaml up -d --no-build --force-recreate app
+```
+
+If using the published image instead of building on the server, set the GitHub Actions repository variable `DOCKER_ORIGIN` to the same public HTTPS URL before publishing. SMTP credentials belong in the deployment environment and are supplied at runtime.
+
 AI summaries call Ollama at `127.0.0.1:11434`. With Docker's default bridge network, that address belongs to the container. To use Ollama on this computer without exposing its API, enable **host networking** in Docker Desktop Settings > Resources > Network. Replace `ports` in the Compose service with `network_mode: host`, then recreate the container. Requires Docker Desktop 4.34 or later. See [local AI setup](docs/ai-summaries.md) for model installation. Model inference is separate from building the web image.
 
 Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
