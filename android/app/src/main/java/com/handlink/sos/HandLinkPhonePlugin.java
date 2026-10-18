@@ -14,7 +14,7 @@ public class HandLinkPhonePlugin extends Plugin {
     public void openDialer(PluginCall call) {
         getActivity().runOnUiThread(() -> {
             try {
-                Intent intent = new Intent(Intent.ACTION_DIAL, Uri.parse("tel:"));
+                Intent intent = new Intent(Intent.ACTION_DIAL, Uri.parse("tel:911"));
                 getActivity().startActivity(intent);
                 call.resolve();
             } catch (ActivityNotFoundException | SecurityException exception) {

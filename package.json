@@ -18,6 +18,7 @@
 		"db:push": "drizzle-kit push",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "node scripts/migrate.mjs",
+		"db:seed": "node scripts/seed.ts",
 		"db:studio": "drizzle-kit studio",
 		"locations:expire": "node scripts/expire-locations.mjs",
 		"android:prepare": "node scripts/prepare-android.mjs",

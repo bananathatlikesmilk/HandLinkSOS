@@ -1,6 +1,11 @@
 import { relations, sql } from 'drizzle-orm';
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
+export const seedHistory = sqliteTable('seed_history', {
+	key: text('key').primaryKey(),
+	completedAt: integer('completed_at', { mode: 'timestamp_ms' }).notNull()
+});
+
 export const task = sqliteTable('task', {
 	id: text('id')
 		.primaryKey()

@@ -1,7 +1,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 
 const phone = registerPlugin<{ openDialer(): Promise<void> }>('HandLinkPhone');
-export const PHONE_DIALER_HREF = 'tel:';
+export const PHONE_DIALER_HREF = 'tel:911';
 export const nativeDialerAvailable = () => Capacitor.getPlatform() === 'android';
 export const dialerHandoffKey = (accountId: string, incidentId: string) =>
 	`handlink:sos:dialer:${accountId}:${incidentId}`;

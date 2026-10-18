@@ -34,7 +34,7 @@ COPY --from=build --chown=node:node /app/package.json ./package.json
 COPY --from=build --chown=node:node /app/drizzle ./drizzle
 COPY --from=build --chown=node:node /app/src/lib/server/db ./src/lib/server/db
 COPY --chown=root:root docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-COPY --chown=node:node scripts/migrate.mjs scripts/create-admin.mjs scripts/expire-locations.mjs scripts/start-server.mjs ./scripts/
+COPY --chown=node:node scripts/migrate.mjs scripts/create-admin.mjs scripts/seed.ts scripts/expire-locations.mjs scripts/start-server.mjs ./scripts/
 
 RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
     && chmod +x /usr/local/bin/docker-entrypoint.sh

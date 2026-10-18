@@ -26,7 +26,7 @@
 		try {
 			await openPhoneDialer();
 			if (!disposed && data.account?.id === accountId && data.incident?.id === incidentId)
-				notice = 'Phone dialer opened. Enter the emergency number and tap Call when ready.';
+				notice = 'Phone dialer opened with 911 filled in. Tap Call to place the call.';
 		} catch {
 			if (!disposed && data.account?.id === accountId && data.incident?.id === incidentId)
 				error = data.incident
@@ -75,8 +75,8 @@
 		HandLink sends SOS information to dispatchers. Calls use the dispatcher's separate phone system.
 	</p>
 	<p class="user-copy mt-4">
-		Open your phone dialer, enter your local emergency number and tap Call. No number has been
-		selected yet. HandLink does not place or connect the call.
+		Open your phone dialer with 911 filled in. You must tap Call to place the call. HandLink does
+		not call automatically or connect the call.
 	</p>
 	{#if native}
 		<button class="btn mt-6 w-full btn-primary" disabled={opening} onclick={openDialer}>

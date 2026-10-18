@@ -4,6 +4,18 @@ SQLite and the existing Better Auth tables remain in place. Authentication ident
 
 ## Apply and recover
 
+### One-time Docker admin seed
+
+Set `SEED_ADMIN_NAME`, `SEED_ADMIN_EMAIL`, and `SEED_ADMIN_PASSWORD` in the server's private `.env` before running `docker compose up` (or `docker compose -f compose.production.yaml up -d`). Use an unused email and a unique password of 12–128 characters. Do not commit these values. Rebuild or pull an image containing this change before starting it.
+
+Every container startup runs migrations, then `scripts/seed.ts`, then the server. Migration `0010_admin_seed_history` adds a `seed_history` table without changing existing data. The `initial-admin-v1` record commits in the same immediate transaction as the new admin and hashed credential. Concurrent startups recheck that record under the write lock. Once recorded, startup never seeds again or resets credentials, even if environment values change or are removed. The record belongs to the persistent database, not the container.
+
+If all seed settings are absent, startup skips seeding without recording completion. Partially configured or invalid settings, duplicate emails, and database failures stop startup without a partial seed. Existing accounts are never promoted, overwritten, or treated as a successful seed. Fix configuration and restart. The seed creates one admin, not a User-role account or sample records.
+
+After successful seeding, remove all three seed settings from `.env` and recreate the container to remove them from its environment. Verify the admin email at `/user/verify`, then sign in at `/admin/login` and set up the authenticator. Seeding sends no email and bypasses neither email verification nor MFA. `pnpm db:seed` can run the same seed manually after migrations.
+
+Keep the database volume when recreating containers; deleting it deletes both accounts and seed history. Do not delete the seed record to reset an admin password. Use account recovery instead. When rolling back application code, leave the additive table and record in place; older code ignores them. Restoring a backup also restores its seed state, so remove bootstrap credentials after setup.
+
 ### Create an admin account locally
 
 Run `pnpm admin:create` in the project terminal. Enter the admin name, email, and a password of 12–128 characters. Password entry is hidden and requires confirmation. This command requires access to the server and its configured database; it adds no public admin signup endpoint. It uses Zod validation, Drizzle transactions, and Better Auth password hashing. Existing accounts are never overwritten or promoted.

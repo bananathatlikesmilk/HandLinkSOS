@@ -11,7 +11,7 @@ import { hashPassword } from 'better-auth/crypto';
 import { z } from 'zod';
 import { user, account } from '../src/lib/server/db/schema.ts';
 
-const adminInput = z.strictObject({
+export const adminInput = z.strictObject({
 	name: z.string().trim().min(1).max(100),
 	email: z.string().trim().toLowerCase().max(254).pipe(z.email()),
 	password: z.string().min(12).max(128)
@@ -21,45 +21,45 @@ const adminInput = z.strictObject({
 export async function createAdmin(db, input) {
 	const values = adminInput.parse(input);
 	const password = await hashPassword(values.password);
-	return db.transaction(
-		(tx) => {
-			if (
-				tx
-					.select({ id: user.id })
-					.from(user)
-					.where(sql`lower(${user.email}) = ${values.email}`)
-					.get()
-			) {
-				throw new Error('This email already has an account. No account was changed.');
-			}
-			const id = randomUUID();
-			const now = new Date();
-			tx.insert(user)
-				.values({
-					id,
-					name: values.name,
-					email: values.email,
-					role: 'admin',
-					emailVerified: false,
-					createdAt: now,
-					updatedAt: now
-				})
-				.run();
-			tx.insert(account)
-				.values({
-					id: randomUUID(),
-					accountId: id,
-					providerId: 'credential',
-					userId: id,
-					password,
-					createdAt: now,
-					updatedAt: now
-				})
-				.run();
-			return { id, email: values.email };
-		},
-		{ behavior: 'immediate' }
-	);
+	return db.transaction((tx) => insertAdmin(tx, values, password), { behavior: 'immediate' });
+}
+
+// Call inside the caller's transaction so identity and credentials commit together.
+export function insertAdmin(tx, values, password) {
+	if (
+		tx
+			.select({ id: user.id })
+			.from(user)
+			.where(sql`lower(${user.email}) = ${values.email}`)
+			.get()
+	) {
+		throw new Error('This email already has an account. No account was changed.');
+	}
+	const id = randomUUID();
+	const now = new Date();
+	tx.insert(user)
+		.values({
+			id,
+			name: values.name,
+			email: values.email,
+			role: 'admin',
+			emailVerified: false,
+			createdAt: now,
+			updatedAt: now
+		})
+		.run();
+	tx.insert(account)
+		.values({
+			id: randomUUID(),
+			accountId: id,
+			providerId: 'credential',
+			userId: id,
+			password,
+			createdAt: now,
+			updatedAt: now
+		})
+		.run();
+	return { id, email: values.email };
 }
 
 async function main() {

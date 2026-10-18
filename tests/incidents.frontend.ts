@@ -104,7 +104,7 @@ test('cancel sends nothing; a real SOS reaches dispatcher confirmation and resol
 		await expect(page.getByRole('heading', { name: 'SOS sent', exact: true })).toBeVisible();
 		await expect(
 			page.getByRole('link', { name: 'Open phone dialer', exact: true })
-		).toHaveAttribute('href', 'tel:');
+		).toHaveAttribute('href', 'tel:911');
 		const own = await (await page.request.get('/api/incidents')).json();
 		expect(own.incidents).toHaveLength(1);
 		const { id, reference } = own.incidents[0];
@@ -189,7 +189,7 @@ test('lost SOS response can retry after reload without a duplicate incident', as
 	await expect(page.getByRole('heading', { name: 'SOS sent', exact: true })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Open phone dialer', exact: true })).toHaveAttribute(
 		'href',
-		'tel:'
+		'tel:911'
 	);
 	const db = database();
 	try {
@@ -217,7 +217,7 @@ test('phone help without a confirmed incident never claims SOS was sent', async 
 	await expect(page.getByRole('heading', { name: 'SOS sent', exact: true })).toHaveCount(0);
 	await expect(page.getByRole('link', { name: 'Open phone dialer', exact: true })).toHaveAttribute(
 		'href',
-		'tel:'
+		'tel:911'
 	);
 	await expect(page.getByText(/Incident reference:/)).toHaveCount(0);
 });
@@ -241,7 +241,7 @@ test('denied location never starts a countdown or submits SOS', async ({ page })
 	}
 });
 
-test('Android opens an empty dialer only after saved SOS; cancellation and refresh never launch it', async ({
+test('Android opens the 911 dialer only after saved SOS; cancellation and refresh never launch it', async ({
 	page
 }) => {
 	test.setTimeout(60000);
@@ -297,7 +297,7 @@ test('native dialer failure keeps SOS saved and allows a manual retry', async ({
 		).__handlinkNativeTest.denyDialer = false;
 	});
 	await page.getByRole('button', { name: 'Open phone dialer', exact: true }).click();
-	await expect(page.getByRole('status')).toContainText('Phone dialer opened.');
+	await expect(page.getByRole('status')).toContainText('Phone dialer opened with 911 filled in.');
 	await expect(page.getByRole('alert')).toHaveCount(0);
 });
 

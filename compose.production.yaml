@@ -19,6 +19,9 @@ services:
       SMTP_USER: ${SMTP_USER:?Set SMTP_USER in .env}
       SMTP_PASSWORD: ${SMTP_PASSWORD:?Set SMTP_PASSWORD in .env}
       SMTP_FROM: ${SMTP_FROM:?Set SMTP_FROM in .env}
+      SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
     volumes:
       - ./data:/app/data
     restart: unless-stopped

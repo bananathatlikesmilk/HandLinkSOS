@@ -29,4 +29,5 @@ if [ -e "$DATABASE_URL" ] && { [ ! -r "$DATABASE_URL" ] || [ ! -w "$DATABASE_URL
 fi
 
 node scripts/migrate.mjs
+node scripts/seed.ts
 exec "$@"
