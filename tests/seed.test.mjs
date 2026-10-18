@@ -31,7 +31,7 @@ test('admin seed commits once, hashes credentials, and never resets accounts on 
 		const identity = client.prepare('SELECT * FROM user').get();
 		assert.equal(identity.email, 'seed@example.com');
 		assert.equal(identity.role, 'admin');
-		assert.equal(identity.email_verified, 0);
+		assert.equal(identity.email_verified, 1);
 		assert.equal(identity.two_factor_enabled, 0);
 		const credential = client.prepare('SELECT * FROM account').get();
 		assert.equal(credential.user_id, identity.id);
@@ -94,6 +94,7 @@ test('seed failures roll back both credentials and marker and never promote an e
 			.run('existing', 'Existing', 'SEED@example.com', 'user');
 		await assert.rejects(seedAdmin(db, input), /already has an account/);
 		assert.equal(client.prepare('SELECT role FROM user').get().role, 'user');
+		assert.equal(client.prepare('SELECT email_verified FROM user').get().email_verified, 0);
 		assert.equal(client.prepare('SELECT count(*) AS n FROM seed_history').get().n, 0);
 		assert.equal(client.prepare('SELECT count(*) AS n FROM account').get().n, 0);
 	} finally {

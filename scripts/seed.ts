@@ -5,7 +5,7 @@ import Database from 'better-sqlite3';
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 import { hashPassword } from 'better-auth/crypto';
-import { seedHistory } from '../src/lib/server/db/schema.ts';
+import { seedHistory, user } from '../src/lib/server/db/schema.ts';
 import { adminInput, insertAdmin } from './create-admin.mjs';
 
 const ADMIN_SEED_KEY = 'initial-admin-v1';
@@ -23,7 +23,9 @@ export async function seedAdmin(db: BetterSQLite3Database, input?: unknown) {
 			if (tx.select().from(seedHistory).where(eq(seedHistory.key, ADMIN_SEED_KEY)).get()) {
 				return 'already-seeded';
 			}
-			insertAdmin(tx, values, password);
+			const created = insertAdmin(tx, values, password);
+			// The server operator provisions this bootstrap identity; public signup stays unverified.
+			tx.update(user).set({ emailVerified: true }).where(eq(user.id, created.id)).run();
 			tx.insert(seedHistory).values({ key: ADMIN_SEED_KEY, completedAt: new Date() }).run();
 			return 'seeded';
 		},
@@ -45,7 +47,7 @@ async function main() {
 		const result = await seedAdmin(drizzle(client), input);
 		if (result === 'seeded') {
 			console.log(
-				'Admin seeded once. Verify its email at /user/verify, then sign in at /admin/login.'
+				'Admin seeded once with email verified. Sign in at /admin/login and set up your authenticator.'
 			);
 		} else if (result === 'already-seeded') {
 			console.log('Admin seed already completed; no accounts changed.');
