@@ -96,7 +96,7 @@ public class HandLinkOverlayService extends Service {
         background.setStroke(dp(1), Color.rgb(219, 225, 181));
         container.setBackground(background);
         ImageButton open = new ImageButton(this);
-        open.setImageResource(R.mipmap.ic_launcher);
+        open.setImageResource(R.drawable.ic_floating_dots);
         open.setBackgroundColor(Color.TRANSPARENT);
         open.setContentDescription("Open HandLink dashboard");
         open.setPadding(dp(8), dp(8), dp(8), dp(8));
