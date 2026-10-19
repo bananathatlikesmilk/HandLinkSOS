@@ -47,7 +47,7 @@
 					body: JSON.stringify(
 						twoFactor
 							? { code, trustDevice: false }
-							: { email: email.trim(), password, rememberMe: false }
+							: { email: email.trim(), password, rememberMe: true }
 					)
 				}
 			);

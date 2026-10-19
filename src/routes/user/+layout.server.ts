@@ -1,4 +1,5 @@
-import { error } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
+import { resolve } from '$app/paths';
 import { eq } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import { emergencyContact, medicalProfile, profile } from '#lib/server/db/schema.ts';
@@ -20,6 +21,8 @@ export const load: LayoutServerLoad = (event) => {
 	if (!account) return { account: null, accountProfile: null, emailConfigured };
 	const saved = db.select().from(profile).where(eq(profile.userId, account.id)).get();
 	if (saved?.deactivatedAt) error(403, 'Account is deactivated.');
+	if (['/user', '/user/', '/user/login'].includes(event.url.pathname))
+		redirect(303, resolve('/user/dashboard'));
 	const medical = saved
 		? db.select().from(medicalProfile).where(eq(medicalProfile.profileId, saved.id)).get()
 		: undefined;

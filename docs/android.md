@@ -12,6 +12,12 @@ This project now includes a Capacitor 8 Android client (`com.handlink.sos`), nat
 
 A debug APK was built and its signature verified on 17 October 2026 using Java 21, Android SDK 36, and Gradle 8.14.3. Native Java/Kotlin compilation passed. The localhost release guard was exercised and correctly rejected a release pre-build. Physical-phone behavior, permission flows, and screen-off reliability still require device testing; compilation and simulated bridge tests do not establish those results.
 
+## Staying signed in
+
+User login saves a persistent, HttpOnly session cookie. Closing and reopening the app returns an authenticated User to the dashboard. The normal server session lasts seven days and renews with continued use; logout, password reset, account deactivation, session revocation, or clearing app data can require another login. No password is stored on the phone. Admin and Dispatcher login policies are unchanged.
+
+Deploy the updated web code and sign in once to replace an older session-only cookie. This change does not require a new APK. Browser restart tests verify persistent-cookie restoration and logout revocation; Android process-restart behavior still needs a physical-phone check.
+
 ## Diagnosing `ERR_SSL_PROTOCOL_ERROR`
 
 On 19 October 2026, the error was reproduced on a connected Samsung Note10+ running Android 12 and WebView 155. The installed APK targeted `https://thebois.fyi/user`. Other HTTPS sites loaded in the same app WebView, while HandLink failed with Chromium error `-107`. A separate HTTPS request from the phone also received `TLSV1_ALERT_ACCESS_DENIED`. This established that the failure was not limited to the app interface or authentication code.

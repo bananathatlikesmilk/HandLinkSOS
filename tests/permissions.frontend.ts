@@ -1,11 +1,49 @@
 import { expect, test, type Page } from '@playwright/test';
-import { login, provision } from './incident-fixture';
+import { login, password, provision } from './incident-fixture';
 import { installNativeBridge, type NativeTestState } from './native-fixture';
 
 const state = (page: Page) =>
 	page.evaluate(
 		() => (globalThis as unknown as { __handlinkNativeTest: NativeTestState }).__handlinkNativeTest
 	);
+
+test('User login survives a browser restart, skips welcome, and logout revokes the saved session', async ({
+	page,
+	browser
+}) => {
+	const account = await provision();
+	await page.addInitScript(() =>
+		localStorage.setItem('handlink:initial-device-permissions:v1', 'attempted')
+	);
+	await page.goto('/user/login');
+	await page.getByLabel('Email', { exact: true }).fill(account.email);
+	await page.getByLabel('Password', { exact: true }).fill(password);
+	await page.getByRole('button', { name: 'Log In', exact: true }).click();
+	await expect(page).toHaveURL('/user/dashboard');
+	const saved = await page.context().storageState();
+	const token = saved.cookies.find((cookie) => cookie.name.endsWith('session_token'));
+	expect(token?.httpOnly).toBe(true);
+	expect(token?.expires).toBeGreaterThan(Date.now() / 1000);
+	// Closing an app discards session-only cookies; restore only cookies saved to disk.
+	const restored = { ...saved, cookies: saved.cookies.filter((cookie) => cookie.expires > 0) };
+	const restarted = await browser.newContext({ storageState: restored });
+	try {
+		const reopened = await restarted.newPage();
+		await reopened.goto('/user');
+		await expect(reopened).toHaveURL('/user/dashboard');
+		await reopened.goto('/user/login');
+		await expect(reopened).toHaveURL('/user/dashboard');
+		await reopened.goto('/user/settings');
+		await reopened.getByRole('button', { name: 'Log out', exact: true }).click();
+		await expect(reopened).toHaveURL('/user/login');
+		// Even a previously saved cookie must fail after explicit logout revokes its DB session.
+		await restarted.addCookies(restored.cookies);
+		await reopened.goto('/user/dashboard');
+		await expect(reopened).toHaveURL('/user/login');
+	} finally {
+		await restarted.close();
+	}
+});
 
 test('initial permissions wait for a signed-in User, do not capture GPS, and do not repeat on reload', async ({
 	page
