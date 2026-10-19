@@ -26,7 +26,9 @@
 		try {
 			await openPhoneDialer();
 			if (!disposed && data.account?.id === accountId && data.incident?.id === incidentId)
-				notice = 'Phone dialer opened with 911 filled in. Tap Call to place the call.';
+				notice = native
+					? 'Phone dialer opened with 911 filled in. Tap Call to place the call.'
+					: 'Your browser was asked to open the phone dialer with 911. If it did not open, tap Open phone dialer.';
 		} catch {
 			if (!disposed && data.account?.id === accountId && data.incident?.id === incidentId)
 				error = data.incident
@@ -47,7 +49,7 @@
 			notice = 'Tap Open phone dialer to continue.';
 			return;
 		}
-		if (native && data.incident.status !== 'Resolved') void openDialer();
+		if (data.incident.status !== 'Resolved') void openDialer();
 	});
 	onDestroy(() => {
 		disposed = true;

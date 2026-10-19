@@ -7,6 +7,12 @@ export const dialerHandoffKey = (accountId: string, incidentId: string) =>
 	`handlink:sos:dialer:${accountId}:${incidentId}`;
 
 export async function openPhoneDialer(): Promise<void> {
-	if (!nativeDialerAvailable()) throw new Error('Use the phone dialer link on this device.');
-	await phone.openDialer();
+	if (nativeDialerAvailable()) {
+		await phone.openDialer();
+		return;
+	}
+	// Browsers may require a fresh user gesture; the call page also keeps a manual link.
+	const link = document.createElement('a');
+	link.href = PHONE_DIALER_HREF;
+	link.click();
 }

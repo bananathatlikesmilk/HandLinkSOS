@@ -274,6 +274,47 @@ test('Android opens the 911 dialer only after saved SOS; cancellation and refres
 	await expect.poll(attempts).toBe(1);
 });
 
+test('web requests the 911 dialer once after saved SOS and keeps a manual fallback', async ({
+	page
+}) => {
+	await page.context().grantPermissions(['geolocation']);
+	await page.context().setGeolocation({ latitude: 14.5995, longitude: 120.9842, accuracy: 10 });
+	const caller = await provision();
+	await login(page.request, caller);
+	await page.addInitScript(() => {
+		const state = globalThis as unknown as { __dialerRequests: string[] };
+		state.__dialerRequests = [];
+		const originalClick = HTMLAnchorElement.prototype.click;
+		HTMLAnchorElement.prototype.click = function () {
+			// Intercept external phone links: tests must never launch a real emergency call.
+			if (this.protocol === 'tel:') {
+				state.__dialerRequests.push(this.href);
+				return;
+			}
+			originalClick.call(this);
+		};
+	});
+	const attempts = () =>
+		page.evaluate(() => (globalThis as unknown as { __dialerRequests: string[] }).__dialerRequests);
+	await page.goto(`/user/sos?profile=${caller.profileId}`);
+	await page.getByRole('button', { name: 'Cancel SOS', exact: true }).click();
+	await expect(page.getByRole('heading', { name: 'SOS cancelled', exact: true })).toBeVisible();
+	expect(await attempts()).toEqual([]);
+	await page.getByRole('link', { name: 'Back to dashboard', exact: true }).click();
+	await page.getByRole('button', { name: 'Start SOS for Casey Reyes', exact: true }).click();
+	await expect(page).toHaveURL(/\/user\/call\?incident=/, { timeout: 15000 });
+	await expect.poll(attempts).toEqual(['tel:911']);
+	await expect(page.getByRole('status')).toContainText('If it did not open');
+	await expect(page.getByRole('link', { name: 'Open phone dialer', exact: true })).toHaveAttribute(
+		'href',
+		'tel:911'
+	);
+	expect((await (await page.request.get('/api/incidents')).json()).incidents).toHaveLength(1);
+	await page.reload();
+	await expect(page.getByRole('heading', { name: 'SOS sent', exact: true })).toBeVisible();
+	expect(await attempts()).toEqual([]);
+});
+
 test('native dialer failure keeps SOS saved and allows a manual retry', async ({ page }) => {
 	test.setTimeout(45000);
 	const caller = await provision();
