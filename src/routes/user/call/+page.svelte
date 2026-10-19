@@ -26,9 +26,7 @@
 		try {
 			await openPhoneDialer();
 			if (!disposed && data.account?.id === accountId && data.incident?.id === incidentId)
-				notice = native
-					? 'Phone dialer opened with 911 filled in. Tap Call to place the call.'
-					: 'Your browser was asked to open the phone dialer with 911. If it did not open, tap Open phone dialer.';
+				notice = 'Phone dialer opened with 911 filled in. Tap Call to place the call.';
 		} catch {
 			if (!disposed && data.account?.id === accountId && data.incident?.id === incidentId)
 				error = data.incident
@@ -49,7 +47,7 @@
 			notice = 'Tap Open phone dialer to continue.';
 			return;
 		}
-		if (data.incident.status !== 'Resolved') void openDialer();
+		if (native && data.incident.status !== 'Resolved') void openDialer();
 	});
 	onDestroy(() => {
 		disposed = true;
@@ -86,13 +84,13 @@
 			{opening ? 'Opening phone dialer...' : 'Open phone dialer'}
 		</button>
 	{:else}
-		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- The phone URI opens an external protocol, not an app route. -->
+		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- The Android intent opens an external dial screen, not an app route. -->
 		<a class="btn mt-6 w-full btn-primary" href={PHONE_DIALER_HREF}>
 			<Phone size={19} aria-hidden="true" /> Open phone dialer
 		</a>
 		<p class="user-copy mt-3">
-			Your device or browser may require a tap to open the Phone app. If this link does not work,
-			open the Phone app yourself.
+			On supported Android browsers, this button opens the dial screen only. If it does not work,
+			open your Phone app and enter 911 yourself.
 		</p>
 	{/if}
 	{#if error}<p class="user-error mt-4" role="alert">{error}</p>{/if}

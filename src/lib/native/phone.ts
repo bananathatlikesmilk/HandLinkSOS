@@ -1,18 +1,14 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 
 const phone = registerPlugin<{ openDialer(): Promise<void> }>('HandLinkPhone');
-export const PHONE_DIALER_HREF = 'tel:911';
+// Request Android's dial screen explicitly; generic tel links can invoke a calling handler.
+export const PHONE_DIALER_HREF =
+	'intent:911#Intent;scheme=tel;action=android.intent.action.DIAL;end';
 export const nativeDialerAvailable = () => Capacitor.getPlatform() === 'android';
 export const dialerHandoffKey = (accountId: string, incidentId: string) =>
 	`handlink:sos:dialer:${accountId}:${incidentId}`;
 
 export async function openPhoneDialer(): Promise<void> {
-	if (nativeDialerAvailable()) {
-		await phone.openDialer();
-		return;
-	}
-	// Browsers may require a fresh user gesture; the call page also keeps a manual link.
-	const link = document.createElement('a');
-	link.href = PHONE_DIALER_HREF;
-	link.click();
+	if (!nativeDialerAvailable()) throw new Error('Open your Phone app manually on this device.');
+	await phone.openDialer();
 }

@@ -104,7 +104,7 @@ test('cancel sends nothing; a real SOS reaches dispatcher confirmation and resol
 		await expect(page.getByRole('heading', { name: 'SOS sent', exact: true })).toBeVisible();
 		await expect(
 			page.getByRole('link', { name: 'Open phone dialer', exact: true })
-		).toHaveAttribute('href', 'tel:911');
+		).toHaveAttribute('href', 'intent:911#Intent;scheme=tel;action=android.intent.action.DIAL;end');
 		const own = await (await page.request.get('/api/incidents')).json();
 		expect(own.incidents).toHaveLength(1);
 		const { id, reference } = own.incidents[0];
@@ -189,7 +189,7 @@ test('lost SOS response can retry after reload without a duplicate incident', as
 	await expect(page.getByRole('heading', { name: 'SOS sent', exact: true })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Open phone dialer', exact: true })).toHaveAttribute(
 		'href',
-		'tel:911'
+		'intent:911#Intent;scheme=tel;action=android.intent.action.DIAL;end'
 	);
 	const db = database();
 	try {
@@ -217,7 +217,7 @@ test('phone help without a confirmed incident never claims SOS was sent', async 
 	await expect(page.getByRole('heading', { name: 'SOS sent', exact: true })).toHaveCount(0);
 	await expect(page.getByRole('link', { name: 'Open phone dialer', exact: true })).toHaveAttribute(
 		'href',
-		'tel:911'
+		'intent:911#Intent;scheme=tel;action=android.intent.action.DIAL;end'
 	);
 	await expect(page.getByText(/Incident reference:/)).toHaveCount(0);
 });
@@ -274,7 +274,7 @@ test('Android opens the 911 dialer only after saved SOS; cancellation and refres
 	await expect.poll(attempts).toBe(1);
 });
 
-test('web requests the 911 dialer once after saved SOS and keeps a manual fallback', async ({
+test('web never opens phone links automatically and offers only an explicit Android dial action', async ({
 	page
 }) => {
 	await page.context().grantPermissions(['geolocation']);
@@ -287,7 +287,7 @@ test('web requests the 911 dialer once after saved SOS and keeps a manual fallba
 		const originalClick = HTMLAnchorElement.prototype.click;
 		HTMLAnchorElement.prototype.click = function () {
 			// Intercept external phone links: tests must never launch a real emergency call.
-			if (this.protocol === 'tel:') {
+			if (this.protocol === 'tel:' || this.protocol === 'intent:') {
 				state.__dialerRequests.push(this.href);
 				return;
 			}
@@ -303,11 +303,11 @@ test('web requests the 911 dialer once after saved SOS and keeps a manual fallba
 	await page.getByRole('link', { name: 'Back to dashboard', exact: true }).click();
 	await page.getByRole('button', { name: 'Start SOS for Casey Reyes', exact: true }).click();
 	await expect(page).toHaveURL(/\/user\/call\?incident=/, { timeout: 15000 });
-	await expect.poll(attempts).toEqual(['tel:911']);
-	await expect(page.getByRole('status')).toContainText('If it did not open');
+	expect(await attempts()).toEqual([]);
+	await expect(page.getByRole('status')).toHaveCount(0);
 	await expect(page.getByRole('link', { name: 'Open phone dialer', exact: true })).toHaveAttribute(
 		'href',
-		'tel:911'
+		'intent:911#Intent;scheme=tel;action=android.intent.action.DIAL;end'
 	);
 	expect((await (await page.request.get('/api/incidents')).json()).incidents).toHaveLength(1);
 	await page.reload();
