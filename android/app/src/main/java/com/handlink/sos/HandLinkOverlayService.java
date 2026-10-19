@@ -142,7 +142,6 @@ public class HandLinkOverlayService extends Service {
         bubble = container;
     }
 
-    @Override public void onTaskRemoved(Intent rootIntent) { stopSelf(); }
     @Override public void onDestroy() {
         active = false;
         message = "Floating button is off.";

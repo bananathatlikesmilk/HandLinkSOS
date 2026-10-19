@@ -45,7 +45,7 @@
         <service
             android:name=".HandLinkOverlayService"
             android:exported="false"
-            android:stopWithTask="true"
+            android:stopWithTask="false"
             android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="User-enabled, visible floating shortcut to the HandLink dashboard; no automatic emergency actions or data capture." />
