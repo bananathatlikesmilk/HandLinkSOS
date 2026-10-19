@@ -15,7 +15,7 @@
 			email: data.account.email,
 			role: data.account.role
 		}}
-		>{#if page.url.pathname === '/dispatch' || page.url.pathname === '/dispatch/security' || page.url.pathname === '/dispatch/reports'}
+		>{#if page.url.pathname === '/dispatch' || page.url.pathname === '/dispatch/security' || page.url.pathname === '/dispatch/reports' || page.url.pathname === '/dispatch/profile'}
 			{@render children()}
 		{:else}<section class="panel">
 				<h1 class="page-heading">Dispatcher workspace</h1>

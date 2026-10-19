@@ -9,6 +9,8 @@ test('entry and login screens have no role selector or demo wording', async ({ p
 		await expect(page.getByRole('radio')).toHaveCount(0);
 		await expect(page.locator('body')).not.toContainText('Frontend preview');
 		await expect(page.locator('form')).toHaveAttribute('method', 'POST');
+		await expect(page.locator('input[autocomplete="current-password"]')).toHaveCount(1);
+		await expect(page.getByLabel('Re-password', { exact: true })).toHaveCount(0);
 	}
 });
 
@@ -28,7 +30,6 @@ test('unknown credentials never open a dashboard', async ({ page }) => {
 	await page.waitForLoadState('networkidle');
 	await page.getByLabel('Email', { exact: true }).fill('unknown@example.com');
 	await page.getByLabel('Password', { exact: true }).fill('not-a-real-password');
-	await page.getByLabel('Re-password', { exact: true }).fill('not-a-real-password');
 	await page.getByRole('button', { name: 'Log In', exact: true }).click();
 	await expect(page.getByRole('alert')).toBeVisible();
 	await expect(page).toHaveURL('/user/login');

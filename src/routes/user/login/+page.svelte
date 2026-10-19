@@ -4,7 +4,6 @@
 	import { ArrowLeft, Eye, EyeOff } from '@lucide/svelte';
 	let email = $state('');
 	let password = $state('');
-	let repeatedPassword = $state('');
 	let reveal = $state(false);
 	let error = $state('');
 	let busy = $state(false);
@@ -29,7 +28,6 @@
 			);
 		}
 		password = '';
-		repeatedPassword = '';
 		code = '';
 		await invalidateAll();
 		await goto(resolve('/user/dashboard'));
@@ -39,10 +37,6 @@
 		event.preventDefault();
 		if (busy) return;
 		error = '';
-		if (!twoFactor && password !== repeatedPassword) {
-			error = 'Passwords do not match.';
-			return;
-		}
 		busy = true;
 		try {
 			const response = await fetch(
@@ -70,7 +64,6 @@
 			if (result.twoFactorRedirect) {
 				twoFactor = true;
 				password = '';
-				repeatedPassword = '';
 				return;
 			}
 			await finishLogin();
@@ -117,22 +110,9 @@
 					required
 				/></label
 			>
-			<label class="user-field" for="login-repeat"
-				>Re-password<input
-					id="login-repeat"
-					class="input"
-					type={reveal ? 'text' : 'password'}
-					bind:value={repeatedPassword}
-					autocomplete="off"
-					placeholder="Re-enter your password"
-					minlength="12"
-					maxlength="128"
-					required
-				/></label
-			>
 			<div class="login-tools">
 				<button type="button" class="btn btn-ghost btn-sm" onclick={() => (reveal = !reveal)}
-					>{#if reveal}<EyeOff size={17} />Hide passwords{:else}<Eye size={17} />Show passwords{/if}</button
+					>{#if reveal}<EyeOff size={17} />Hide password{:else}<Eye size={17} />Show password{/if}</button
 				><a href={resolve('/user/forgot-password')}>Forgot password?</a>
 			</div>
 		{:else}

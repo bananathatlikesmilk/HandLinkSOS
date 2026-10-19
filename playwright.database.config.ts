@@ -11,6 +11,7 @@ export default defineConfig({
 	testMatch: [
 		'tests/profile.api.ts',
 		'tests/accounts.api.ts',
+		'tests/staff-profile.frontend.ts',
 		'tests/incidents.api.ts',
 		'tests/sos-consent.api.ts',
 		'tests/sos-consent.frontend.ts',

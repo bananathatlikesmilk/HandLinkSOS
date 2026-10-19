@@ -3,7 +3,16 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { Activity, FileText, LogOut, Menu, ShieldCheck, Users, X } from '@lucide/svelte';
+	import {
+		Activity,
+		FileText,
+		LogOut,
+		Menu,
+		ShieldCheck,
+		UserRound,
+		Users,
+		X
+	} from '@lucide/svelte';
 	import StaffBrand from './StaffBrand.svelte';
 	let {
 		role = 'dispatch',
@@ -41,6 +50,11 @@
 		...(role === 'admin'
 			? [{ href: '/admin/accounts' as const, label: 'Manage accounts', icon: Users }]
 			: []),
+		{
+			href: role === 'admin' ? ('/admin/profile' as const) : ('/dispatch/profile' as const),
+			label: 'My profile',
+			icon: UserRound
+		},
 		{
 			href: role === 'admin' ? ('/admin/security' as const) : ('/dispatch/security' as const),
 			label: 'Account security',

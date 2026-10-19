@@ -28,7 +28,6 @@ test('real User login, profile saving, reload and logout work', async ({ page })
 	await page.waitForLoadState('networkidle');
 	await page.getByLabel('Email', { exact: true }).fill(account.email);
 	await page.getByLabel('Password', { exact: true }).fill(account.password);
-	await page.getByLabel('Re-password', { exact: true }).fill(account.password);
 	await page.getByRole('button', { name: 'Log In', exact: true }).click();
 	await expect(page).toHaveURL('/user/dashboard');
 	const signedIn = page.getByRole('region', { name: 'Signed-in account', exact: true });
