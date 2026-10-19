@@ -71,12 +71,9 @@
 	{:else}
 		<h1 class="user-title">Call through your phone</h1>
 	{/if}
+	<p class="user-copy mt-4">SOS shares information. Phone calls use a separate system.</p>
 	<p class="user-copy mt-4">
-		HandLink sends SOS information to dispatchers. Calls use the dispatcher's separate phone system.
-	</p>
-	<p class="user-copy mt-4">
-		Open your phone dialer with 911 filled in. You must tap Call to place the call. HandLink does
-		not call automatically or connect the call.
+		Open the dialer with 911 ready. You must tap Call. HandLink never calls automatically.
 	</p>
 	{#if native}
 		<button class="btn mt-6 w-full btn-primary" disabled={opening} onclick={openDialer}>
@@ -89,8 +86,7 @@
 			<Phone size={19} aria-hidden="true" /> Open phone dialer
 		</a>
 		<p class="user-copy mt-3">
-			On supported Android browsers, this button opens the dial screen only. If it does not work,
-			open your Phone app and enter 911 yourself.
+			Supported Android browsers only. Otherwise, open your Phone app and enter 911.
 		</p>
 	{/if}
 	{#if error}<p class="user-error mt-4" role="alert">{error}</p>{/if}

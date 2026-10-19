@@ -140,8 +140,7 @@
 		<p class="user-copy mt-2">Scan the verified code of someone you trust.</p>
 	</header>
 	<p class="user-notice">
-		Scanning requests access. The profile owner must approve your request before you can send SOS
-		for them.
+		Scanning sends a request. Their approval is required before you can send SOS for them.
 	</p>
 	{#if !hasProfile}
 		<section class="user-panel space-y-4">
@@ -153,10 +152,7 @@
 		<section class="user-panel space-y-4" role="status">
 			<UserPlus size={28} />
 			<h2 class="text-lg font-semibold">Request sent to {connection.ownerName}</h2>
-			<p class="user-copy">
-				Waiting for approval. Ask this person to review your request in Profiles. You can check its
-				status in your Profiles page.
-			</p>
+			<p class="user-copy">Waiting for approval. Check the request in Profiles.</p>
 		</section>
 	{:else}
 		<section class="user-panel space-y-5" aria-labelledby="scanner-heading">
@@ -203,8 +199,7 @@
 				<UserPlus size={28} />
 				<h2 id="found-heading" class="text-lg font-semibold">Invitation found</h2>
 				<p class="user-copy">
-					Only continue if you received this code from someone you trust. Your name and relationship
-					will appear in their approval request.
+					Continue only with someone you trust. They will see your name and relationship.
 				</p>
 				<form class="space-y-4" onsubmit={requestAccess}>
 					<label class="user-field"

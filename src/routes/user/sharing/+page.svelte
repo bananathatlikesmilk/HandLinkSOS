@@ -229,9 +229,7 @@
 <svelte:head><title>Share location · HandLink</title></svelte:head>
 <div class="sharing-screen">
 	<h1 class="user-title text-center">Share location to your circle</h1>
-	<p class="user-copy mt-4 text-center">
-		Choose who can view your location and how long to share it.
-	</p>
+	<p class="user-copy mt-4 text-center">Choose recipients and a sharing timer.</p>
 	<div class="sharing-symbol"><MapPin size={42} strokeWidth={1.1} /></div>
 	{#if loading}<p class="user-copy mt-6" role="status">Loading location sharing…</p>
 	{:else if active}
@@ -295,8 +293,7 @@
 					</p>{/each}
 			</fieldset>
 			<p class="user-copy text-sm">
-				Emergency contacts need a verified linked app account. If unavailable here, add them through
-				QR approval.
+				Contacts need a verified app account. Missing someone? Add them by QR.
 			</p>
 			<a class="link text-sm" href={resolve('/user/profiles')}>Manage trusted profiles</a>
 			<button
@@ -308,10 +305,7 @@
 						? 'Retry sharing request'
 						: 'Share location'}</button
 			>
-			{#if pending}<p class="user-copy text-sm">
-					A request may have been saved. Retry checks the same request without creating a second
-					session.
-				</p>{/if}
+			{#if pending}<p class="user-copy text-sm">Retry safely checks your existing request.</p>{/if}
 		</form>
 	{/if}
 	{#if error}<p class="user-error mt-4" role="alert">{error}</p>
@@ -328,10 +322,9 @@
 	<div class="user-notice mt-5">
 		<Clock3 size={18} />
 		<p>
-			Browser updates require this app to stay open and visible. In the Android app, explicitly
-			enable screen-off updates to continue sharing with an ongoing notification. Updates occur
-			about every five minutes. Timer expiry creates in-app notifications; incoming background push
-			is not connected.
+			Browser: keep this page visible. Android: enable screen-off updates for background sharing and
+			an ongoing notification. Updates run about every five minutes. Check Notifications for sharing
+			updates.
 		</p>
 	</div>
 </div>

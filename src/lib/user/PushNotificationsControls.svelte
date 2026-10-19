@@ -85,10 +85,7 @@
 <section class="user-panel mt-6 space-y-3" aria-labelledby="push-notifications-heading">
 	<h2 id="push-notifications-heading">Phone notifications</h2>
 	{#if native}
-		<p class="user-copy text-sm">
-			Choose whether this Android phone receives notifications for your signed-in account. Enabling
-			asks for notification permission.
-		</p>
+		<p class="user-copy text-sm">Receive alerts on this phone. Requires notification permission.</p>
 		<p class="user-copy text-sm" role="status">
 			{loading
 				? 'Checking phone notifications…'
@@ -97,7 +94,7 @@
 					: 'Phone notifications disabled.'}
 		</p>
 		{#if !loading && !configured}<p class="user-notice text-sm">
-				Phone notification delivery is not configured yet. In-app notifications remain available.
+				Phone alerts unavailable. Check in-app Notifications.
 			</p>{/if}
 		<button
 			class="btn w-full btn-outline"
@@ -111,13 +108,11 @@
 					: 'Enable phone notifications'}
 		</button>
 		<p class="user-copy text-sm">
-			Android permissions, battery restrictions, or force-stopping the app can delay or block
-			delivery. Open HandLink to check saved updates.
+			Battery settings or force-stopping can block alerts. Check HandLink for saved updates.
 		</p>
 	{:else}
 		<p class="user-copy text-sm">
-			Phone notifications require the HandLink Android app. In this browser, open Notifications to
-			check saved updates.
+			Phone alerts require the Android app. Use Notifications for saved updates.
 		</p>
 	{/if}
 	{#if error || statusError}<p class="user-error text-sm" role="alert">{error || statusError}</p>

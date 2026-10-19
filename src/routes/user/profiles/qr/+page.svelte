@@ -142,8 +142,8 @@
 				>
 			</p>
 			<p class="user-copy text-sm">
-				This code works once and contains no personal information. Scanning creates a request. You
-				must approve it in Profiles before anyone can send SOS for you.
+				Single-use code; no personal details. Approve requests in Profiles before others can send
+				SOS for you.
 			</p>
 			<button class="btn w-full btn-outline" disabled={busy} onclick={lockQr}
 				>Hide and lock QR code</button

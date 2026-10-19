@@ -75,15 +75,13 @@
 
 <section class="user-panel mt-6" aria-labelledby="permissions-heading" aria-busy={working}>
 	<h2 id="permissions-heading" class="text-base font-medium">App permissions</h2>
-	<p class="user-copy mt-2 text-sm">
-		Control access in your device settings. You can change your choices at any time.
-	</p>
+	<p class="user-copy mt-2 text-sm">Manage location, camera, and the floating button.</p>
 	<div class="permission-row">
 		<div class="permission-details">
 			<MapPin size={20} aria-hidden="true" />
 			<div>
 				<h3>Location access</h3>
-				<p>{accessLabel(status?.location)}. Used for SOS and location sharing.</p>
+				<p>{accessLabel(status?.location)}. For SOS and sharing.</p>
 			</div>
 		</div>
 		<button
@@ -97,7 +95,7 @@
 			<Camera size={20} aria-hidden="true" />
 			<div>
 				<h3>Camera access</h3>
-				<p>{accessLabel(status?.camera)}. Used to scan trusted profile QR codes.</p>
+				<p>{accessLabel(status?.camera)}. For QR scanning.</p>
 			</div>
 		</div>
 		<button
@@ -118,10 +116,9 @@
 							: 'Permission not allowed.'
 						: 'Available in the Android app only.'}
 				</p>
-				<p>The floating button opens your dashboard. It does not send SOS or place calls.</p>
+				<p>Dashboard shortcut only. No SOS or calls. Hide from Settings or its notification.</p>
 				{#if native}<p>
-						Floating button: {status?.overlayActive ? 'On' : 'Off'}. Android may also ask for
-						notification permission.
+						Floating button: {status?.overlayActive ? 'On' : 'Off'}. Notifications required.
 					</p>{/if}
 			</div>
 		</div>
@@ -160,7 +157,7 @@
 				disabled={disabled || working}
 				onclick={() => run(openApplicationSettings)}>Open app settings</button
 			>{:else}<p class="user-copy text-xs">
-				If access is blocked, use your browser's site settings to allow location or camera.
+				Blocked? Allow access in your browser's site settings.
 			</p>{/if}
 	</div>
 	{#if status?.message}<p class="user-copy mt-3 text-sm" role="status">{status.message}</p>{/if}

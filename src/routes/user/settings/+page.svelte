@@ -102,30 +102,24 @@
 				<h2 id="privacy-notice-title">Privacy and security</h2>
 			</div>
 			<p class="user-copy">
-				SOS alerts save your device location and the selected person's profile for authorized
-				dispatchers. Location sharing lets you choose approved recipients and a timer. You can stop
-				sharing at any time.
+				SOS saves your location and the selected profile for authorized dispatchers. You choose
+				sharing recipients and duration, and can stop anytime.
 			</p>
 			<p class="user-copy">
-				Share only information you are comfortable providing. A trusted profile can use SOS on your
-				behalf only after you approve their QR request. Reciprocal SOS access needs separate
-				approval.
+				Share only what you choose. Sending SOS for someone requires their QR approval. Each
+				direction needs separate approval.
 			</p>
 			<p class="user-copy">
-				Your profile changes are saved to your account. SOS and sharing updates create in-app
-				notifications. Android phone notifications require delivery setup and your opt-in. Calls use
-				the dispatcher's separate phone system; this app does not place calls.
+				Profile changes are saved. SOS and sharing updates appear in Notifications. Android phone
+				alerts require setup and permission. Calls use a separate phone system; HandLink never
+				calls.
 			</p>
-			<p class="user-copy">
-				Deactivation blocks account access and keeps existing records. It does not delete your
-				profile.
-			</p>
+			<p class="user-copy">Deactivation blocks access. Your profile and records are kept.</p>
 		</section>{/if}
 	{#key page.data.account?.id}<PushNotificationsControls disabled={busy} />{/key}
 	<div class="user-notice mt-6">
-		Browser location updates require this app to stay visible. In the Android app, enable screen-off
-		updates from Share location for an ongoing location notification. The optional floating button
-		opens your dashboard over other apps and can be hidden at any time.
+		Keep this page visible for browser location updates. On Android, enable screen-off updates in
+		Share location.
 	</div>
 	<section class="account-status user-panel">
 		<UserRound size={23} strokeWidth={1.3} />
@@ -167,8 +161,7 @@
 				>
 			</div>
 			<p class="user-copy mt-3">
-				You will be logged out and account access will be blocked. Your profile and existing records
-				will be kept.
+				You will be logged out and lose account access. Your profile and records will be kept.
 			</p>
 			<div class="user-actions">
 				<button class="btn btn-primary" disabled={busy} onclick={deactivate}

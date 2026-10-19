@@ -95,8 +95,8 @@
 <section class="user-panel mt-5 space-y-3" aria-label="Android screen-off updates">
 	<h2 class="font-medium">Android screen-off updates</h2>
 	<p class="user-copy text-sm">
-		Enable updates while the screen is off. Android requires an ongoing notification and location
-		permission. Battery restrictions or force-stopping the app can interrupt updates.
+		Share with the screen off. Requires location permission and an ongoing notification. Battery
+		settings or force-stopping can interrupt updates.
 	</p>
 	<p class="user-copy text-sm" role="status">{message}</p>
 	{#if error}<p class="user-error text-sm" role="alert">{error}</p>{/if}
@@ -112,6 +112,6 @@
 				: 'Enable screen-off updates'}
 	</button>
 	<p class="user-copy text-sm">
-		Disabling screen-off updates keeps your sharing session active. Use Stop sharing to end access.
+		Turning this off does not end sharing. Use Stop sharing to end access.
 	</p>
 </section>

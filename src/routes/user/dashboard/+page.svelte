@@ -79,7 +79,7 @@
 			></button
 		>
 		<p class="user-copy mt-5 text-center">
-			Your device location is sent with your SOS. You have five seconds to cancel.
+			SOS includes your location. Cancel within five seconds.
 		</p>
 	</div>
 	<section class="trusted-section" aria-labelledby="trusted-title">
@@ -96,7 +96,7 @@
 					><span>{person.name}</span><Siren size={17} strokeWidth={1.4} /></button
 				>{:else}<p class="user-copy">No approved trusted profiles available.</p>{/each}
 		</div>
-		<p class="trusted-help">You can send SOS on behalf of approved trusted profiles.</p>
+		<p class="trusted-help">Send SOS for approved profiles.</p>
 	</section>
 	<section class="user-panel mt-6 space-y-3" aria-labelledby="recent-sos-title">
 		<h2 id="recent-sos-title">Your recent SOS alerts</h2>

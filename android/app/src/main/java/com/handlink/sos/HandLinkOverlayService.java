@@ -104,15 +104,9 @@ public class HandLinkOverlayService extends Service {
             try { startActivity(dashboardIntent()); }
             catch (RuntimeException exception) { message = "Open HandLink from its app icon."; }
         });
-        ImageButton close = new ImageButton(this);
-        close.setImageResource(android.R.drawable.ic_menu_close_clear_cancel);
-        close.setBackgroundColor(Color.TRANSPARENT);
-        close.setContentDescription("Hide HandLink floating button");
-        close.setOnClickListener(view -> stopSelf());
         container.addView(open, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        container.addView(close, new LinearLayout.LayoutParams(dp(48), dp(48)));
         int type = Build.VERSION.SDK_INT >= 26 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
-        WindowManager.LayoutParams params = new WindowManager.LayoutParams(dp(96), dp(48), type,
+        WindowManager.LayoutParams params = new WindowManager.LayoutParams(dp(48), dp(48), type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL, PixelFormat.TRANSLUCENT);
         params.gravity = Gravity.TOP | Gravity.START;
         params.x = dp(16);
