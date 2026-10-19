@@ -92,14 +92,14 @@ public class HandLinkOverlayService extends Service {
         container.setOrientation(LinearLayout.HORIZONTAL);
         GradientDrawable background = new GradientDrawable();
         background.setColor(Color.rgb(35, 39, 23));
-        background.setCornerRadius(dp(28));
+        background.setCornerRadius(dp(24));
         background.setStroke(dp(1), Color.rgb(219, 225, 181));
         container.setBackground(background);
         ImageButton open = new ImageButton(this);
         open.setImageResource(R.drawable.ic_floating_dots);
         open.setBackgroundColor(Color.TRANSPARENT);
         open.setContentDescription("Open HandLink dashboard");
-        open.setPadding(dp(8), dp(8), dp(8), dp(8));
+        open.setPadding(dp(12), dp(12), dp(12), dp(12));
         open.setOnClickListener(view -> {
             try { startActivity(dashboardIntent()); }
             catch (RuntimeException exception) { message = "Open HandLink from its app icon."; }
@@ -109,10 +109,10 @@ public class HandLinkOverlayService extends Service {
         close.setBackgroundColor(Color.TRANSPARENT);
         close.setContentDescription("Hide HandLink floating button");
         close.setOnClickListener(view -> stopSelf());
-        container.addView(open, new LinearLayout.LayoutParams(dp(56), dp(56)));
-        container.addView(close, new LinearLayout.LayoutParams(dp(48), dp(56)));
+        container.addView(open, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        container.addView(close, new LinearLayout.LayoutParams(dp(48), dp(48)));
         int type = Build.VERSION.SDK_INT >= 26 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
-        WindowManager.LayoutParams params = new WindowManager.LayoutParams(dp(104), dp(56), type,
+        WindowManager.LayoutParams params = new WindowManager.LayoutParams(dp(96), dp(48), type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL, PixelFormat.TRANSLUCENT);
         params.gravity = Gravity.TOP | Gravity.START;
         params.x = dp(16);
@@ -133,8 +133,8 @@ public class HandLinkOverlayService extends Service {
                         android.graphics.Rect bounds = new android.graphics.Rect();
                         if (Build.VERSION.SDK_INT >= 30) bounds.set(windows.getCurrentWindowMetrics().getBounds());
                         else { android.util.DisplayMetrics metrics = getResources().getDisplayMetrics(); bounds.set(0, 0, metrics.widthPixels, metrics.heightPixels); }
-                        params.x = Math.max(0, Math.min(Math.round(startX + dx), Math.max(0, bounds.width() - dp(104))));
-                        params.y = Math.max(0, Math.min(Math.round(startY + dy), Math.max(0, bounds.height() - dp(80))));
+                        params.x = Math.max(0, Math.min(Math.round(startX + dx), Math.max(0, bounds.width() - params.width)));
+                        params.y = Math.max(0, Math.min(Math.round(startY + dy), Math.max(0, bounds.height() - params.height - dp(24))));
                         try { windows.updateViewLayout(container, params); }
                         catch (RuntimeException exception) { stopSelf(); }
                     }
