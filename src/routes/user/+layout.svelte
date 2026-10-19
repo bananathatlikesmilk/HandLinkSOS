@@ -9,6 +9,7 @@
 	import { USER_PREVIEW, UserPreview } from '#lib/user/preview.svelte.ts';
 	import UserBrand from '#lib/user/UserBrand.svelte';
 	import LocationPublisher from '#lib/user/LocationPublisher.svelte';
+	import UserPermissionStartup from '#lib/user/UserPermissionStartup.svelte';
 	import { syncPushAccount } from '#lib/native/push.ts';
 	import type { LayoutProps } from './$types';
 	let { children, data }: LayoutProps = $props();
@@ -174,7 +175,7 @@
 		{/if}
 		{#if data.account && !authPage}{#key data.account.id}<LocationPublisher
 					accountId={data.account.id}
-				/>{/key}{/if}
+				/><UserPermissionStartup accountId={data.account.id} />{/key}{/if}
 		<main id="user-content" tabindex="-1" class="user-content">
 			{#key data.account?.id}{@render children()}{/key}
 		</main>

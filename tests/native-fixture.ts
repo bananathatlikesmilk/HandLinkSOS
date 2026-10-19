@@ -1,7 +1,10 @@
 import type { Page } from '@playwright/test';
 
-export async function installNativeBridge(page: Page) {
-	await page.addInitScript(() => {
+export async function installNativeBridge(
+	page: Page,
+	options: { denyInitialPermissions?: boolean } = {}
+) {
+	await page.addInitScript((options) => {
 		const state = {
 			active: false,
 			sessionId: null as string | null,
@@ -14,6 +17,18 @@ export async function installNativeBridge(page: Page) {
 			gpsChecks: 0,
 			dialerAttempts: 0,
 			denyDialer: false,
+			initialRequests: 0,
+			cameraRequests: 0,
+			locationRequests: 0,
+			permissionDeny: options.denyInitialPermissions ?? false,
+			cameraPermission: 'prompt',
+			locationPermission: 'prompt',
+			overlayAllowed: false,
+			overlayActive: false,
+			overlayStarts: 0,
+			overlayStops: 0,
+			overlayDelay: false,
+			finishOverlayStart: null as (() => void) | null,
 			pushPermission: 'prompt',
 			pushRequests: 0,
 			pushRegistrations: 0,
@@ -27,6 +42,19 @@ export async function installNativeBridge(page: Page) {
 			__handlinkNativeTest: state,
 			Capacitor: {
 				PluginHeaders: [
+					{
+						name: 'HandLinkPermissions',
+						methods: [
+							'status',
+							'requestInitial',
+							'requestCamera',
+							'requestLocation',
+							'openAppSettings',
+							'openOverlaySettings',
+							'startOverlay',
+							'stopOverlay'
+						].map((name) => ({ name, rtype: 'promise' }))
+					},
 					{
 						name: 'PushNotifications',
 						methods: [
@@ -70,6 +98,46 @@ export async function installNativeBridge(page: Page) {
 					return 'fixture-listener';
 				},
 				async nativePromise(plugin: string, method: string, options?: { sessionId: string }) {
+					if (plugin === 'HandLinkPermissions') {
+						const initialKey = 'fixture:initial-permissions';
+						if (method === 'requestInitial' && !localStorage.getItem(initialKey)) {
+							state.initialRequests++;
+							localStorage.setItem(initialKey, 'yes');
+							state.cameraPermission = state.locationPermission = state.permissionDeny
+								? 'denied'
+								: 'granted';
+						}
+						if (method === 'requestCamera') {
+							state.cameraRequests++;
+							state.cameraPermission = state.permissionDeny ? 'denied' : 'granted';
+						}
+						if (method === 'requestLocation') {
+							state.locationRequests++;
+							state.locationPermission = state.permissionDeny ? 'denied' : 'granted';
+						}
+						if (method === 'openOverlaySettings') state.overlayAllowed = true;
+						if (method === 'startOverlay') {
+							if (!state.overlayAllowed) throw new Error('Allow display over other apps first.');
+							state.overlayStarts++;
+							if (state.overlayDelay)
+								await new Promise<void>((resolve) => {
+									state.finishOverlayStart = resolve;
+								});
+							state.overlayActive = true;
+						}
+						if (method === 'stopOverlay') {
+							state.overlayStops++;
+							state.overlayActive = false;
+						}
+						return {
+							location: state.locationPermission,
+							camera: state.cameraPermission,
+							overlayAllowed: state.overlayAllowed,
+							overlayActive: state.overlayActive,
+							initialRequested: Boolean(localStorage.getItem(initialKey)),
+							message: ''
+						};
+					}
 					if (plugin === 'PushNotifications') {
 						if (method === 'checkPermissions') return { receive: state.pushPermission };
 						if (method === 'requestPermissions') {
@@ -134,10 +202,22 @@ export async function installNativeBridge(page: Page) {
 				}
 			}
 		});
-	});
+	}, options);
 }
 
 export type NativeTestState = {
+	initialRequests: number;
+	cameraRequests: number;
+	locationRequests: number;
+	permissionDeny: boolean;
+	cameraPermission: string;
+	locationPermission: string;
+	overlayAllowed: boolean;
+	overlayActive: boolean;
+	overlayStarts: number;
+	overlayStops: number;
+	overlayDelay: boolean;
+	finishOverlayStart: (() => void) | null;
 	active: boolean;
 	sessionId: string | null;
 	starts: number;

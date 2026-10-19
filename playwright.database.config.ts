@@ -18,6 +18,7 @@ export default defineConfig({
 		'tests/sharing.api.ts',
 		'tests/sharing.frontend.ts',
 		'tests/native.frontend.ts',
+		'tests/permissions.frontend.ts',
 		'tests/incidents.frontend.ts'
 	],
 	workers: 1,

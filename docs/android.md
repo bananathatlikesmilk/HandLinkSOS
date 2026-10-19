@@ -12,6 +12,14 @@ This project now includes a Capacitor 8 Android client (`com.handlink.sos`), nat
 
 A debug APK was built and its signature verified on 17 October 2026 using Java 21, Android SDK 36, and Gradle 8.14.3. Native Java/Kotlin compilation passed. The localhost release guard was exercised and correctly rejected a release pre-build. Physical-phone behavior, permission flows, and screen-off reliability still require device testing; compilation and simulated bridge tests do not establish those results.
 
+## Diagnosing `ERR_SSL_PROTOCOL_ERROR`
+
+On 19 October 2026, the error was reproduced on a connected Samsung Note10+ running Android 12 and WebView 155. The installed APK targeted `https://thebois.fyi/user`. Other HTTPS sites loaded in the same app WebView, while HandLink failed with Chromium error `-107`. A separate HTTPS request from the phone also received `TLSV1_ALERT_ACCESS_DENIED`. This established that the failure was not limited to the app interface or authentication code.
+
+A credential-free HTTP diagnostic request to the domain returned an explicit filtering page: `403 Forbidden`, `The URL is forbidden`, and classification `Non-Managed`. The phone and computer used different public network addresses. The evidence identifies a web filter on the phone's connection as the blocker for this incident; it does not establish that every SSL protocol error has the same cause. Chrome loading the website does not rule out different handling of app traffic.
+
+Have the authorized network administrator allow `thebois.fyi` in the relevant web-filter policy and review HTTPS inspection rules for the domain. Alternatively, verify on another network the phone owner is permitted to use. Then reopen HandLink and confirm the User screen loads without a TLS error. Successful loading after a network change or policy correction still requires device verification. Do not disable certificate verification, accept SSL errors, or change the public app URL to HTTP as a workaround. Rebuilding an unchanged APK does not repair a network filtering rule.
+
 ## Install the build tools
 
 1. Install [Android Studio 2025.2.1 or newer](https://developer.android.com/studio).
@@ -69,7 +77,19 @@ No passwords or auth tokens are exposed to JavaScript by the custom plugin. Nati
 
 The service requests foreground location permission, not unrestricted Android background location. It starts only from an explicit in-app action and shows an ongoing notification. A short, bounded wake lock covers uploads; no indefinite wake lock is held. It does not restart automatically after Android kills it. Force-stop, revoked permissions, disabled location, battery restrictions, lost USB/network, or a stopped server can interrupt tracking. Reopen the app and explicitly enable the service again after interruption.
 
-When the service is running at expiry, it can show a local timer-ended notification. The existing server expiry worker creates in-app notices for the owner and eligible recipients. This local service is separate from the Firebase push integration, which now supports generic SOS and location-sharing alerts for opted-in, authenticated Android installations. Physical-phone receipt still needs testing. Display over other apps remains unconnected. SOS now opens the Android dialer with 911 filled in after a confirmed save; the user must press Call.
+When the service is running at expiry, it can show a local timer-ended notification. The existing server expiry worker creates in-app notices for the owner and eligible recipients. This local service is separate from the Firebase push integration, which now supports generic SOS and location-sharing alerts for opted-in, authenticated Android installations. Physical-phone receipt still needs testing. Display over other apps now supports an explicitly enabled Android floating dashboard button; see the permission setup below. SOS now opens the Android dialer with 911 filled in after a confirmed save; the user must press Call.
+
+## User startup permissions and floating dashboard button
+
+After a User signs in and opens a protected User screen, HandLink requests location and camera access sequentially. The Android app records that initial attempt in private device preferences; declining does not cause repeated prompts on every navigation or restart. Browser startup uses a device-local attempt marker and makes a best-effort request because browser policies vary. Auth screens and staff portals do not trigger this setup. Denial leaves the app available; the User can retry from Settings. Permission requests never save coordinates or create a sharing session. Browser camera permission checks release their stream immediately; native startup only requests camera permission and does not start the camera.
+
+Settings includes actual location and camera permission status, retry buttons, and an Android app-settings shortcut. Permanently denied permissions must be changed in Android Settings. Camera access is used for QR scanning, not recording in the background. Browser permission-status APIs vary; an unknown status is labelled as not checked rather than falsely shown as granted.
+
+The Android floating button requires a separate opt-in: press **Allow display over apps**, enable HandLink on Android's special-access screen, return, then press **Enable floating button**. Android may also request notification access. Granting display permission alone never starts the button. The foreground service displays a persistent notification, a draggable dashboard button, and a close control. Both the close control and the notification's **Hide button** action stop it. Its tap opens only the configured server's protected `/user/dashboard`; it never sends SOS, opens the dialer, or places a call. The overlay reads no camera, coordinates, screen content, or input from other apps.
+
+Logout, deactivation, leaving the User portal, removing display permission, and dismissing the app task stop the button. Delayed permission/start results cannot restart it after a stop. It does not automatically restart after process death or reboot. Some apps deliberately hide overlays and Android can stop the service. Other platforms and web browsers do not support this Android overlay. Remote account revocation is enforced when the protected dashboard is opened; the shortcut itself displays no account information.
+
+The manifest declares `CAMERA`, `SYSTEM_ALERT_WINDOW`, and the `specialUse` foreground-service type with its required permission and subtype explanation. A future Google Play release must declare and justify this foreground-service use for review. Rebuild/install the APK and deploy the web code together; the native bridge is not present in older APKs. Verify initial grant/denial, permanent denial and settings recovery, QR scanning, approximate GPS, special-access return, drag/tap/hide, notification hide, background display, logout, and permission revocation on a physical phone. Automated bridge simulations do not prove these OS behaviors.
 
 ## Physical-phone checks
 

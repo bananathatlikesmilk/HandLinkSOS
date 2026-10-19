@@ -132,7 +132,7 @@ test('denied native permission leaves sharing active; late enable cannot restart
 	expect((await (await page.request.get('/api/sharing')).json()).own.status).toBe('cancelled');
 });
 
-test('logout stops native updates; settings checks native location without creating sharing', async ({
+test('logout stops native updates; settings requests native location without creating sharing', async ({
 	page
 }) => {
 	test.setTimeout(90000);
@@ -142,12 +142,23 @@ test('logout stops native updates; settings checks native location without creat
 	await login(page.request, owner);
 	await installNativeBridge(page);
 	await page.goto('/user/settings');
-	await page.getByRole('button', { name: 'Check location access', exact: true }).click();
-	await expect(
-		page.getByText('Location access works. This check did not save or send your coordinates.', {
-			exact: true
-		})
-	).toBeVisible();
+	await page.getByRole('button', { name: 'Allow location', exact: true }).click();
+	await expect
+		.poll(() =>
+			page.evaluate(
+				() =>
+					(globalThis as unknown as { __handlinkNativeTest: NativeTestState }).__handlinkNativeTest
+						.locationRequests
+			)
+		)
+		.toBe(1);
+	expect(
+		await page.evaluate(
+			() =>
+				(globalThis as unknown as { __handlinkNativeTest: NativeTestState }).__handlinkNativeTest
+					.locationPermission
+		)
+	).toBe('granted');
 	expect((await (await page.request.get('/api/sharing')).json()).own).toBeNull();
 	await page.goto('/user/sharing');
 	await page.getByRole('checkbox', { name: /Casey Reyes/ }).check();
