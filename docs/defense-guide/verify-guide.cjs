@@ -1,0 +1,24 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
+const { createRequire } = require('node:module');
+const req = createRequire(path.join(process.env.HANDLINK_GUIDE_TOOLS || path.join(os.tmpdir(), 'handlink-defense-doc-tools'), 'package.json'));
+const JSZip = req('jszip');
+const assert = require('node:assert/strict');
+(async () => {
+  const file = path.join(__dirname, 'HandLink-System-Defense-Guide.docx');
+  const zip = await JSZip.loadAsync(fs.readFileSync(file), { checkCRC32: true });
+  const document = await zip.file('word/document.xml').async('string');
+  const text = document.replace(/<[^>]*>/g, ' ');
+  const diagrams = fs.readdirSync(path.join(__dirname, 'flowcharts')).filter(x => x.endsWith('.png'));
+  assert.equal(diagrams.length, 37);
+  assert.equal((document.match(/<w:drawing>/g) || []).length, 37);
+  for (const term of ['User account', 'Dispatcher', 'Admin', 'Authorization', 'Ollama', 'SQLite', 'Firebase', 'ACTION_DIAL', 'seed_history', 'restore', 'Complete custom API index']) assert.ok(text.includes(term), `Missing topic: ${term}`);
+  for (const token of ['-----BEGIN PRIVATE KEY-----', '-----BEGIN RSA PRIVATE KEY-----', 'sk-proj-', '\uFFFD']) assert.ok(!text.includes(token), `Forbidden private/corrupt content: ${token}`);
+  assert.ok(zip.file('[Content_Types].xml'));
+  assert.ok(zip.file('word/styles.xml'));
+  assert.ok(zip.file('word/_rels/document.xml.rels'));
+  const stats = { bytes: fs.statSync(file).size, diagrams: diagrams.length, inlineDrawings: (document.match(/<wp:inline\b/g) || []).length, zipCRC: 'passed', requiredTopics: 'passed', obviousPrivateKeyScan: 'passed' };
+  fs.writeFileSync(path.join(__dirname, 'verification-summary.json'), JSON.stringify(stats, null, 2));
+  console.log(JSON.stringify(stats, null, 2));
+})().catch(e => { console.error(e); process.exitCode = 1; });
