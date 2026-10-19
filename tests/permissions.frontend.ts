@@ -112,6 +112,24 @@ test('browser Settings includes camera and explains that overlays need Android',
 	await page.goto('/user/settings');
 	await expect(page.getByRole('heading', { name: 'Camera access', exact: true })).toBeVisible();
 	await expect(page.getByText('Available in the Android app only.', { exact: true })).toBeVisible();
+	await expect(page.getByText('not implemented', { exact: false })).toHaveCount(0);
+	const privacyToggle = page.getByRole('button', { name: 'View', exact: true });
+	await privacyToggle.click();
+	const privacyNotes = page.getByRole('region', { name: 'Privacy and security', exact: true });
+	await expect(privacyNotes).toBeVisible();
+	const notifications = page.getByRole('region', { name: 'Phone notifications', exact: true });
+	for (const width of [390, 1280]) {
+		await page.setViewportSize({ width, height: 844 });
+		const notesBox = await privacyNotes.boundingBox();
+		const notificationsBox = await notifications.boundingBox();
+		expect(notesBox).not.toBeNull();
+		expect(notificationsBox).not.toBeNull();
+		expect(notificationsBox!.y).toBeGreaterThanOrEqual(notesBox!.y + notesBox!.height);
+	}
+	await page.getByRole('button', { name: 'Close', exact: true }).click();
+	await expect(privacyNotes).toHaveCount(0);
+	await expect(notifications).toBeVisible();
+	await page.setViewportSize({ width: 390, height: 844 });
 	await expect(
 		page.getByRole('button', { name: 'Enable floating button', exact: true })
 	).toHaveCount(0);

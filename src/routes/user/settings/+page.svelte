@@ -92,7 +92,6 @@
 			>
 		</div>
 	</div>
-	{#key page.data.account?.id}<PushNotificationsControls disabled={busy} />{/key}
 	{#if privacyOpen}<section
 			id="user-privacy-notice"
 			class="user-panel space-y-4"
@@ -122,6 +121,7 @@
 				profile.
 			</p>
 		</section>{/if}
+	{#key page.data.account?.id}<PushNotificationsControls disabled={busy} />{/key}
 	<div class="user-notice mt-6">
 		Browser location updates require this app to stay visible. In the Android app, enable screen-off
 		updates from Share location for an ongoing location notification. The optional floating button
