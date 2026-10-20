@@ -834,3 +834,96 @@ body {
 	color: var(--app-accent-text);
 	border-color: var(--app-accent);
 }
+
+/* Legacy feature components also need complete foreground/background pairs in light mode. */
+:root[data-appearance='light'] .auth-shell :is(.input, .background-toggle),
+:root[data-appearance='light'] .handlink-staff .security input:not([type='checkbox']) {
+	background: var(--app-surface);
+	color: var(--app-text);
+	border-color: var(--app-border);
+	box-shadow: none;
+}
+:root[data-appearance='light'] .auth-shell .input::placeholder {
+	color: var(--app-muted);
+}
+:root[data-appearance='light'] .auth-shell :focus-visible {
+	outline-color: var(--app-accent);
+}
+:root[data-appearance='light'] .auth-shell .continue-button {
+	text-shadow: none;
+}
+:root[data-appearance='light'] .handlink-staff .security {
+	color: var(--app-text);
+}
+:root[data-appearance='light'] .handlink-staff .security .muted {
+	color: var(--app-muted);
+}
+:root[data-appearance='light'] .handlink-staff .security :is(.message, .secret, .codes) {
+	background: var(--app-surface-alt);
+	color: var(--app-text);
+	border-color: var(--app-border);
+}
+:root[data-appearance='light'] .handlink-staff .security :is(button, .workspace-link) {
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+	border-color: var(--app-accent);
+}
+:root[data-appearance='light'] .handlink-staff .security :is(button, .workspace-link):hover {
+	filter: brightness(1.08);
+}
+:root[data-appearance='light']
+	.user-preview
+	:is(.profile-avatar, .qr-action, .trusted-wrap, .countdown-ring, .sharing-symbol) {
+	color: var(--app-text);
+	border-color: var(--app-border);
+}
+:root[data-appearance='light']
+	.user-preview
+	:is(.trusted-row, .dispatcher-avatar, .camera-frame, .qr-action:hover, .cancellation-result) {
+	background: var(--app-surface-alt);
+	color: var(--app-text);
+}
+:root[data-appearance='light'] .user-preview .camera-placeholder {
+	color: var(--app-text);
+}
+:root[data-appearance='light']
+	.user-preview
+	:is(
+		.registration-progress li,
+		.registration-footer,
+		.welcome-note,
+		.incident-id,
+		.countdown-ring span,
+		.sharing-active
+	) {
+	color: var(--app-muted);
+}
+:root[data-appearance='light'] .user-preview .registration-progress .current {
+	color: var(--app-text);
+}
+:root[data-appearance='light'] .user-preview .registration-progress :is(.current, .complete) span {
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+	border-color: var(--app-accent);
+}
+:root[data-appearance='light'] .user-preview .sharing-screen .share-button {
+	color: var(--app-accent);
+	border-color: var(--app-accent);
+}
+:root[data-appearance='light']
+	:is(
+		.auth-shell .form-error,
+		.handlink-staff .error-message,
+		.handlink-staff .security .error,
+		.handlink-staff .alert-error,
+		.user-preview .alert-error
+	) {
+	background: #fff0ee;
+	color: #8c2424;
+	border-color: #b36a63;
+}
+:root[data-appearance='light'] :is(.handlink-staff, .user-preview) .alert-warning {
+	background: #fff5d6;
+	color: #654600;
+	border-color: #96752b;
+}

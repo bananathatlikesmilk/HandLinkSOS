@@ -1,6 +1,79 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import { headers, login, password, provision } from './incident-fixture';
 import { enrollStaffMfa, totp } from './mfa-fixture';
+
+async function expectLightSurface(locator: Locator) {
+	await expect(locator.page().locator('html')).toHaveAttribute('data-appearance', 'light');
+	await expect(locator).toBeVisible();
+	const colors = await locator.evaluate((element) => {
+		const style = getComputedStyle(element);
+		return { background: style.backgroundColor, foreground: style.color };
+	});
+	const rgb = (value: string) =>
+		value
+			.match(/[\d.]+/g)!
+			.slice(0, 3)
+			.map(Number);
+	const luminance = (value: string) =>
+		rgb(value)
+			.map((channel) => {
+				const normalized = channel / 255;
+				return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+			})
+			.reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+	const background = luminance(colors.background);
+	const foreground = luminance(colors.foreground);
+	expect(background, JSON.stringify(colors)).toBeGreaterThan(0.7);
+	expect((background + 0.05) / (foreground + 0.05), JSON.stringify(colors)).toBeGreaterThanOrEqual(
+		4.5
+	);
+}
+
+test('light login and User feature panels keep readable colors', async ({ page }) => {
+	test.setTimeout(90000);
+	await page.addInitScript(() => {
+		localStorage.setItem('handlink:appearance', 'light');
+		localStorage.setItem('handlink:initial-device-permissions:v1', 'attempted');
+	});
+	await page.goto('/login');
+	await expect(page.locator('html')).toHaveAttribute('data-appearance', 'light');
+	await expectLightSurface(page.getByLabel('Email', { exact: true }));
+	await expectLightSurface(page.getByLabel('Password', { exact: true }));
+	await page.screenshot({
+		path: test.info().outputPath('login-light.png'),
+		animations: 'disabled'
+	});
+	await login(page.request, await provision());
+	await page.goto('/user/profiles');
+	await expect(page.locator('html')).toHaveAttribute('data-appearance', 'light');
+	const avatar = page.locator('.profile-avatar').first();
+	await expect(avatar).toHaveCSS('color', 'rgb(24, 45, 52)');
+	await page.locator('.qr-action').first().hover();
+	await expectLightSurface(page.locator('.qr-action').first());
+	await page.goto('/user/profiles/scan');
+	await expectLightSurface(page.locator('.camera-frame'));
+	await expect(page.locator('.camera-placeholder')).toHaveCSS('color', 'rgb(24, 45, 52)');
+	await page.screenshot({
+		path: test.info().outputPath('scanner-light.png'),
+		animations: 'disabled'
+	});
+	await page.goto('/user/sharing');
+	await expect(page.locator('.share-button')).toHaveCSS('color', 'rgb(20, 103, 86)');
+});
+
+test('light staff security uses readable inputs, messages and text', async ({ page }) => {
+	test.setTimeout(90000);
+	await page.addInitScript(() => localStorage.setItem('handlink:appearance', 'light'));
+	await login(page.request, await provision('admin'));
+	await page.goto('/admin/security');
+	await expect(page.locator('.security')).toHaveCSS('color', 'rgb(24, 45, 52)');
+	await expectLightSurface(page.getByLabel('Current password', { exact: true }).first());
+	await expectLightSurface(page.locator('.security .message').first());
+	await page.screenshot({
+		path: test.info().outputPath('security-light.png'),
+		animations: 'disabled'
+	});
+});
 
 test('one login page routes Users and protects staff destinations with MFA', async ({ page }) => {
 	test.setTimeout(120000);
