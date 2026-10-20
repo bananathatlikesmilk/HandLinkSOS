@@ -468,8 +468,31 @@
 						</p>
 					</div>
 				</header>
+				{#if selected.incident.isForSomeoneElse}
+					<div class="my-4 alert" aria-label="SOS for someone else">
+						<p>
+							<strong>SOS for someone else</strong><br />{selected.incident.callerName} sent this SOS
+							for {selected.incident.personName}.
+						</p>
+					</div>
+				{/if}
 				<table class="detail-table mb-6">
 					<tbody>
+						<tr
+							><th scope="row">SOS for</th><td
+								>{selected.incident.personName}{selected.incident.isForSomeoneElse
+									? ' (someone else)'
+									: ' (self)'}</td
+							></tr
+						>
+						<tr><th scope="row">Caller name</th><td>{selected.incident.callerName}</td></tr>
+						<tr><th scope="row">Caller phone number</th><td>{selected.incident.callerPhone}</td></tr
+						>
+						{#if selected.incident.isForSomeoneElse}<tr
+								><th scope="row">Relationship</th><td
+									>{selected.incident.callerRelationship || 'Not provided'}</td
+								></tr
+							>{/if}
 						{#each [['Started', date(selected.incident.startedAt)], ['Confirmed', date(selected.incident.confirmedAt)], ['Ended', date(selected.incident.endedAt)], ['Dispatcher', selected.incident.dispatcherName || 'Not assigned']] as [label, value] (label)}<tr
 							>
 								<th scope="row">{label}</th>
@@ -506,18 +529,7 @@
 									? 'Verbally confirm the caller’s name and phone number before opening registered information.'
 									: 'Only the assigned dispatcher can view registered information and update this incident.'}
 						</p>
-						<table class="detail-table">
-							<tbody>
-								<tr>
-									<th scope="row">Caller name</th>
-									<td>{selected.incident.callerName}</td>
-								</tr>
-								<tr>
-									<th scope="row">Caller phone number</th>
-									<td>{selected.incident.callerPhone}</td>
-								</tr>
-							</tbody>
-						</table>
+
 						{#if role === 'dispatch' && selected.incident.status === 'Not assigned'}<label
 								class="confirmation-check"
 								><input

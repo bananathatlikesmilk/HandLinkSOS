@@ -10,6 +10,57 @@ import {
 	sos
 } from './incident-fixture';
 
+test('SOS for someone else keeps caller, beneficiary and relationship visible after confirmation', async ({
+	page,
+	request
+}) => {
+	test.setTimeout(60000);
+	const caller = await provision();
+	const person = await provision();
+	const db = database();
+	try {
+		// Identical names must not make an SOS for another account look like a self SOS.
+		db.prepare(
+			"INSERT INTO trusted_connection (id,owner_profile_id,requester_profile_id,relationship,status,approved_at) VALUES (?,?,?,'Sibling','approved',?)"
+		).run(crypto.randomUUID(), person.profileId, caller.profileId, Date.now());
+	} finally {
+		db.close();
+	}
+	await login(request, caller);
+	const created = await request.post('/api/incidents', { headers, data: sos(person.profileId) });
+	expect(created.status()).toBe(201);
+	const { id } = (await created.json()).incident;
+	await login(page.request, await provision('dispatcher'));
+	await page.goto('/dispatch');
+	const banner = page.getByLabel('SOS for someone else', { exact: true });
+	const relationship = page
+		.getByRole('row')
+		.filter({ has: page.getByRole('rowheader', { name: 'Relationship', exact: true }) });
+	await expect(banner).toBeVisible();
+	await expect(banner).toContainText('Casey Reyes sent this SOS for Casey Reyes.');
+	await expect(relationship).toContainText('Sibling');
+	await page.getByRole('checkbox', { name: /I verbally confirmed/ }).check();
+	await page.getByRole('button', { name: 'Confirm incident', exact: true }).click();
+	await expect(page.getByRole('button', { name: 'Confirm incident', exact: true })).toHaveCount(0);
+	await expect(banner).toBeVisible();
+	await expect(relationship).toContainText('Sibling');
+	await expect(page.getByRole('rowheader', { name: 'Caller name', exact: true })).toBeVisible();
+	await expect(
+		page.getByRole('rowheader', { name: 'Caller phone number', exact: true })
+	).toBeVisible();
+	const detail = await (await page.request.get(`/api/staff/incidents/${id}`)).json();
+	expect(detail.incident).toMatchObject({ isForSomeoneElse: true, callerRelationship: 'Sibling' });
+	await page.reload();
+	await expect(banner).toBeVisible();
+	await expect(relationship).toContainText('Sibling');
+	const self = await request.post('/api/incidents', { headers, data: sos(caller.profileId) });
+	expect(self.status()).toBe(201);
+	expect((await self.json()).incident).toMatchObject({
+		isForSomeoneElse: false,
+		callerRelationship: ''
+	});
+});
+
 test('another dispatcher sees no report while admin can read it without status controls', async ({
 	page,
 	request,

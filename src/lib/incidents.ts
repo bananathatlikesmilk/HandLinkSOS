@@ -15,6 +15,8 @@ export type IncidentSummary = {
 	personName: string;
 	callerName: string;
 	callerPhone: string;
+	isForSomeoneElse: boolean;
+	callerRelationship: string;
 	status: IncidentStatus;
 	dispatcherUserId: string | null;
 	dispatcherName: string | null;

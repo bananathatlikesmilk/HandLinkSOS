@@ -31,6 +31,8 @@ const summaryColumns = {
 	personName: sql<string>`${profile.firstName} || ' ' || ${profile.lastName}`,
 	callerName: incident.callerName,
 	callerPhone: callerProfile.phone,
+	isForSomeoneElse: sql<boolean>`${profile.userId} <> ${incident.callerUserId}`.mapWith(Boolean),
+	callerRelationship: incident.callerRelationship,
 	status: incident.status,
 	dispatcherUserId: incident.dispatcherUserId,
 	dispatcherName: dispatcher.name,
