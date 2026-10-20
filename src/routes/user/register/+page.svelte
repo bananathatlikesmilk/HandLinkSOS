@@ -29,7 +29,38 @@
 	let error = $state('');
 	const sections = ['personal', 'medical', 'contacts'] as const;
 	const titles = ['Personal information', 'Medical information', 'Emergency contacts'];
+	let availabilityVersion = 0;
+	async function checkAvailability(field: 'email' | 'phone', value: string) {
+		const version = ++availabilityVersion;
+		try {
+			const response = await accountRequest('/api/register/availability', { [field]: value });
+			const result = await response.json();
+			if (version !== availabilityVersion || profile[field] !== value) return false;
+			if (!result.available) {
+				error =
+					field === 'email'
+						? 'This email is already registered. Log in or use another email.'
+						: 'This phone number is already registered. Use another number.';
+				return false;
+			}
+			error = '';
+			return true;
+		} catch (cause) {
+			if (version === availabilityVersion)
+				error =
+					cause instanceof Error ? cause.message : 'Unable to check these details. Try again.';
+			return false;
+		}
+	}
+	function checkField(event: FocusEvent) {
+		const field = event.target;
+		if (!(field instanceof HTMLInputElement) || !field.checkValidity()) return;
+		if (field.id === 'register-email') void checkAvailability('email', profile.email);
+		if (step === 0 && field.type === 'tel') void checkAvailability('phone', profile.phone);
+	}
 	function clearValidation(event: Event) {
+		availabilityVersion++;
+		error = '';
 		const field = event.target;
 		if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement)
 			field.setCustomValidity('');
@@ -42,11 +73,8 @@
 			if (!field.value.trim()) field.setCustomValidity('Complete this required field.');
 			if (field instanceof HTMLInputElement && field.type === 'tel') {
 				const number = field.value.trim().replace(/[\s()-]/g, '');
-				if (
-					!/^\+[1-9]\d{7,14}$/.test(number) ||
-					(number.startsWith('+639') && !/^\+639\d{9}$/.test(number))
-				)
-					field.setCustomValidity('Enter a complete phone number, such as +639171234567.');
+				if (!/^09\d{9}$/.test(number))
+					field.setCustomValidity('Enter 11 digits, such as 09171234567.');
 			}
 		}
 		if (form.checkValidity()) return true;
@@ -57,24 +85,26 @@
 		event.preventDefault();
 		if (busy || !validStep(event.currentTarget as HTMLFormElement)) return;
 		error = '';
-		if (step < 2) {
-			step += 1;
-			return;
-		}
-		if (!profile.contacts.length) {
-			error = 'Add at least one emergency contact.';
-			return;
-		}
-		if (password !== repeatedPassword) {
-			error = 'Passwords do not match.';
-			return;
-		}
-		if (!page.data.emailConfigured) {
-			error = 'Email delivery must be configured before account creation.';
-			return;
-		}
 		busy = true;
 		try {
+			if ((step === 0 || step === 2) && !(await checkAvailability('phone', profile.phone))) return;
+			if (step === 2 && !(await checkAvailability('email', profile.email))) return;
+			if (step < 2) {
+				step += 1;
+				return;
+			}
+			if (!profile.contacts.length) {
+				error = 'Add at least one emergency contact.';
+				return;
+			}
+			if (password !== repeatedPassword) {
+				error = 'Passwords do not match.';
+				return;
+			}
+			if (!page.data.emailConfigured) {
+				error = 'Email delivery must be configured before account creation.';
+				return;
+			}
 			await accountRequest('/api/register', {
 				email: profile.email.trim(),
 				password,
@@ -109,7 +139,7 @@
 						</li>{/each}
 				</ol>
 				<p class="user-copy">Fields marked <span aria-hidden="true">*</span> are required.</p>
-				<form onsubmit={next} oninput={clearValidation}>
+				<form onsubmit={next} oninput={clearValidation} onfocusout={checkField}>
 					<UserProfileFields bind:profile section={sections[step]} />
 					{#if step === 2}
 						<div class="user-divider"></div>

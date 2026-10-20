@@ -4,6 +4,7 @@ import { emergencyContact, medicalProfile, profile, user } from '#lib/server/db/
 import { privateJson, readInput, requireUser } from '#lib/server/api.ts';
 import { profileInput } from '#lib/server/validation.ts';
 import { revokeInvalidLocationRecipients } from '#lib/server/location-policy.ts';
+import { requireAvailablePhone } from '#lib/server/registration.ts';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = (event) => {
@@ -36,6 +37,7 @@ export const PUT: RequestHandler = async (event) => {
 		(tx) => {
 			// Recheck after the async body read, while the write transaction holds its lock.
 			const { identity } = requireUser(event);
+			requireAvailablePhone(input.phone, identity.id);
 			const existing = tx.select().from(profile).where(eq(profile.userId, identity.id)).get();
 			const profileId = existing?.id ?? crypto.randomUUID();
 			const { medical, emergencyContacts, ...personal } = input;

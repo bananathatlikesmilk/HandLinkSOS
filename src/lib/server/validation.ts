@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { canonicalPhone } from '#lib/phone.ts';
 
 const name = z.string().trim().min(1).max(100);
 export const emptyInput = z.strictObject({});
@@ -28,16 +29,12 @@ export const accountListInput = z.strictObject({
 	role: z.enum(['all', 'user', 'dispatcher', 'admin']).default('all'),
 	page: z.coerce.number().int().min(1).max(100000).default(1)
 });
-const phone = z
+export const phoneInput = z
 	.string()
 	.trim()
 	.max(30)
-	.transform((value) => value.replace(/[\s()-]/g, ''))
-	.pipe(
-		z
-			.string()
-			.regex(/^\+[1-9]\d{7,14}$/, 'Use an international phone number, such as +639171234567.')
-	);
+	.transform((value) => canonicalPhone(value.replace(/[\s()-]/g, '')))
+	.pipe(z.string().regex(/^\+639\d{9}$/, 'Enter an 11-digit mobile number, such as 09171234567.'));
 const birthday = z
 	.string()
 	.regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -59,7 +56,7 @@ export const profileInput = z.strictObject({
 	lastName: name,
 	birthday,
 	sex: z.enum(['Female', 'Male', 'Other', 'Prefer not to say']),
-	phone,
+	phone: phoneInput,
 	medical: z.strictObject({
 		bloodType: z.enum(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Unknown']).nullable(),
 		chronicCondition: medicalText,
@@ -72,7 +69,7 @@ export const profileInput = z.strictObject({
 			z.strictObject({
 				firstName: name,
 				lastName: name,
-				phone,
+				phone: phoneInput,
 				email: z.email().max(254),
 				relationship: name
 			})

@@ -65,10 +65,14 @@ export async function accountRequest(path: string, body: unknown = {}, method = 
 		if (response.status === 401) throw new Error('Your session expired. Please log in again.');
 		if (response.status === 422)
 			throw new Error(
-				'Check all required fields, contact emails, and phone numbers. Use + country code or a Philippine 09 number.'
+				'Check required fields and contact emails. Phone numbers must have 11 digits, starting with 09.'
 			);
 		if (response.status === 429)
 			throw new Error('Too many attempts. Please wait before trying again.');
+		if (response.status === 409) {
+			const result = await response.json();
+			if (typeof result.message === 'string') throw new Error(result.message);
+		}
 		throw new Error('Unable to complete this request. Please try again.');
 	}
 	return response;

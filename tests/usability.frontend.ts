@@ -178,11 +178,11 @@ test('one login page routes Users and protects staff destinations with MFA', asy
 	}
 });
 
-test('registration blocks incomplete personal fields and defaults phone to +639', async ({
+test('registration blocks incomplete personal fields and limits local phone to 11 digits', async ({
 	page
 }) => {
 	await page.goto('/user/register');
-	await expect(page.getByLabel('Phone number', { exact: true })).toHaveValue('+639');
+	await expect(page.getByLabel('Phone number', { exact: true })).toHaveValue('09');
 	await page.getByRole('button', { name: 'Continue', exact: true }).click();
 	await expect(
 		page.getByRole('group', { name: 'Personal information', exact: true })
@@ -191,7 +191,10 @@ test('registration blocks incomplete personal fields and defaults phone to +639'
 	await page.getByLabel('Last name', { exact: true }).fill('Reyes');
 	await page.getByLabel('Birthday', { exact: true }).fill('2000-01-01');
 	await page.getByLabel('Sex', { exact: true }).selectOption('Female');
-	await page.getByLabel('Phone number', { exact: true }).fill('+639171234567');
+	await page.getByLabel('Phone number', { exact: true }).fill('09987654321');
+	await page.getByLabel('Phone number', { exact: true }).press('End');
+	await page.getByLabel('Phone number', { exact: true }).pressSequentially('999');
+	await expect(page.getByLabel('Phone number', { exact: true })).toHaveValue('09987654321');
 	await page.getByRole('button', { name: 'Continue', exact: true }).click();
 	await expect(
 		page.getByRole('group', { name: 'Personal information', exact: true })
@@ -205,6 +208,38 @@ test('registration blocks incomplete personal fields and defaults phone to +639'
 	await expect(page.getByRole('combobox', { name: 'Relationship', exact: true })).toHaveValue(
 		'Friend'
 	);
+});
+
+test('registration shows duplicate phone and email feedback before submission', async ({
+	page
+}) => {
+	const owner = await provision();
+	await page.goto('/user/register');
+	await page.getByLabel('First name', { exact: true }).fill('Casey');
+	await page.getByLabel('Last name', { exact: true }).fill('Reyes');
+	await page.getByLabel('Birthday', { exact: true }).fill('2000-01-01');
+	await page.getByLabel('Sex', { exact: true }).selectOption('Female');
+	const phone = page.getByLabel('Phone number', { exact: true });
+	await phone.fill('09171234567');
+	await phone.press('Tab');
+	await expect(page.getByRole('alert')).toHaveText(
+		'This phone number is already registered. Use another number.'
+	);
+	await page.getByRole('button', { name: 'Continue', exact: true }).click();
+	await expect(
+		page.getByRole('group', { name: 'Personal information', exact: true })
+	).toBeVisible();
+	await phone.fill('09976543210');
+	await page.getByRole('button', { name: 'Continue', exact: true }).click();
+	await expect(page.getByRole('group', { name: /Medical information/ })).toBeVisible();
+	await page.getByRole('button', { name: 'Continue', exact: true }).click();
+	const email = page.getByLabel('Your email', { exact: true });
+	await email.fill(owner.email.toUpperCase());
+	await email.press('Tab');
+	await expect(page.getByRole('alert')).toHaveText(
+		'This email is already registered. Log in or use another email.'
+	);
+	await expect(page).toHaveURL('/user/register');
 });
 
 test('User navigation stays visible and chosen theme persists across pages', async ({ page }) => {

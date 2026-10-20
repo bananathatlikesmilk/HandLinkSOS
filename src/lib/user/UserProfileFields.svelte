@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Plus, Trash2 } from '@lucide/svelte';
 	import { onMount } from 'svelte';
+	import { localPhone } from '#lib/phone.ts';
 	import RelationshipSelect from './RelationshipSelect.svelte';
 	import type { UserProfile } from './preview.svelte.ts';
 	let {
@@ -16,40 +17,24 @@
 		day: '2-digit'
 	}).format(new Date());
 	onMount(() => {
-		if (!profile.phone) profile.phone = '+639';
+		if (!profile.phone) profile.phone = '09';
 		for (const contact of profile.contacts) {
-			if (!contact.phone) contact.phone = '+639';
+			if (!contact.phone) contact.phone = '09';
 		}
 		ready = true;
 	});
 	function normalizePhone(event: Event, assign: (value: string) => void) {
 		const input = event.currentTarget as HTMLInputElement;
-		const raw = input.value;
-		const normalized = raw.startsWith('09')
-			? `+63${raw.slice(1)}`
-			: raw.startsWith('9')
-				? `+63${raw}`
-				: raw.startsWith('639')
-					? `+${raw}`
-					: raw;
+		const normalized = localPhone(input.value).slice(0, 11);
 		assign(normalized);
-		if (normalized !== raw) {
-			const start = input.selectionStart;
-			const end = input.selectionEnd;
-			input.value = normalized;
-			if (start !== null && end !== null)
-				input.setSelectionRange(
-					start + normalized.length - raw.length,
-					end + normalized.length - raw.length
-				);
-		}
+		input.value = normalized;
 	}
 	function addContact() {
 		profile.contacts.push({
 			id: crypto.randomUUID(),
 			firstName: '',
 			lastName: '',
-			phone: '+639',
+			phone: '09',
 			email: '',
 			relationship: ''
 		});
@@ -111,12 +96,14 @@
 					aria-label="Phone number"
 					type="tel"
 					class="input"
-					value={profile.phone}
+					value={localPhone(profile.phone)}
 					oninput={(event) => normalizePhone(event, (value) => (profile.phone = value))}
 					autocomplete="tel"
-					placeholder="+63 917 123 4567"
-					minlength="7"
-					maxlength="25"
+					placeholder="09171234567"
+					inputmode="numeric"
+					pattern={'09[0-9]{9}'}
+					minlength="11"
+					maxlength="11"
 					required
 				/></label
 			>
@@ -217,11 +204,13 @@
 							aria-label="Phone number"
 							class="input"
 							type="tel"
-							value={contact.phone}
+							value={localPhone(contact.phone)}
 							oninput={(event) => normalizePhone(event, (value) => (contact.phone = value))}
-							placeholder="+63 917 123 4567"
-							minlength="7"
-							maxlength="25"
+							placeholder="09171234567"
+							inputmode="numeric"
+							pattern={'09[0-9]{9}'}
+							minlength="11"
+							maxlength="11"
 							required
 						/></label
 					>

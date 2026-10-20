@@ -129,3 +129,71 @@ test('public registration cannot grant a staff role', async ({ request }) => {
 	expect(response.status()).toBe(400);
 	expect((await response.json()).code).toBe('FIELD_NOT_ALLOWED');
 });
+
+test('registration detects used email and equivalent phone formats without exposing account details', async ({
+	request
+}) => {
+	const id = await signIn(request);
+	const data = { ...input, phone: '09812345678' };
+	expect((await request.put('/api/profile', { headers, data })).status()).toBe(200);
+	const client = new Database(process.env.HANDLINK_TEST_DB!);
+	const identity = client.prepare('SELECT email FROM user WHERE id=?').get(id) as { email: string };
+	client.close();
+	for (const body of [
+		{ email: identity.email.toUpperCase() },
+		{ phone: '09812345678' },
+		{ phone: '+639812345678' }
+	]) {
+		const result = await request.post('/api/register/availability', { headers, data: body });
+		expect(result.status()).toBe(200);
+		expect(result.headers()['cache-control']).toBe('no-store');
+		expect(await result.json()).toEqual({ available: false });
+	}
+	const unused = await request.post('/api/register/availability', {
+		headers,
+		data: { email: `${crypto.randomUUID()}@example.com` }
+	});
+	expect(await unused.json()).toEqual({ available: true });
+	expect(
+		(
+			await request.post('/api/register/availability', {
+				headers: { Origin: 'https://attacker.example' },
+				data: { phone: data.phone }
+			})
+		).status()
+	).toBe(403);
+	for (const phone of ['0981234567', '098123456789', '+12025550123', '09a812345678']) {
+		expect(
+			(await request.post('/api/register/availability', { headers, data: { phone } })).status()
+		).toBe(422);
+	}
+	for (const registration of [
+		{ email: identity.email.toUpperCase(), password: 'test-password-123456', profile: data },
+		{ email: `${crypto.randomUUID()}@example.com`, password: 'test-password-123456', profile: data }
+	]) {
+		expect((await request.post('/api/register', { headers, data: registration })).status()).toBe(
+			409
+		);
+	}
+});
+
+test('profile phone uniqueness survives concurrent saves and preserves emergency contact sharing', async ({
+	request,
+	playwright
+}) => {
+	await signIn(request);
+	const another = await playwright.request.newContext({ baseURL: origin });
+	await signIn(another);
+	const data = { ...input, phone: '09912345678' };
+	const results = await Promise.all([
+		request.put('/api/profile', { headers, data }),
+		another.put('/api/profile', { headers, data: { ...data, phone: '+639912345678' } })
+	]);
+	expect(results.map((result) => result.status()).sort()).toEqual([200, 409]);
+	const winner = results[0].ok() ? request : another;
+	expect((await winner.put('/api/profile', { headers, data })).status()).toBe(200);
+	const saved = await (await winner.get('/api/profile')).json();
+	expect(saved.profile.phone).toBe('+639912345678');
+	expect(saved.emergencyContacts[0].phone).toBe(input.emergencyContacts[0].phone);
+	await another.dispose();
+});
