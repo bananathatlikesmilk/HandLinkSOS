@@ -123,6 +123,22 @@ test('0011 adds report addenda without changing existing accounts, incidents, no
 			/FOREIGN KEY/
 		);
 		assert.deepEqual(snapshot(), before);
+		const savedAddenda = client.prepare('SELECT * FROM incident_addendum').all();
+		const settingsIndex = journal.entries.findIndex(
+			(entry) => entry.tag === '0012_ai_provider_setting'
+		);
+		assert.equal(settingsIndex, 12);
+		for (const statement of migrations[settingsIndex].sql) client.exec(statement);
+		assert.deepEqual(snapshot(), before);
+		assert.deepEqual(client.prepare('SELECT * FROM incident_addendum').all(), savedAddenda);
+		assert.deepEqual(client.prepare('SELECT * FROM ai_provider_setting').all(), []);
+		const setting = client.prepare(
+			'INSERT INTO ai_provider_setting (id,provider,revision,updated_by_user_id,updated_at) VALUES (?,?,?,?,?)'
+		);
+		assert.throws(() => setting.run('other', 'ollama', 'r1', 'admin', now), /CHECK/);
+		assert.throws(() => setting.run('summary', 'unknown', 'r1', 'admin', now), /CHECK/);
+		assert.throws(() => setting.run('summary', 'gemini', 'r1', 'missing', now), /FOREIGN KEY/);
+		setting.run('summary', 'gemini', 'r1', 'admin', now);
 		assert.equal(client.pragma('foreign_keys', { simple: true }), 1);
 		assert.deepEqual(client.pragma('foreign_key_check'), []);
 		assert.equal(client.pragma('integrity_check', { simple: true }), 'ok');

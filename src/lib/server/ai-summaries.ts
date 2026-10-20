@@ -14,12 +14,9 @@ import {
 } from './db/schema.ts';
 import { requireStaff } from './api.ts';
 import { latestIncidentNote } from './incident-notes.ts';
-import {
-	aiConfigured,
-	requestOllamaSummary,
-	summaryModel,
-	OllamaSummaryError
-} from './ollama-summary.ts';
+import { selectedAiProvider } from './ai-settings.ts';
+import { requestSummary } from './summary-providers.ts';
+import { SummaryProviderError } from './summary-provider.ts';
 import { hasSummaryContent, isDeletionOnly, redactIncidentText } from './summary-privacy.ts';
 import { containsSummaryInstructions } from './summary-extract.ts';
 import type { aiGenerateInput, aiReviewInput } from './validation.ts';
@@ -93,8 +90,11 @@ export function getAiSummaryState(incidentId: string): AiSummaryState {
 				.get()
 		: null;
 	const note = latestIncidentNote(incidentId);
+	const choice = selectedAiProvider();
 	return {
-		configured: aiConfigured,
+		configured: choice.configured,
+		provider: choice.provider,
+		providerRevision: choice.revision,
 		generationPending: Boolean(
 			db
 				.select({ id: aiSummaryRequest.id })
@@ -127,11 +127,16 @@ export function previewAiSummary(event: RequestEvent, id: string | undefined) {
 		const { row } = owned(event, id);
 		const note = latestIncidentNote(row.id);
 		if (!note || !note.notes.trim()) error(409, 'Save incident notes before generating a summary.');
+		const choice = selectedAiProvider();
 		return {
+			provider: choice.provider,
+			providerRevision: choice.revision,
 			sourceNoteId: note.id,
 			text: redactIncidentText(note.notes, identifiers(row)),
 			warnings: [
-				'Review the exact text before sending it to local Ollama. Automatic redaction cannot find every identifier.',
+				choice.provider === 'gemini'
+					? 'Review this text before sending it to Google Gemini, an external cloud service. Automatic redaction cannot find every identifier.'
+					: 'Review the exact text before sending it to the configured Ollama server. Automatic redaction cannot find every identifier.',
 				'Delete names, addresses, contact details, private history, and unnecessary information. Only delete text; do not add or rewrite it.',
 				'AI drafts may be wrong. Verify against incident notes before approving.'
 			]
@@ -154,6 +159,7 @@ export async function generateAiSummary(
 	const reservation = db.transaction(
 		(tx) => {
 			const { actor, row } = owned(event, id);
+			const choice = selectedAiProvider();
 			const hash = createHash('sha256').update(input.approvedText).digest('hex');
 			const existing = tx
 				.select()
@@ -165,11 +171,17 @@ export async function generateAiSummary(
 					existing.incidentId !== row.id ||
 					existing.requestedByUserId !== actor.id ||
 					existing.inputHash !== hash ||
-					existing.sourceNoteId !== input.sourceNoteId
+					existing.sourceNoteId !== input.sourceNoteId ||
+					(input.provider !== undefined && !existing.model.startsWith(`${input.provider}:`))
 				)
 					error(409, 'This summary request ID was already used with different information.');
 				if (existing.status === 'completed')
-					return { replayed: true, incidentId: row.id, identifiers: [] as string[] };
+					return {
+						replayed: true as const,
+						incidentId: row.id,
+						identifiers: [] as string[],
+						choice
+					};
 				error(
 					409,
 					existing.status === 'pending'
@@ -177,8 +189,20 @@ export async function generateAiSummary(
 						: 'This attempt failed. Start a new request after the cooldown.'
 				);
 			}
-			if (!aiConfigured)
-				error(503, 'Configure a local Ollama model for summaries. Reports remain available.');
+			if (
+				input.provider === undefined && input.providerRevision === undefined
+					? choice.provider !== 'ollama'
+					: input.provider !== choice.provider || input.providerRevision !== choice.revision
+			)
+				error(
+					409,
+					'AI provider changed. Refresh the preview and confirm where the notes will be sent.'
+				);
+			if (!choice.configured)
+				error(
+					503,
+					'The selected AI provider is not configured. Ask Admin to review AI settings. Reports remain available.'
+				);
 			const note = latestIncidentNote(row.id);
 			if (!note || note.id !== input.sourceNoteId)
 				error(409, 'Incident notes changed. Refresh the preview before generating.');
@@ -246,21 +270,21 @@ export async function generateAiSummary(
 					requestedByUserId: actor.id,
 					sourceNoteId: note.id,
 					inputHash: hash,
-					model: summaryModel,
+					model: choice.model,
 					createdAt: now
 				})
 				.run();
-			return { replayed: false, incidentId: row.id, identifiers: privateValues };
+			return { replayed: false as const, incidentId: row.id, identifiers: privateValues, choice };
 		},
 		{ behavior: 'immediate' }
 	);
 	if (reservation.replayed) return getAiSummaryState(reservation.incidentId);
 	let generated: string;
 	try {
-		generated = await requestOllamaSummary(input.approvedText);
+		generated = await requestSummary(reservation.choice.provider, input.approvedText);
 	} catch (failure) {
 		failRequest(input.requestId);
-		if (failure instanceof OllamaSummaryError)
+		if (failure instanceof SummaryProviderError)
 			error(failure.status, `${failure.message} Existing reports and summaries were kept.`);
 		error(
 			502,
@@ -279,11 +303,12 @@ export async function generateAiSummary(
 				if (
 					!current ||
 					current.status !== 'pending' ||
+					selectedAiProvider().revision !== reservation.choice.revision ||
 					latestIncidentNote(row.id)?.id !== input.sourceNoteId
 				)
 					error(
 						409,
-						'Notes or request state changed while generating. Refresh and review a new preview.'
+						'Notes, AI provider, or request state changed while generating. Refresh and review a new preview.'
 					);
 				// Apply current identifiers again in case profile/contact data changed during the network call.
 				const summary = redactIncidentText(generated, [

@@ -11,7 +11,15 @@ globalThis.fetch = async function (input, options) {
 	const url = String(typeof input === 'string' || input instanceof URL ? input : input.url);
 	if (url.startsWith('https://api.openai.com/'))
 		throw new Error('Cloud AI is forbidden in local summary tests.');
-	if (url !== 'http://127.0.0.1:11434/api/chat') return originalFetch(input, options);
+	const gemini = url.startsWith('https://generativelanguage.googleapis.com/');
+	if (
+		gemini &&
+		(url !==
+			'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent' ||
+			options?.headers?.['x-goog-api-key'] !== 'isolated-gemini-key-not-real')
+	)
+		throw new Error('Gemini tests require the exact mocked model and fake credential.');
+	if (!gemini && url !== 'http://127.0.0.1:11434/api/chat') return originalFetch(input, options);
 	const db = new Database(process.env.HANDLINK_TEST_DB);
 	let mode, delay;
 	try {
@@ -29,6 +37,7 @@ globalThis.fetch = async function (input, options) {
 		db.close();
 	}
 	if (mode === 'live') {
+		if (gemini) throw new Error('Live Gemini requests are forbidden in tests.');
 		if (process.env.HANDLINK_LIVE_OLLAMA !== '1')
 			throw new Error('Real local inference requires explicit opt-in.');
 		return originalFetch(input, options);
@@ -45,6 +54,27 @@ globalThis.fetch = async function (input, options) {
 				{ once: true }
 			);
 		});
+	if (gemini) {
+		if (mode === 'failure') return new Response('{}', { status: 503 });
+		if (mode === 'quota') return new Response('{}', { status: 429 });
+		if (mode === 'bad-key') return new Response('{}', { status: 403 });
+		const { sentences } = JSON.parse(JSON.parse(options.body).contents[0].parts[0].text);
+		const content =
+			mode === 'malformed'
+				? 'not json'
+				: JSON.stringify({
+						sentenceIds:
+							mode === 'invalid-selection' ? [sentences.length] : sentences.map(({ id }) => id)
+					});
+		return Response.json({
+			candidates: [
+				{
+					finishReason: mode === 'incomplete' ? 'MAX_TOKENS' : 'STOP',
+					content: { role: 'model', parts: [{ text: content }] }
+				}
+			]
+		});
+	}
 	if (mode === 'failure') return new Response('{}', { status: 503 });
 	if (mode === 'missing-model') return new Response('{}', { status: 404 });
 	if (mode === 'offline') throw new TypeError('Isolated Ollama offline');

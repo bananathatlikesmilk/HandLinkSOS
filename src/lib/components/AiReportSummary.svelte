@@ -2,7 +2,7 @@
 	import { onDestroy } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { apiRequest, ApiRequestError } from '#lib/client/request.ts';
-	import type { AiSummaryState } from '#lib/ai-summary.ts';
+	import type { AiSummaryState, AiProvider } from '#lib/ai-summary.ts';
 	let {
 		incidentId,
 		ai,
@@ -21,7 +21,14 @@
 	let busy = $state(false);
 	let error = $state('');
 	let notice = $state('');
-	let preview = $state<{ sourceNoteId: string; text: string; warnings: string[] } | null>(null);
+	let preview = $state<{
+		sourceNoteId: string;
+		text: string;
+		warnings: string[];
+		provider: AiProvider;
+		providerRevision: string;
+		observedRevision: string;
+	} | null>(null);
 	let approvedText = $state('');
 	let confirmed = $state(false);
 	let requestId = '';
@@ -29,6 +36,14 @@
 	let requestSource = '';
 	let controller: AbortController | undefined;
 	let disposed = false;
+	const previewStale = $derived(
+		Boolean(
+			preview &&
+			ai.providerRevision !== preview.providerRevision &&
+			ai.providerRevision !== preview.observedRevision
+		)
+	);
+	const activeProvider = $derived(preview && !previewStale ? preview.provider : ai.provider);
 	const base = $derived(`${resolve('/api/staff/reports/[id]', { id: incidentId })}/summary`);
 	function textChanged(value: string) {
 		approvedText = value;
@@ -39,7 +54,12 @@
 		if (busy || disabled || !canManage) return;
 		if (
 			action === 'generate' &&
-			(!ai.configured || !preview || !confirmed || !approvedText.trim() || ai.generationPending)
+			(!ai.configured ||
+				!preview ||
+				previewStale ||
+				!confirmed ||
+				!approvedText.trim() ||
+				ai.generationPending)
 		)
 			return;
 		if (
@@ -66,11 +86,14 @@
 		controller = current;
 		try {
 			if (action === 'preview') {
-				const result = await apiRequest<NonNullable<typeof preview>>(`${base}/preview`, {
-					signal: current.signal
-				});
+				const result = await apiRequest<Omit<NonNullable<typeof preview>, 'observedRevision'>>(
+					`${base}/preview`,
+					{
+						signal: current.signal
+					}
+				);
 				if (disposed || current.signal.aborted) return;
-				preview = result;
+				preview = { ...result, observedRevision: ai.providerRevision };
 				textChanged(result.text);
 			} else {
 				let body: unknown;
@@ -84,6 +107,8 @@
 					body = {
 						requestId,
 						sourceNoteId: preview.sourceNoteId,
+						provider: preview.provider,
+						providerRevision: preview.providerRevision,
 						approvedText: text,
 						confirmed: true
 					};
@@ -168,33 +193,35 @@
 		</div>
 	{:else}<p class="muted text-sm">No AI summary generated yet.</p>{/if}
 	{#if !ai.configured}<p class="muted text-sm">
-			Local AI setup needed. Configure the server's Ollama summary model to generate summaries.
-			Saved reports remain available.
+			AI setup needed. Ask Admin to configure the selected summary provider. Saved reports remain
+			available.
 		</p>{/if}
 	{#if ai.generationPending}<p role="status" class="muted text-sm">
 			AI generation is in progress. Refreshing this report will check its status.
 		</p>{/if}
 	{#if canManage}
-		<p class="muted text-sm">
-			Only the approved text below is processed by Ollama on the HandLink server. It is not sent to
-			an external AI service. Registered medical records, contacts, and location are not included
-			automatically. Remove any remaining identifying or unnecessary private information.
-		</p>
-		<details class="muted text-sm">
-			<summary class="cursor-pointer">Local AI setup</summary>
-			<p class="mt-2">
-				Install and start Ollama on the HandLink server computer. Download the default model with
-				<code>ollama pull qwen2.5:3b</code>. Keep Ollama running while generating summaries. No API
-				key is needed. The first generation may take longer while the model loads.
+		{#if activeProvider === 'gemini'}
+			<p class="alert alert-warning">
+				Only the approved text is sent to Google Gemini, an external cloud AI service. Review it
+				before consenting. Medical records, contacts, and location are not included automatically.
 			</p>
-		</details>
+		{:else}
+			<p class="muted text-sm">
+				Only the approved text below is processed by Ollama on the HandLink server configured in
+				.env. It is not sent to Gemini. Registered medical records, contacts, and location are not
+				included automatically. Remove remaining identifying or unnecessary private information.
+			</p>
+		{/if}
 		<button
 			class="btn btn-outline btn-sm"
 			disabled={busy || disabled || !ai.configured || ai.generationPending}
 			onclick={() => perform('preview')}
 			>{preview ? 'Reload notes preview' : 'Prepare notes for AI'}</button
 		>
-		{#if preview}
+		{#if previewStale}<p role="status" class="muted">
+				AI provider changed. Reload the notes preview before generating.
+			</p>{/if}
+		{#if preview && !previewStale}
 			{#each preview.warnings as warning, index (index)}<p class="muted text-sm">
 					{warning}
 				</p>{/each}
@@ -218,7 +245,11 @@
 					bind:checked={confirmed}
 					disabled={busy || disabled}
 				/>
-				<span>I reviewed this text and removed identifying or unnecessary private information</span>
+				<span
+					>{activeProvider === 'gemini'
+						? 'I reviewed this text, removed identifying or unnecessary private information, and agree to send it to Google Gemini'
+						: 'I reviewed this text and removed identifying or unnecessary private information'}</span
+				>
 			</label>
 			<p class="muted text-xs">
 				Generating again replaces the current summary. Previous versions remain in the audit record.

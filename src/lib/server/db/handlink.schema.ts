@@ -23,6 +23,21 @@ const accountReference = (name: string) =>
 		.notNull()
 		.references(() => user.id, { onDelete: 'restrict' });
 
+export const aiProviderSetting = sqliteTable(
+	'ai_provider_setting',
+	{
+		id: text('id').primaryKey(),
+		provider: text('provider', { enum: ['ollama', 'gemini'] }).notNull(),
+		revision: text('revision').notNull(),
+		updatedByUserId: accountReference('updated_by_user_id'),
+		updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull()
+	},
+	(table) => [
+		check('ai_provider_singleton', sql`${table.id} = 'summary'`),
+		check('ai_provider_allowed', sql`${table.provider} in ('ollama', 'gemini')`)
+	]
+);
+
 export const accountAudit = sqliteTable(
 	'account_audit',
 	{

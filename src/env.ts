@@ -1,6 +1,14 @@
 import { defineEnvVars } from '@sveltejs/kit/env';
 
 export const variables = defineEnvVars({
+	GEMINI_API_KEY: {
+		description: 'Private server-only Google Gemini API key.',
+		schema: (value) => value
+	},
+	GEMINI_SUMMARY_MODEL: {
+		description: 'Gemini summary model. Defaults to gemini-3.5-flash-lite.',
+		schema: (value) => value
+	},
 	OLLAMA_SERVER_URL: {
 		description:
 			'Server-only HTTP(S) Ollama origin. Uses the configured address; defaults to http://127.0.0.1:11434 only when absent.',

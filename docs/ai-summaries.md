@@ -1,6 +1,24 @@
-# Local AI report summaries
+# AI report summaries
 
-HandLink uses Ollama on the same computer as the HandLink server. No OpenAI API key, paid AI account, or cloud fallback is used. Downloading Ollama and a model requires internet access; generation uses local resources after download. Computer hardware, electricity, and hosting still have costs.
+HandLink defaults to Ollama on the configured server. Admin can select Ollama or Google Gemini under **AI settings**. The selection is saved in the database and applies to all dispatchers. No OpenAI integration or automatic provider fallback is used. Ollama requires a downloaded model and server resources. Gemini sends approved notes to Google's cloud and is subject to the Google project's quota, terms, and any applicable charges.
+
+## Admin provider selection and Gemini
+
+1. Set the private server `.env` values:
+
+   ```dotenv
+   GEMINI_API_KEY="your-google-ai-studio-api-key"
+   GEMINI_SUMMARY_MODEL="gemini-3.5-flash-lite"
+   ```
+
+2. Restart local development, or recreate the deployed app container with the updated environment. Production Compose passes these values to the app. Never commit the key or put it in browser code or the APK.
+3. Deploy migration `0012_ai_provider_setting.sql`. Normal Docker startup applies migrations before serving requests. Existing databases default to Ollama until an MFA-verified Admin saves another selection.
+4. Open **Admin → AI settings**, choose **Gemini (Google cloud)**, and save. The page shows configuration status and model names, never the API key. Gemini cannot be selected without a configured key and valid model name.
+5. Dispatchers prepare and review a new preview. Gemini requires explicit consent to send the approved text to Google. Changing the system provider invalidates old previews. Requests reserved before a provider change cannot publish a late result. Older clients without provider consent fields can continue using Ollama but cannot invoke Gemini.
+
+Both providers select sentence IDs. The server reconstructs summaries only from the approved source and applies the same validation, redaction, ownership, MFA, cooldown, retry, and review rules. Gemini failures preserve saved summaries and never switch to Ollama automatically. The selected provider and model are retained in each generation's existing audit record. No registered medical records are automatically sent to either provider.
+
+Migration 0012 only adds a settings table. Roll application code back with that table retained. Set the provider to Ollama before rolling back to an older application version that only understands Ollama. Back up the database before deployment; restoring an old backup would also remove later data.
 
 ## Setup
 
@@ -41,11 +59,11 @@ The Docker extension does not override `OLLAMA_SERVER_URL` from `.env`. To use a
 
 1. Confirm and handle the incident, then save incident notes.
 2. Open the incident report and select **Prepare notes for AI**.
-3. Review the exact text. Delete identifying or unnecessary private information and confirm the checkbox. Edits reset consent.
+3. Review the exact text and selected provider. Delete identifying or unnecessary private information and confirm the checkbox. Edits reset consent. Gemini's checkbox explicitly consents to sending the text to Google.
 4. Generate a draft. The first request can take longer while the model loads. The server allows 90 seconds; this generation request allows 100 seconds in the browser. Other API requests retain their existing 20-second timeout.
 5. Compare every statement against the notes, then approve the summary if accurate.
 
-Only the assigned, active, MFA-verified dispatcher can prepare, generate, or approve a summary. Admin can read saved summaries through authorized reports. Other dispatchers cannot access them. Medical profiles are not automatically read or sent. Automatic redaction is incomplete; dispatcher review remains required even though processing stays local. The AI selects whole sentences from the approved notes instead of writing new prose. The server validates integer sentence IDs, requires original order without duplicates, reconstructs the draft only from the approved source, enforces length limits, and applies another redaction pass before saving. This prevents model-authored urgency, advice, or diagnoses from being added. Common copied prompts are rejected before inference; delete those instructions from the preview and confirm the edited text again. This check does not detect every possible malicious instruction. Sentence selection can still omit relevant context, and source notes themselves can be inaccurate, so dispatcher review remains required. Summaries are drafts, not diagnoses or treatment advice.
+Only the assigned, active, MFA-verified dispatcher can prepare, generate, or approve a summary. Admin can read saved summaries through authorized reports. Other dispatchers cannot access them. Medical profiles are not automatically read or sent. Automatic redaction is incomplete; dispatcher review remains required for either provider. The AI selects whole sentences from the approved notes instead of writing new prose. The server validates integer sentence IDs, requires original order without duplicates, reconstructs the draft only from the approved source, enforces length limits, and applies another redaction pass before saving. This prevents model-authored urgency, advice, or diagnoses from being added. Common copied prompts are rejected before inference; delete those instructions from the preview and confirm the edited text again. This check does not detect every possible malicious instruction. Sentence selection can still omit relevant context, and source notes themselves can be inaccurate, so dispatcher review remains required. Summaries are drafts, not diagnoses or treatment advice.
 
 ## Saved reports and failures
 
@@ -55,7 +73,7 @@ Stopped Ollama, missing models, incomplete results, and failed validation do not
 
 ## Verification
 
-Run `pnpm exec playwright test --config=playwright.ai.config.ts` for the API and browser workflow. Tests use a separate database and intercept only the local Ollama endpoint. Cloud OpenAI requests are forbidden in the mock. Tests do not send incident data to an external provider or require a downloaded model. Real model inference needs a separate local check using fictional notes; mocked tests do not establish model accuracy or phone performance.
+Run `pnpm exec playwright test --config=playwright.ai.config.ts` for the API and browser workflow. Tests use a separate database, fake Gemini credentials, and mocked Ollama and Gemini endpoints. Live Gemini and cloud OpenAI requests are forbidden in the mock. Tests do not send incident data to an external provider or require a downloaded model. Real model inference needs a separate check using fictional notes; mocked tests do not establish model accuracy or phone performance.
 
 To exercise the installed model through the real HandLink API with a fictional incident and a separate test database, explicitly opt in from PowerShell:
 

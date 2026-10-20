@@ -10,6 +10,7 @@
 		LogOut,
 		Menu,
 		ShieldCheck,
+		Sparkles,
 		UserRound,
 		Users,
 		X
@@ -43,7 +44,10 @@
 			icon: FileText
 		},
 		...(role === 'admin'
-			? [{ href: '/admin/accounts' as const, label: 'Manage accounts', icon: Users }]
+			? [
+					{ href: '/admin/accounts' as const, label: 'Manage accounts', icon: Users },
+					{ href: '/admin/ai' as const, label: 'AI settings', icon: Sparkles }
+				]
 			: []),
 		{
 			href: role === 'admin' ? ('/admin/profile' as const) : ('/dispatch/profile' as const),

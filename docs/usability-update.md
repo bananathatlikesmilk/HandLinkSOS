@@ -36,6 +36,8 @@ Migration 0011 is additive. A local backup was created before applying it. For a
 
 The APK's native permissions and plugins are unchanged by this update. An APK connected to the deployed site loads the deployed web changes. Real camera, notification delivery, and phone-specific appearance still need device checks. Server AI container startup and real inference need operator verification.
 
+Admin now has **AI settings** to select Ollama or Google Gemini system-wide. Gemini requires `GEMINI_API_KEY` in the private server `.env`, an app restart, and migration `0012_ai_provider_setting.sql`. Dispatchers explicitly consent to cloud processing before Gemini receives reviewed notes. See [AI setup](ai-summaries.md) for configuration, privacy, and rollback details. Apply all pending migrations when deploying, including 0012.
+
 ## Verification
 
 Type checking, the production build, ESLint, Prettier, and Svelte autofixer checks passed. Twenty database and mobile configuration checks passed, including preservation of existing records through migration 0011. Ten final account, navigation, registration, and QR browser checks passed. The AI suite passed seven mocked API/browser checks; two opt-in real-model checks were skipped. Focused incident tests also exercised autosave sequencing, conflicts, navigation, locked resolved notes, dated addenda, and retries after a lost response.

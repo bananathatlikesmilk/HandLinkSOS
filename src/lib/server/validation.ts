@@ -166,9 +166,12 @@ export const deviceInput = z.strictObject({
 });
 export const summaryInput = z.strictObject({ summary: z.string().trim().min(1).max(4000) });
 export const aiGenerateInput = z.strictObject({
+	provider: z.enum(['ollama', 'gemini']).optional(),
+	providerRevision: z.union([z.uuid(), z.literal('default')]).optional(),
 	requestId: z.uuid(),
 	sourceNoteId: z.uuid(),
 	approvedText: z.string().trim().min(1).max(2000),
 	confirmed: z.literal(true)
 });
 export const aiReviewInput = z.strictObject({ requestId: z.uuid(), confirmed: z.literal(true) });
+export const aiSettingsInput = z.strictObject({ provider: z.enum(['ollama', 'gemini']) });
