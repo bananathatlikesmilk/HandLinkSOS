@@ -55,3 +55,11 @@ pnpm exec playwright test --config=playwright.ai.config.ts
 ```
 
 The browser suites use isolated test databases. Do not replace their test configuration with production credentials. Mocked AI checks prove request handling and data preservation, not model accuracy. See the AI setup document for the separate opt-in fictional-data inference check.
+
+## SOS profile search and favorites — 21 October 2026
+
+The User dashboard filters approved SOS profiles by name, ignoring capitalization and surrounding spaces. A separate star button saves a personal favorite without starting SOS. Favorites appear first, followed by alphabetical name order. Self SOS remains separate. Search never exposes unapproved profiles, and revoking a trusted connection removes it from the eligible list even if it was favorited.
+
+Favorites are stored on the requesting account's trusted connection and persist across reloads and devices. Another account cannot read or change this preference through its own SOS list. Failed saves keep the previous state and show an error for retry.
+
+Deploy migration `0013_sos_favorites.sql` before serving the updated application. Normal Docker startup applies pending migrations. Local setup uses `pnpm db:migrate`, which backs up an existing database first. The migration adds a Boolean column defaulting to false and preserves existing connections. Application rollback can leave the extra column in place; older application versions ignore it. Do not drop the column or restore an old database as part of a routine rollback.

@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { ArrowRight, Plus, Siren, Users } from '@lucide/svelte';
+	import { ArrowRight, Plus, Search, Siren, Star, Users } from '@lucide/svelte';
 	import { getUserPreview } from '#lib/user/preview.svelte.ts';
 	import { incidentRequest, type SosTarget } from '#lib/user/incidents-client.ts';
 	import type { IncidentSummary } from '#lib/incidents.ts';
@@ -13,11 +13,28 @@
 	let error = $state('');
 	const self = $derived(targets.find((target) => target.id === preview.profile.id));
 	const trusted = $derived(targets.filter((target) => target.id !== preview.profile.id));
+	let search = $state('');
+	let savingFavorites = $state<string[]>([]);
+	let favoriteError = $state('');
+	let targetRevision = 0;
+	const visiblePeople = $derived(
+		trusted
+			.filter((person) =>
+				person.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())
+			)
+			.sort(
+				(a, b) =>
+					Number(b.favorite) - Number(a.favorite) ||
+					a.name.localeCompare(b.name) ||
+					a.id.localeCompare(b.id)
+			)
+	);
 	let controller: AbortController;
 	let refreshing = false;
 	async function refresh() {
 		if (refreshing) return;
 		refreshing = true;
+		const revision = targetRevision;
 		try {
 			const [people, alerts] = await Promise.all([
 				incidentRequest<{ targets: SosTarget[] }>('/api/incidents/targets', {
@@ -27,7 +44,7 @@
 					signal: controller.signal
 				})
 			]);
-			targets = people.targets;
+			if (revision === targetRevision && !savingFavorites.length) targets = people.targets;
 			incidents = alerts.incidents;
 			error = '';
 		} catch (cause) {
@@ -51,6 +68,32 @@
 	});
 	async function start(id: string) {
 		await goto(resolve(`/user/sos?profile=${encodeURIComponent(id)}`));
+	}
+	async function toggleFavorite(person: SosTarget) {
+		if (savingFavorites.includes(person.id)) return;
+		favoriteError = '';
+		savingFavorites = [...savingFavorites, person.id];
+		targetRevision++;
+		try {
+			const saved = await incidentRequest<{ id: string; favorite: boolean }>(
+				resolve('/api/incidents/targets/[id]/favorite', { id: person.id }),
+				{
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ favorite: !person.favorite }),
+					signal: controller.signal
+				}
+			);
+			targets = targets.map((target) =>
+				target.id === saved.id ? { ...target, favorite: saved.favorite } : target
+			);
+		} catch (cause) {
+			if (!controller.signal.aborted)
+				favoriteError = cause instanceof Error ? cause.message : 'Could not save favorite.';
+		} finally {
+			targetRevision++;
+			savingFavorites = savingFavorites.filter((id) => id !== person.id);
+		}
 	}
 </script>
 
@@ -87,16 +130,44 @@
 			<h2 id="trusted-title">Added profiles</h2>
 			<a href={resolve('/user/profiles')}><Plus size={14} /> Add profile</a>
 		</div>
+		<label class="recipient-search">
+			<Search size={18} aria-hidden="true" />
+			<input
+				class="input"
+				type="search"
+				aria-label="Search SOS profiles"
+				placeholder="Search by name"
+				bind:value={search}
+			/>
+		</label>
+		{#if favoriteError}<p class="user-error" role="alert">{favoriteError}</p>{/if}
 		<div class="trusted-buttons">
-			{#each trusted as person (person.id)}<button
-					class="trusted-sos"
-					disabled={loading}
-					aria-label={`Start SOS for ${person.name}`}
-					onclick={() => start(person.id)}
-					><span>{person.name}</span><Siren size={17} strokeWidth={1.4} /></button
-				>{:else}<p class="user-copy">No approved trusted profiles available.</p>{/each}
+			{#each visiblePeople as person (person.id)}
+				<div class="trusted-person" class:favorite={person.favorite}>
+					<button
+						class="trusted-sos"
+						disabled={loading}
+						aria-label={`Start SOS for ${person.name}`}
+						onclick={() => start(person.id)}
+						><span>{person.name}</span><Siren size={17} strokeWidth={1.4} /></button
+					>
+					<button
+						class="favorite-toggle"
+						class:selected={person.favorite}
+						type="button"
+						aria-label={`${person.favorite ? 'Remove' : 'Add'} ${person.name} ${person.favorite ? 'from' : 'to'} favorites`}
+						aria-pressed={person.favorite}
+						disabled={savingFavorites.includes(person.id)}
+						onclick={() => toggleFavorite(person)}
+					>
+						<Star size={21} fill={person.favorite ? 'currentColor' : 'none'} aria-hidden="true" />
+					</button>
+				</div>
+			{:else}<p class="user-copy">
+					{search.trim() ? 'No matching profiles.' : 'No approved trusted profiles available.'}
+				</p>{/each}
 		</div>
-		<p class="trusted-help">Send SOS for approved profiles.</p>
+		<p class="trusted-help">Send SOS for approved profiles. Star favorites to keep them on top.</p>
 	</section>
 	<section class="user-panel mt-6 space-y-3" aria-labelledby="recent-sos-title">
 		<h2 id="recent-sos-title">Your recent SOS alerts</h2>
@@ -186,6 +257,8 @@
 		margin-top: 12px;
 	}
 	.trusted-sos {
+		flex: 1;
+		min-width: 0;
 		border: 1px solid var(--app-border);
 		display: flex;
 		align-items: center;
@@ -199,6 +272,50 @@
 	}
 	.trusted-sos:hover {
 		background: var(--app-surface-alt);
+	}
+	.recipient-search {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin-top: 12px;
+		color: var(--app-muted);
+	}
+	.recipient-search input {
+		width: 100%;
+		min-width: 0;
+	}
+	.recipient-search input::placeholder {
+		color: var(--app-muted);
+		opacity: 1;
+	}
+	.trusted-person {
+		display: flex;
+		gap: 8px;
+	}
+	.trusted-person.favorite .trusted-sos {
+		border-color: var(--app-accent);
+	}
+	.trusted-sos span {
+		overflow-wrap: anywhere;
+	}
+	.favorite-toggle {
+		display: grid;
+		place-items: center;
+		width: 52px;
+		min-height: 52px;
+		flex-shrink: 0;
+		border: 1px solid var(--app-border);
+		background: var(--app-surface);
+		color: var(--app-muted);
+		border-radius: 8px;
+	}
+	.favorite-toggle.selected {
+		color: var(--app-accent);
+		border-color: var(--app-accent);
+	}
+	.favorite-toggle:focus-visible {
+		outline: 2px solid var(--app-accent);
+		outline-offset: 3px;
 	}
 	.trusted-help {
 		font-size: 12px;

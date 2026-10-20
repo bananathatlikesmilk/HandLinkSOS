@@ -39,6 +39,37 @@ function seed(client) {
 			.run(id, owner, 'First', 'Last', '2000-01-01', 'Female', '+639171234567', Date.now());
 }
 
+test('SOS favorites migration preserves trusted connections and defaults existing rows to unfavorited', () => {
+	const client = new Database(':memory:');
+	client.pragma('foreign_keys=ON');
+	try {
+		const migrations = readMigrationFiles({ migrationsFolder: './drizzle' });
+		for (const migration of migrations.slice(0, 13))
+			for (const statement of migration.sql) client.exec(statement);
+		seed(client);
+		client
+			.prepare(
+				"INSERT INTO trusted_connection (id,owner_profile_id,requester_profile_id,relationship,status,approved_at) VALUES ('connection','profile-owner','profile-requester','Sibling','approved',?)"
+			)
+			.run(Date.now());
+		const before = client.prepare('SELECT * FROM trusted_connection').get();
+		for (const statement of migrations[13].sql) client.exec(statement);
+		assert.deepEqual(client.prepare('SELECT * FROM trusted_connection').get(), {
+			...before,
+			requester_favorite: 0
+		});
+		client.prepare('UPDATE trusted_connection SET requester_favorite=1').run();
+		assert.equal(
+			client.prepare('SELECT requester_favorite FROM trusted_connection').get().requester_favorite,
+			1
+		);
+		assert.throws(() => client.prepare('UPDATE trusted_connection SET requester_favorite=2').run());
+		assert.deepEqual(client.pragma('foreign_key_check'), []);
+	} finally {
+		client.close();
+	}
+});
+
 test('short incident references preserve old records, backfill in order, and remain unique and immutable', () => {
 	const client = new Database(':memory:');
 	client.pragma('foreign_keys=ON');

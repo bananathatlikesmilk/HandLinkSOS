@@ -151,6 +151,7 @@ export const trustedConnection = sqliteTable(
 			.references(() => profile.id, { onDelete: 'restrict' }),
 		invitationId: text('invitation_id').references(() => qrInvitation.id, { onDelete: 'restrict' }),
 		relationship: text('relationship').notNull(),
+		requesterFavorite: integer('requester_favorite', { mode: 'boolean' }).notNull().default(false),
 		status: text('status', { enum: ['pending', 'approved', 'revoked'] })
 			.notNull()
 			.default('pending'),
@@ -162,6 +163,7 @@ export const trustedConnection = sqliteTable(
 		uniqueIndex('trusted_pair_unique').on(t.ownerProfileId, t.requesterProfileId),
 		check('trusted_not_self', sql`${t.ownerProfileId} <> ${t.requesterProfileId}`),
 		check('trusted_status', sql`${t.status} in ('pending','approved','revoked')`),
+		check('trusted_requester_favorite', sql`${t.requesterFavorite} in (0, 1)`),
 		check('trusted_approval', sql`${t.status} <> 'approved' or ${t.approvedAt} is not null`)
 	]
 );

@@ -11,6 +11,76 @@ import {
 import { enrollStaffMfa } from './mfa-fixture';
 import { password } from './incident-fixture';
 
+test('SOS favorites are persistent, requester-scoped and restricted to approved active profiles', async ({
+	request,
+	playwright
+}) => {
+	const caller = await provision(),
+		person = await provision(),
+		other = await provision();
+	const endpoint = `/api/incidents/targets/${person.profileId}/favorite`;
+	expect((await request.put(endpoint, { headers, data: { favorite: true } })).status()).toBe(401);
+	const db = database();
+	try {
+		for (const requester of [caller, other])
+			db.prepare(
+				"INSERT INTO trusted_connection (id,owner_profile_id,requester_profile_id,relationship,status,approved_at) VALUES (?,?,?,'Friend','approved',?)"
+			).run(crypto.randomUUID(), person.profileId, requester.profileId, Date.now());
+	} finally {
+		db.close();
+	}
+	await login(request, caller);
+	expect((await request.put(endpoint, { data: { favorite: true } })).status()).toBe(403);
+	expect((await request.put(endpoint, { headers, data: { favorite: 'yes' } })).status()).toBe(422);
+	expect(
+		(
+			await request.put(endpoint, {
+				headers,
+				data: { favorite: true, requesterProfileId: other.profileId }
+			})
+		).status()
+	).toBe(422);
+	for (let i = 0; i < 2; i++)
+		expect((await request.put(endpoint, { headers, data: { favorite: true } })).status()).toBe(200);
+	const people = await (await request.get('/api/incidents/targets')).json();
+	expect(
+		people.targets.find((target: { id: string }) => target.id === person.profileId).favorite
+	).toBe(true);
+	const context = await playwright.request.newContext({ baseURL: origin });
+	try {
+		await login(context, other);
+		const ownPeople = await (await context.get('/api/incidents/targets')).json();
+		expect(
+			ownPeople.targets.find((target: { id: string }) => target.id === person.profileId).favorite
+		).toBe(false);
+		expect(
+			(
+				await context.put(`/api/incidents/targets/${caller.profileId}/favorite`, {
+					headers,
+					data: { favorite: true }
+				})
+			).status()
+		).toBe(404);
+	} finally {
+		await context.dispose();
+	}
+	const check = database();
+	try {
+		check
+			.prepare(
+				"UPDATE trusted_connection SET status='revoked',revoked_at=? WHERE requester_profile_id=? AND owner_profile_id=?"
+			)
+			.run(Date.now(), caller.profileId, person.profileId);
+	} finally {
+		check.close();
+	}
+	expect((await request.put(endpoint, { headers, data: { favorite: false } })).status()).toBe(404);
+	const remaining = await (await request.get('/api/incidents/targets')).json();
+	expect(remaining.targets.some((target: { id: string }) => target.id === person.profileId)).toBe(
+		false
+	);
+});
+
 test('SOS endpoints enforce sessions, roles, MFA, same origin, and strict inputs', async ({
 	request,
 	playwright

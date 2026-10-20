@@ -1,4 +1,4 @@
-export type SosTarget = { id: string; name: string };
+export type SosTarget = { id: string; name: string; favorite: boolean };
 
 export type PendingSos = {
 	personProfileId: string;

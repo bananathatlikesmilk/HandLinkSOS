@@ -85,7 +85,8 @@ export function listSosTargets(event: RequestEvent) {
 	const approved = db
 		.select({
 			id: profile.id,
-			name: sql<string>`${profile.firstName} || ' ' || ${profile.lastName}`
+			name: sql<string>`${profile.firstName} || ' ' || ${profile.lastName}`,
+			favorite: trustedConnection.requesterFavorite
 		})
 		.from(trustedConnection)
 		.innerJoin(profile, eq(profile.id, trustedConnection.ownerProfileId))
@@ -104,10 +105,41 @@ export function listSosTargets(event: RequestEvent) {
 		.all();
 	return {
 		targets: [
-			{ id: ownProfile.id, name: `${ownProfile.firstName} ${ownProfile.lastName}` },
+			{
+				id: ownProfile.id,
+				name: `${ownProfile.firstName} ${ownProfile.lastName}`,
+				favorite: false
+			},
 			...approved
 		]
 	};
+}
+export function setSosFavorite(event: RequestEvent, id: string | undefined, favorite: boolean) {
+	return db.transaction(
+		(tx) => {
+			const { ownProfile } = requireUser(event);
+			if (
+				!id ||
+				!ownProfile ||
+				id === ownProfile.id ||
+				!listSosTargets(event).targets.some((person) => person.id === id)
+			)
+				error(404, 'Approved SOS profile not found.');
+			tx.update(trustedConnection)
+				.set({ requesterFavorite: favorite })
+				.where(
+					and(
+						eq(trustedConnection.requesterProfileId, ownProfile.id),
+						eq(trustedConnection.ownerProfileId, id),
+						eq(trustedConnection.status, 'approved'),
+						isNull(trustedConnection.revokedAt)
+					)
+				)
+				.run();
+			return { id, favorite };
+		},
+		{ behavior: 'immediate' }
+	);
 }
 export function getOwnIncident(event: RequestEvent, id: string) {
 	const { identity } = requireUser(event);

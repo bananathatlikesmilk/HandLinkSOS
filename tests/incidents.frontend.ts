@@ -10,6 +10,92 @@ import {
 	sos
 } from './incident-fixture';
 
+test('SOS profiles can be searched and account favorites stay first after reload', async ({
+	page
+}) => {
+	const caller = await provision();
+	const ana = await provision();
+	const zoe = await provision();
+	const db = database();
+	try {
+		for (const [person, firstName] of [
+			[ana, 'Ana'],
+			[zoe, 'Zoe']
+		] as const) {
+			db.prepare('UPDATE user_profile SET first_name=? WHERE id=?').run(
+				firstName,
+				person.profileId
+			);
+			db.prepare(
+				"INSERT INTO trusted_connection (id,owner_profile_id,requester_profile_id,relationship,status,approved_at) VALUES (?,?,?,'Friend','approved',?)"
+			).run(crypto.randomUUID(), person.profileId, caller.profileId, Date.now());
+		}
+	} finally {
+		db.close();
+	}
+	await login(page.request, caller);
+	let sentAlerts = 0;
+	page.on('request', (outgoing) => {
+		if (outgoing.method() === 'POST' && outgoing.url().endsWith('/api/incidents')) sentAlerts++;
+	});
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/user/dashboard');
+	const list = page.locator('.trusted-buttons');
+	await expect(
+		list.getByRole('button', { name: 'Start SOS for Ana Reyes', exact: true })
+	).toBeVisible();
+	await expect(list.locator('.trusted-person').first()).toContainText('Ana Reyes');
+	const favoriteUrl = `**/api/incidents/targets/${zoe.profileId}/favorite`;
+	await page.route(favoriteUrl, (route) =>
+		route.fulfill({
+			status: 503,
+			contentType: 'application/json',
+			body: JSON.stringify({ message: 'Favorite temporarily unavailable.' })
+		})
+	);
+	await page.getByRole('button', { name: 'Add Zoe Reyes to favorites', exact: true }).click();
+	await expect(page.getByRole('alert')).toBeVisible();
+	await expect(list.locator('.trusted-person').first()).toContainText('Ana Reyes');
+	await expect(
+		page.getByRole('button', { name: 'Add Zoe Reyes to favorites', exact: true })
+	).toHaveAttribute('aria-pressed', 'false');
+	await page.unroute(favoriteUrl);
+	await page.getByRole('button', { name: 'Add Zoe Reyes to favorites', exact: true }).click();
+	await expect(
+		page.getByRole('button', { name: 'Remove Zoe Reyes from favorites', exact: true })
+	).toHaveAttribute('aria-pressed', 'true');
+	await expect(list.locator('.trusted-person').first()).toContainText('Zoe Reyes');
+	const search = page.getByRole('searchbox', { name: 'Search SOS profiles', exact: true });
+	await search.fill(' aNa ');
+	await expect(list.locator('.trusted-person')).toHaveCount(1);
+	await expect(list).toContainText('Ana Reyes');
+	await search.fill('nobody-matches');
+	await expect(list).toContainText('No matching profiles.');
+	await search.fill('');
+	await page.reload();
+	await expect(list.locator('.trusted-person').first()).toContainText('Zoe Reyes');
+	await expect(
+		page.getByRole('button', { name: 'Remove Zoe Reyes from favorites', exact: true })
+	).toHaveAttribute('aria-pressed', 'true');
+	for (const appearance of ['light', 'dark']) {
+		await page.evaluate(
+			(value) => document.documentElement.setAttribute('data-appearance', value),
+			appearance
+		);
+		expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+			true
+		);
+		await page.locator('.trusted-section').screenshot({
+			path: test.info().outputPath(`sos-favorites-${appearance}.png`),
+			animations: 'disabled'
+		});
+	}
+	await page.getByRole('button', { name: 'Remove Zoe Reyes from favorites', exact: true }).click();
+	await expect(list.locator('.trusted-person').first()).toContainText('Ana Reyes');
+	await expect(page).toHaveURL('/user/dashboard');
+	expect(sentAlerts).toBe(0);
+});
+
 test('SOS for someone else keeps caller, beneficiary and relationship visible after confirmation', async ({
 	page,
 	request
