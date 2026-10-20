@@ -5,6 +5,7 @@
 	import UserProfileFields from '#lib/user/UserProfileFields.svelte';
 	import { getUserPreview, type UserProfile } from '#lib/user/preview.svelte.ts';
 	import { accountRequest, loadAccountProfile, profilePayload } from '#lib/user/account.ts';
+	import { clearFieldValidation, validateForm } from '#lib/client/form-validation.ts';
 	const preview = getUserPreview();
 	let draft = $state<UserProfile>(structuredClone($state.snapshot(preview.profile)));
 	let busy = $state(false);
@@ -12,6 +13,8 @@
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
 		if (busy) return;
+		errorMessage = validateForm(event.currentTarget as HTMLFormElement);
+		if (errorMessage) return;
 		busy = true;
 		errorMessage = '';
 		try {
@@ -37,7 +40,16 @@
 	</header>
 	<p class="user-copy">Changes are saved to your account.</p>
 	{#if errorMessage}<p class="user-notice" role="alert">{errorMessage}</p>{/if}
-	<form class="space-y-6" onsubmit={save} aria-busy={busy}>
+	<form
+		class="space-y-6"
+		novalidate
+		onsubmit={save}
+		oninput={(event) => {
+			clearFieldValidation(event);
+			errorMessage = '';
+		}}
+		aria-busy={busy}
+	>
 		<fieldset disabled={busy} class="min-w-0 space-y-6">
 			<UserProfileFields bind:profile={draft} />
 			<div class="user-panel">

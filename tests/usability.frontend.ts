@@ -184,6 +184,11 @@ test('registration blocks incomplete personal fields and limits local phone to 1
 	await page.goto('/user/register');
 	await expect(page.getByLabel('Phone number', { exact: true })).toHaveValue('09');
 	await page.getByRole('button', { name: 'Continue', exact: true }).click();
+	await expect(page.getByRole('alert')).toContainText('First name: This field is required.');
+	await expect(page.getByLabel('First name', { exact: true })).toHaveAttribute(
+		'aria-invalid',
+		'true'
+	);
 	await expect(
 		page.getByRole('group', { name: 'Personal information', exact: true })
 	).toBeVisible();
@@ -200,6 +205,10 @@ test('registration blocks incomplete personal fields and limits local phone to 1
 		page.getByRole('group', { name: 'Personal information', exact: true })
 	).toBeVisible();
 	await page.getByLabel('First name', { exact: true }).fill('Casey');
+	await expect(page.getByLabel('First name', { exact: true })).not.toHaveAttribute(
+		'aria-invalid',
+		'true'
+	);
 	await page.getByRole('button', { name: 'Continue', exact: true }).click();
 	await expect(page.getByRole('group', { name: /Medical information/ })).toBeVisible();
 	await page.getByRole('button', { name: 'Continue', exact: true }).click();
@@ -240,6 +249,41 @@ test('registration shows duplicate phone and email feedback before submission', 
 		'This email is already registered. Log in or use another email.'
 	);
 	await expect(page).toHaveURL('/user/register');
+});
+
+test('profile errors identify the rejected field, preserve edits, and explain network failures', async ({
+	page
+}) => {
+	await login(page.request, await provision());
+	await page.goto('/user/profiles/edit');
+	const allergies = page.getByLabel('Allergies', { exact: true });
+	await allergies.fill('Draft allergy note');
+	await page.route('**/api/profile', (route) =>
+		route.request().method() === 'PUT'
+			? route.fulfill({
+					status: 422,
+					contentType: 'application/json',
+					body: JSON.stringify({
+						message: 'Emergency contact 1 - Email: Enter a valid email, such as name@example.com.'
+					})
+				})
+			: route.continue()
+	);
+	await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+	await expect(page.getByRole('alert')).toContainText(
+		'Emergency contact 1 - Email: Enter a valid email'
+	);
+	await expect(allergies).toHaveValue('Draft allergy note');
+	await expect(page).toHaveURL('/user/profiles/edit');
+	await page.unroute('**/api/profile');
+	await page.route('**/api/profile', (route) =>
+		route.request().method() === 'PUT' ? route.abort('internetdisconnected') : route.continue()
+	);
+	await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+	await expect(page.getByRole('alert')).toContainText(
+		'Cannot reach the server. Check your internet connection'
+	);
+	await expect(allergies).toHaveValue('Draft allergy note');
 });
 
 test('User navigation stays visible and chosen theme persists across pages', async ({ page }) => {

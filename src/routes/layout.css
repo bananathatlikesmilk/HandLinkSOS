@@ -927,3 +927,11 @@ body {
 	color: #654600;
 	border-color: #96752b;
 }
+
+:is(.user-error, .user-notice, .error-message, .alert)[role='alert'] {
+	white-space: pre-line;
+}
+.user-preview :is(input, select, textarea)[aria-invalid='true'] {
+	outline: 2px solid var(--color-error, #c43c3c);
+	outline-offset: 2px;
+}

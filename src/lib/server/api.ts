@@ -4,6 +4,7 @@ import type { z } from 'zod';
 import { db } from './db/index.ts';
 import { profile, session, user } from './db/schema.ts';
 import { hasStaffMfa } from './staff-mfa.ts';
+import { inputProblems, inputProblemMessage } from './input-errors.ts';
 
 function currentAccount(event: RequestEvent) {
 	if (!event.locals.user || !event.locals.session) error(401, 'Sign in first.');
@@ -89,7 +90,11 @@ export async function readInput<T extends z.ZodType>(
 		error(400, 'Invalid JSON.');
 	}
 	const result = schema.safeParse(body);
-	if (!result.success) error(422, 'Invalid fields. Check the required formats and limits.');
+	if (!result.success) {
+		const issues = inputProblems(result.error.issues);
+		event.setHeaders({ 'Cache-Control': 'no-store' });
+		error(422, inputProblemMessage(issues), { issues });
+	}
 	return result.data;
 }
 

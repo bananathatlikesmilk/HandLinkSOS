@@ -7,6 +7,7 @@
 	import { emptyProfile } from '#lib/user/preview.svelte.ts';
 	import { page } from '$app/state';
 	import { profilePayload, accountRequest } from '#lib/user/account.ts';
+	import { clearFieldValidation, validateForm } from '#lib/client/form-validation.ts';
 	let busy = $state(false);
 	let profile = $state({
 		...emptyProfile(),
@@ -61,25 +62,11 @@
 	function clearValidation(event: Event) {
 		availabilityVersion++;
 		error = '';
-		const field = event.target;
-		if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement)
-			field.setCustomValidity('');
+		clearFieldValidation(event);
 	}
 	function validStep(form: HTMLFormElement) {
-		for (const field of form.querySelectorAll<HTMLInputElement | HTMLSelectElement>(
-			'input[required], select[required]'
-		)) {
-			field.setCustomValidity('');
-			if (!field.value.trim()) field.setCustomValidity('Complete this required field.');
-			if (field instanceof HTMLInputElement && field.type === 'tel') {
-				const number = field.value.trim().replace(/[\s()-]/g, '');
-				if (!/^09\d{9}$/.test(number))
-					field.setCustomValidity('Enter 11 digits, such as 09171234567.');
-			}
-		}
-		if (form.checkValidity()) return true;
-		form.reportValidity();
-		return false;
+		error = validateForm(form);
+		return !error;
 	}
 	async function next(event: SubmitEvent) {
 		event.preventDefault();
@@ -139,7 +126,7 @@
 						</li>{/each}
 				</ol>
 				<p class="user-copy">Fields marked <span aria-hidden="true">*</span> are required.</p>
-				<form onsubmit={next} oninput={clearValidation} onfocusout={checkField}>
+				<form novalidate onsubmit={next} oninput={clearValidation} onfocusout={checkField}>
 					<UserProfileFields bind:profile section={sections[step]} />
 					{#if step === 2}
 						<div class="user-divider"></div>

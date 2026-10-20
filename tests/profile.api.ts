@@ -116,6 +116,34 @@ test('API rejects foreign origins, oversized bodies, and invalid fields', async 
 	expect(await (await request.get('/api/profile')).json()).toEqual({ profile: null });
 });
 
+test('invalid input returns named fields and correction rules without submitted private values', async ({
+	request
+}) => {
+	await signIn(request);
+	const response = await request.put('/api/profile', {
+		headers,
+		data: {
+			...input,
+			firstName: ' ',
+			phone: 'PRIVATE-BAD-PHONE',
+			emergencyContacts: [{ ...input.emergencyContacts[0], email: 'PRIVATE-BAD-EMAIL' }]
+		}
+	});
+	expect(response.status()).toBe(422);
+	expect(response.headers()['cache-control']).toBe('no-store');
+	const body = await response.json();
+	expect(body.message).toContain('First name: This field is required.');
+	expect(body.message).toContain('Phone number: Use 11 digits starting with 09');
+	expect(body.message).toContain('Emergency contact 1 - Email: Enter a valid email');
+	expect(body.issues).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({ field: 'First name' }),
+			expect.objectContaining({ field: 'Emergency contact 1 - Email' })
+		])
+	);
+	expect(JSON.stringify(body)).not.toContain('PRIVATE');
+});
+
 test('public registration cannot grant a staff role', async ({ request }) => {
 	const response = await request.post('/api/auth/sign-up/email', {
 		headers,
