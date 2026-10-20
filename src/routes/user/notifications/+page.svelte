@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { Bell, Check } from '@lucide/svelte';
@@ -60,6 +60,38 @@
 			pageSize = result.pageSize;
 			currentPage = result.page;
 			error = '';
+			await tick();
+			if (stopped || document.hidden || controller.signal.aborted || data.account?.id !== identity)
+				return;
+			const unread = result.notifications.filter((item) => !item.readAt);
+			const saved = await Promise.allSettled(
+				unread.map(async (item) => {
+					await apiRequest(`/api/notifications/${encodeURIComponent(item.id)}/read`, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: '{}',
+						signal: controller.signal
+					});
+					return item.id;
+				})
+			);
+			if (stopped || controller.signal.aborted || data.account?.id !== identity) return;
+			const readIds = new Set(
+				saved.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []))
+			);
+			if (readIds.size) {
+				const readAt = new Date().toISOString();
+				notifications = notifications.map((item) =>
+					readIds.has(item.id) ? { ...item, readAt } : item
+				);
+				window.dispatchEvent(new Event('user-notifications-change'));
+			}
+			for (const result of saved) {
+				if (result.status !== 'rejected') continue;
+				if (result.reason instanceof ApiRequestError && [401, 403].includes(result.reason.status))
+					throw result.reason;
+				error = 'Some updates could not be marked as read. Refresh to retry.';
+			}
 		} catch (cause) {
 			if (!stopped && !controller.signal.aborted) {
 				if (cause instanceof ApiRequestError && (cause.status === 401 || cause.status === 403)) {

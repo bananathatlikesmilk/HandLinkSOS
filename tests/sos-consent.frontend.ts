@@ -59,7 +59,10 @@ test('mutual request stays pending until separate approval; beneficiary sees SOS
 		).toBeVisible();
 		await expect(page.getByText(`Incident reference: ${reference}`, { exact: true })).toBeVisible();
 		await expect(page.getByText(id, { exact: false })).toHaveCount(0);
-		await page.getByRole('button', { name: 'Mark as read' }).click();
+		await expect(page.getByRole('button', { name: 'Mark as read' })).toHaveCount(0);
+		await expect
+			.poll(async () => (await (await page.request.get('/api/notifications')).json()).unreadCount)
+			.toBe(0);
 		await page.getByLabel('Reason for cancellation').fill('I am safe now. Please confirm with me.');
 		await page.getByRole('button', { name: 'Request cancellation', exact: true }).click();
 		await expect(page.getByText('Awaiting dispatcher review', { exact: true })).toBeVisible();
@@ -85,9 +88,11 @@ test('mutual request stays pending until separate approval; beneficiary sees SOS
 		await expect(page.getByText('Cancellation approved', { exact: true })).toBeVisible({
 			timeout: 15000
 		});
-		await expect(page.getByRole('link', { name: 'Updates, 1 unread' })).toBeVisible({
-			timeout: 15000
-		});
+		await expect
+			.poll(async () => (await (await page.request.get('/api/notifications')).json()).unreadCount, {
+				timeout: 15000
+			})
+			.toBe(0);
 		await page.route('**/api/notifications?*', (route) =>
 			route.fulfill({
 				status: 401,
