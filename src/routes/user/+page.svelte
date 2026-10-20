@@ -1,43 +1,47 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import UserBrand from '#lib/user/UserBrand.svelte';
+	import AuthFrame from '#lib/components/AuthFrame.svelte';
 </script>
 
-<svelte:head><title>HandLink — Your safety, connected</title></svelte:head>
-<section class="welcome">
-	<div class="welcome-brand">
-		<UserBrand large />
-		<p class="user-copy">Your safety, connected.</p>
-	</div>
-	<div class="user-actions welcome-actions">
-		<a class="btn w-full btn-primary" href={resolve('/user/login')}>Log In</a>
-		<a class="btn w-full btn-outline" href={resolve('/user/register')}>Create Account</a>
-		<p class="welcome-note">A helping hand, when you need it most.</p>
-	</div>
-</section>
+<svelte:head><title>HandLink | Your safety, connected</title></svelte:head>
+<AuthFrame>
+	<main id="user-content" class="welcome">
+		<section class="welcome-content" aria-labelledby="welcome-title">
+			<p class="user-kicker">HANDLINK</p>
+			<h1 id="welcome-title">Your safety,<br />connected.</h1>
+			<p class="welcome-copy">A helping hand, when you need it most.</p>
+			<div class="welcome-actions">
+				<a class="btn w-full btn-primary" href={resolve('/login')}>Log In</a>
+				<a class="btn w-full btn-outline" href={resolve('/user/register')}>Create Account</a>
+			</div>
+		</section>
+	</main>
+</AuthFrame>
 
 <style>
 	.welcome {
-		min-height: calc(100svh - 10rem);
-		display: flex;
-		flex-direction: column;
-		justify-content: space-between;
-		align-items: center;
-		padding: clamp(4rem, 14vh, 7rem) 0 2rem;
-	}
-	.welcome-brand {
+		min-height: 100dvh;
 		display: grid;
-		justify-items: center;
-		gap: 1.25rem;
+		place-items: center;
+		padding: 132px 24px 96px;
+	}
+	.welcome-content {
+		width: min(100%, 360px);
+		text-align: center;
+	}
+	h1 {
+		font-size: clamp(36px, 7vw, 48px);
+		line-height: 1.15;
+		font-weight: 400;
+		margin-block: 16px;
+	}
+	.welcome-copy {
+		color: var(--app-muted);
+		line-height: 1.7;
+		margin-block: 20px 36px;
 	}
 	.welcome-actions {
-		width: min(100%, 320px);
-		margin-top: 5rem;
-	}
-	.welcome-note {
-		text-align: center;
-		font-size: 0.75rem;
-		color: #b7b7ab;
-		margin-top: 0.75rem;
+		display: grid;
+		gap: 16px;
 	}
 </style>

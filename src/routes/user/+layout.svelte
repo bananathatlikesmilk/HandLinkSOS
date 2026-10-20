@@ -123,87 +123,93 @@
 
 <svelte:head><meta name="theme-color" content="#17180f" /></svelte:head>
 <a href="#user-content" class="skip-link">Skip to User screen</a>
-<div class="user-preview" class:has-navigation={!authPage} data-theme="handlink-user">
-	{#if !authPage}
-		<nav class="user-navigation" aria-label="Main navigation">
-			{#each navigation as link (link.href)}
-				<a
-					href={resolve(link.href)}
-					class:current={page.url.pathname.startsWith(link.href)}
-					aria-current={page.url.pathname.startsWith(link.href) ? 'page' : undefined}
-					aria-label={link.label === 'Updates' && unreadCount > 0
-						? `Updates, ${unreadCount} unread`
-						: link.label}
-				>
-					<span class="navigation-icon"
-						><link.icon
-							size={23}
-							aria-hidden="true"
-						/>{#if link.label === 'Updates' && unreadCount > 0}<span class="navigation-badge"
-								>{unreadCount > 99 ? '99+' : unreadCount}</span
-							>{/if}</span
-					>
-					<span>{link.label}</span>
-				</a>
-			{/each}
-		</nav>
-	{/if}
-	<div class="user-device" class:with-navigation={!authPage}>
-		{#if !welcome}<header class="user-header">
-				<UserBrand />
-				<div class="header-controls">
-					<ThemeToggle />
-				</div>
-			</header>{/if}
-		{#if data.account && !authPage}
-			<section class="signed-in-account" aria-label="Signed-in account">
-				<span class="account-label">Signed in as</span>
-				<strong>{data.account.name}</strong>
-				<span class="account-email">{data.account.email}</span>
-				<span class="account-role">User</span>
-			</section>
-		{/if}
-		{#if !authPage && !dashboard}<div class="user-back">
-				<a href={resolve('/user/dashboard')}><ChevronLeft size={17} /> Dashboard</a>
-			</div>{/if}
-		{#if !authPage && unreadCount > 0}
-			<a class="notification-banner" href={resolve('/user/notifications')}
-				><Bell size={18} /> You have unread updates <span>({unreadCount})</span></a
-			>
-		{/if}
-		{#if !authPage && showLocationWarning && locationWarning}
-			<div class="sharing-warning" role="status" aria-atomic="true">
-				<Bell size={20} aria-hidden="true" />
-				<div>
-					{#if locationWarning.isOwner}
-						<strong>Your location sharing ends in less than a minute.</strong>
-						<a href={resolve('/user/sharing')}>Manage location sharing</a>
-					{:else}
-						<strong
-							>{locationWarning.ownerName}'s location sharing ends in less than a minute.</strong
-						>
-						<a
-							href={resolve(
-								`/user/sharing/view?id=${encodeURIComponent(locationWarning.sessionId)}`
-							)}
-						>
-							View location
-						</a>
-					{/if}
-				</div>
-			</div>
-		{/if}
-		{#if data.account && !authPage}{#key data.account.id}<LocationPublisher
-					accountId={data.account.id}
-				/><UserPermissionStartup accountId={data.account.id} />{/key}{/if}
-		<main id="user-content" tabindex="-1" class="user-content">
-			{#key data.account?.id}{@render children()}{/key}
-		</main>
-		<footer class="user-footer">
-			<span>HandLink</span><span>Your people. Within reach.</span>
-		</footer>
+{#if welcome || page.url.pathname === '/user/register'}
+	<div class="user-preview" data-theme="handlink-user">
+		{#key data.account?.id}{@render children()}{/key}
 	</div>
-</div>
+{:else}
+	<div class="user-preview" class:has-navigation={!authPage} data-theme="handlink-user">
+		{#if !authPage}
+			<nav class="user-navigation" aria-label="Main navigation">
+				{#each navigation as link (link.href)}
+					<a
+						href={resolve(link.href)}
+						class:current={page.url.pathname.startsWith(link.href)}
+						aria-current={page.url.pathname.startsWith(link.href) ? 'page' : undefined}
+						aria-label={link.label === 'Updates' && unreadCount > 0
+							? `Updates, ${unreadCount} unread`
+							: link.label}
+					>
+						<span class="navigation-icon"
+							><link.icon
+								size={23}
+								aria-hidden="true"
+							/>{#if link.label === 'Updates' && unreadCount > 0}<span class="navigation-badge"
+									>{unreadCount > 99 ? '99+' : unreadCount}</span
+								>{/if}</span
+						>
+						<span>{link.label}</span>
+					</a>
+				{/each}
+			</nav>
+		{/if}
+		<div class="user-device" class:with-navigation={!authPage}>
+			{#if !welcome}<header class="user-header">
+					<UserBrand />
+					<div class="header-controls">
+						<ThemeToggle />
+					</div>
+				</header>{/if}
+			{#if data.account && !authPage}
+				<section class="signed-in-account" aria-label="Signed-in account">
+					<span class="account-label">Signed in as</span>
+					<strong>{data.account.name}</strong>
+					<span class="account-email">{data.account.email}</span>
+					<span class="account-role">User</span>
+				</section>
+			{/if}
+			{#if !authPage && !dashboard}<div class="user-back">
+					<a href={resolve('/user/dashboard')}><ChevronLeft size={17} /> Dashboard</a>
+				</div>{/if}
+			{#if !authPage && unreadCount > 0}
+				<a class="notification-banner" href={resolve('/user/notifications')}
+					><Bell size={18} /> You have unread updates <span>({unreadCount})</span></a
+				>
+			{/if}
+			{#if !authPage && showLocationWarning && locationWarning}
+				<div class="sharing-warning" role="status" aria-atomic="true">
+					<Bell size={20} aria-hidden="true" />
+					<div>
+						{#if locationWarning.isOwner}
+							<strong>Your location sharing ends in less than a minute.</strong>
+							<a href={resolve('/user/sharing')}>Manage location sharing</a>
+						{:else}
+							<strong
+								>{locationWarning.ownerName}'s location sharing ends in less than a minute.</strong
+							>
+							<a
+								href={resolve(
+									`/user/sharing/view?id=${encodeURIComponent(locationWarning.sessionId)}`
+								)}
+							>
+								View location
+							</a>
+						{/if}
+					</div>
+				</div>
+			{/if}
+			{#if data.account && !authPage}{#key data.account.id}<LocationPublisher
+						accountId={data.account.id}
+					/><UserPermissionStartup accountId={data.account.id} />{/key}{/if}
+			<main id="user-content" tabindex="-1" class="user-content">
+				{#key data.account?.id}{@render children()}{/key}
+			</main>
+			<footer class="user-footer">
+				<span>HandLink</span><span>Your people. Within reach.</span>
+			</footer>
+		</div>
+	</div>
+{/if}
 
 <style>
 	.user-header {

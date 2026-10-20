@@ -809,7 +809,7 @@ body {
 	color: var(--app-text);
 }
 :root[data-appearance='light'] .auth-shell::before {
-	opacity: 0.16;
+	opacity: 0.32;
 }
 :root[data-appearance='light'] .auth-shell::after {
 	background: transparent;
@@ -836,7 +836,7 @@ body {
 }
 
 /* Legacy feature components also need complete foreground/background pairs in light mode. */
-:root[data-appearance='light'] .auth-shell :is(.input, .background-toggle),
+:root[data-appearance='light'] .auth-shell :is(.input, .select, .textarea, .background-toggle),
 :root[data-appearance='light'] .handlink-staff .security input:not([type='checkbox']) {
 	background: var(--app-surface);
 	color: var(--app-text);

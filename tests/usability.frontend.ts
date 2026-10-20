@@ -2,6 +2,54 @@ import { expect, test, type Locator } from '@playwright/test';
 import { headers, login, password, provision } from './incident-fixture';
 import { enrollStaffMfa, totp } from './mfa-fixture';
 
+test('welcome and registration share the login animation and readable mobile light theme', async ({
+	page
+}) => {
+	await page.addInitScript(() => localStorage.setItem('handlink:appearance', 'light'));
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/user');
+	await expect(page.locator('html')).toHaveAttribute('data-appearance', 'light');
+	await expect(page.locator('.auth-shell')).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Log In', exact: true })).toBeVisible();
+	const pause = page.getByRole('button', { name: 'Pause background animation', exact: true });
+	await pause.click();
+	await expect(page.locator('.auth-shell')).toHaveClass(/background-paused/);
+	await expect
+		.poll(() =>
+			page
+				.locator('.auth-shell')
+				.evaluate((element) => getComputedStyle(element, '::before').animationPlayState)
+		)
+		.toBe('paused');
+	await page.screenshot({
+		path: test.info().outputPath('welcome-light-mobile.png'),
+		fullPage: true,
+		animations: 'disabled'
+	});
+	await page.getByRole('link', { name: 'Create Account', exact: true }).click();
+	await expect(page).toHaveURL('/user/register');
+	await expect(page.locator('.auth-shell')).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Create Account', exact: true })).toBeVisible();
+	await expectLightSurface(page.getByLabel('First name', { exact: true }));
+	await expectLightSurface(page.getByLabel('Sex', { exact: true }));
+	await expect(page.getByRole('button', { name: 'Switch to dark mode', exact: true })).toHaveCount(
+		1
+	);
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+	await page.screenshot({
+		path: test.info().outputPath('register-light-mobile.png'),
+		fullPage: true,
+		animations: 'disabled'
+	});
+	await page.getByRole('button', { name: 'Switch to dark mode', exact: true }).click();
+	await expect(page.locator('html')).toHaveAttribute('data-appearance', 'dark');
+	await page.screenshot({
+		path: test.info().outputPath('register-dark-mobile.png'),
+		fullPage: true,
+		animations: 'disabled'
+	});
+});
+
 async function expectLightSurface(locator: Locator) {
 	await expect(locator.page().locator('html')).toHaveAttribute('data-appearance', 'light');
 	await expect(locator).toBeVisible();
@@ -39,6 +87,13 @@ test('light login and User feature panels keep readable colors', async ({ page }
 	await expect(page.locator('html')).toHaveAttribute('data-appearance', 'light');
 	await expectLightSurface(page.getByLabel('Email', { exact: true }));
 	await expectLightSurface(page.getByLabel('Password', { exact: true }));
+	await expect
+		.poll(() =>
+			page
+				.locator('.auth-shell')
+				.evaluate((element) => getComputedStyle(element, '::before').opacity)
+		)
+		.toBe('0.32');
 	await page.screenshot({
 		path: test.info().outputPath('login-light.png'),
 		animations: 'disabled'
@@ -101,7 +156,19 @@ test('one login page routes Users and protects staff destinations with MFA', asy
 		await page.goto('/login');
 		await page.getByLabel('Email', { exact: true }).fill(staff.email);
 		await page.getByLabel('Password', { exact: true }).fill(password);
-		await page.getByRole('button', { name: 'Log In', exact: true }).click();
+		// Preview shares one IP bucket across accounts. Honor the real limiter without disabling it.
+		for (let attempt = 0; ; attempt++) {
+			const responsePromise = page.waitForResponse((response) =>
+				response.url().endsWith('/api/auth/sign-in/email')
+			);
+			await page.getByRole('button', { name: 'Log In', exact: true }).click();
+			const response = await responsePromise;
+			if (response.status() !== 429 || attempt >= 2) break;
+			const seconds = Number(response.headers()['retry-after']);
+			await new Promise((resolve) =>
+				setTimeout(resolve, (Number.isFinite(seconds) && seconds > 0 ? seconds : 10) * 1000 + 100)
+			);
+		}
 		await expect(page.getByLabel('Authenticator code', { exact: true })).toBeVisible();
 		await expect(page).toHaveURL('/login');
 		await page.getByLabel('Authenticator code', { exact: true }).fill(totp(setup!.totpURI));
