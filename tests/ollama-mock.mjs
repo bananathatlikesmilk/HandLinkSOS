@@ -63,6 +63,10 @@ globalThis.fetch = async function (input, options) {
 			mode === 'malformed'
 				? 'not json'
 				: JSON.stringify({
+						summary:
+							mode === 'rewrite'
+								? 'Chest pain is reported and assistance requested.'
+								: [...new Set(sentences.map(({ text }) => text))].join(' '),
 						sentenceIds:
 							mode === 'invalid-selection' ? [sentences.length] : sentences.map(({ id }) => id)
 					});
@@ -104,15 +108,20 @@ globalThis.fetch = async function (input, options) {
 						'Casey Reyes reports chest pain. Contact casey@example.com at +639171234567. GPS 14.5995,120.9842.'
 				}
 			: {
+					summary:
+						mode === 'rewrite'
+							? 'Chest pain is reported and assistance requested.'
+							: mode === 'copied'
+								? sentences.map(({ text }) => text).join(' ')
+								: [...new Set(sentences.map(({ text }) => text))].join(' '),
 					sentenceIds:
 						mode === 'invalid-selection'
 							? [sentences.length]
 							: mode === 'duplicate-selection'
 								? [0, 0]
-								: mode === 'reordered-selection'
-									? [1, 0]
-									: sentences.map(({ id }) => id)
+								: sentences.map(({ id }) => id)
 				};
+	if (mode === 'extra-fields') selection.unexpected = 'not part of the response contract';
 	return Response.json({
 		done: true,
 		done_reason: 'stop',

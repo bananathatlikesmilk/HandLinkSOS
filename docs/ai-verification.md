@@ -2,6 +2,14 @@
 
 ## Scope
 
+### Update: 21 October 2026
+
+The extractive implementation described below could copy short or single-paragraph notes unchanged. New generation now requests a concise rewritten paragraph and supporting sentence IDs from either provider. Validation retains bounded output, valid distinct references, instruction checks, redaction, and mandatory dispatcher approval. Full verbatim copies of notes longer than 40 words are rejected rather than saved as successful summaries. Short notes can legitimately produce similar wording.
+
+A narrow output check rejects newly introduced diagnosis, prescription, recommendation, and urgency terms observed in earlier quality failures. This is not semantic verification. Source references and JSON validity do not prove factual accuracy or preservation of every denial. Rewritten drafts can hallucinate, omit facts, or change meaning; dispatchers must compare them with the source before approval. The historical live results below do not validate this revised prompt. New unit and mocked provider tests exercise the response contract and failure handling without sending incident data to external services.
+
+Current verification used local `qwen2.5:3b` through the real HandLink API with fictional notes and an isolated database. The revised prompt preserved reported chest pain and breathlessness without adding urgency, preserved denial of unconsciousness and bleeding after a fall, and preserved conflicting unverified witness accounts and unknown cause. It reduced repetitive dizziness notes to a 21-word draft while retaining the negative injury report. The copied-instruction case was blocked before inference; the dispatcher-cleaned preview generated successfully. A separate live test generated and approved a fictional incident summary. Six unit tests and twelve API/browser tests passed across the verification runs, including the opt-in live tests; Gemini requests remained mocked. These examples are limited checks, not general clinical accuracy guarantees.
+
 Verified local `qwen2.5:3b` through HandLink's real summary API with fictional notes and an isolated database. Separate mocked API/browser tests exercise authorization, consent, redaction, concurrent requests, failed generation, database rollback, cooldown, and dispatcher review. No real incident data or cloud AI was used.
 
 ## Initial quality findings

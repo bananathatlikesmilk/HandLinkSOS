@@ -55,7 +55,12 @@ test('Admin selects Gemini; cloud consent, audits, failures and provider changes
 				})
 			).status()
 		).toBe(200);
-		await addNotes(staff, id, 'Casey Reyes reports chest pain. Dispatch assistance requested.');
+		await addNotes(
+			staff,
+			id,
+			'Casey Reyes reports chest pain. Dispatch assistance requested. ' +
+				'The caller repeats the request for assistance. '.repeat(8)
+		);
 		const base = `/api/staff/reports/${id}/summary`;
 		const source = await (await staff.get(base + '/preview')).json();
 		expect(source.provider).toBe('gemini');
@@ -65,7 +70,7 @@ test('Admin selects Gemini; cloud consent, audits, failures and provider changes
 			provider: source.provider,
 			providerRevision: source.providerRevision
 		};
-		provider();
+		provider('rewrite');
 		expect((await staff.post(base, { headers, data: generation(source) })).status()).toBe(409);
 		expect(
 			(await staff.post(base, { headers, data: { ...input, provider: 'ollama' } })).status()
@@ -76,7 +81,10 @@ test('Admin selects Gemini; cloud consent, audits, failures and provider changes
 		expect(providerState().calls).toBe(0);
 		const result = await staff.post(base, { headers, data: input });
 		expect(result.status(), await result.text()).toBe(200);
-		expect((await result.json()).summary.model).toBe('gemini:gemini-3.5-flash-lite');
+		const generated = (await result.json()).summary;
+		expect(generated.model).toBe('gemini:gemini-3.5-flash-lite');
+		expect(generated.summary).toBe('Chest pain is reported and assistance requested.');
+		expect(generated.summary.length).toBeLessThan(source.text.length);
 		const sent = providerState();
 		expect(sent.calls).toBe(1);
 		for (const secret of [

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { GEMINI_API_KEY, GEMINI_SUMMARY_MODEL } from '$app/env/private';
-import { selectedSummary, summarySentences } from './summary-extract.ts';
+import { validatedSummary, summarySentences } from './summary-extract.ts';
 import { readSummaryResponse, SummaryProviderError, summaryPrompt } from './summary-provider.ts';
 
 const key = GEMINI_API_KEY?.trim();
@@ -38,8 +38,11 @@ export async function requestGeminiSummary(text: string) {
 						responseMimeType: 'application/json',
 						responseSchema: {
 							type: 'OBJECT',
-							properties: { sentenceIds: { type: 'ARRAY', items: { type: 'INTEGER' } } },
-							required: ['sentenceIds']
+							properties: {
+								summary: { type: 'STRING' },
+								sentenceIds: { type: 'ARRAY', items: { type: 'INTEGER' } }
+							},
+							required: ['summary', 'sentenceIds']
 						}
 					}
 				})
@@ -91,5 +94,5 @@ export async function requestGeminiSummary(text: string) {
 		.filter((part) => !part.thought)
 		.map((part) => part.text)
 		.join('');
-	return selectedSummary(sentences, JSON.parse(content));
+	return validatedSummary(sentences, JSON.parse(content));
 }

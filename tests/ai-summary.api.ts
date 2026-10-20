@@ -30,6 +30,38 @@ async function handled(caller: APIRequestContext, staff: APIRequestContext) {
 }
 const path = (id: string) => `/api/staff/reports/${id}/summary`;
 
+test('Ollama saves a rewritten summary rather than copying notes and rejects full-note echoes', async ({
+	request,
+	playwright
+}) => {
+	test.setTimeout(120000);
+	const staff = await playwright.request.newContext({ baseURL: origin });
+	try {
+		const { id } = await handled(request, staff);
+		const notes =
+			'Caller reports chest pain. Caller requests assistance. ' +
+			'The caller repeats the request for assistance. '.repeat(8);
+		await addNotes(staff, id, notes);
+		const source = await preview(staff, id);
+		provider('rewrite');
+		const input = generation(source);
+		const response = await staff.post(path(id), { headers, data: input });
+		expect(response.status(), await response.text()).toBe(200);
+		const saved = (await response.json()).summary;
+		expect(saved.summary).toBe('Chest pain is reported and assistance requested.');
+		expect(saved.summary.length).toBeLessThan(source.text.length);
+		expect(saved.reviewedAt).toBeNull();
+		ageRequest(input.requestId);
+		provider('copied');
+		const failed = await staff.post(path(id), { headers, data: generation(source) });
+		expect(failed.status()).toBe(502);
+		expect((await failed.json()).message).toContain('copied the full notes');
+		expect((await (await staff.get(`/api/staff/reports/${id}`)).json()).ai.summary).toEqual(saved);
+	} finally {
+		await staff.dispose();
+	}
+});
+
 test('local Ollama quality checks preserve uncertainty and ignore instructions inside fictional notes', async ({
 	request,
 	playwright
@@ -84,7 +116,7 @@ test('local Ollama quality checks preserve uncertainty and ignore instructions i
 					'Caller repeats the request for assistance and asks whether the dispatcher can hear the call clearly. '.repeat(
 						12
 					),
-				required: [/dizziness/i, /denies injury/i],
+				required: [/dizziness/i, /denies injury|without injury|no injury/i],
 				forbidden: /diagnos|immediate|urgent|recommend/i
 			},
 			{
@@ -401,7 +433,7 @@ test('provider refusal, malformed and incomplete responses preserve the approved
 			'identifiers',
 			'invalid-selection',
 			'duplicate-selection',
-			'reordered-selection'
+			'extra-fields'
 		]) {
 			provider(mode);
 			const input = generation(source);

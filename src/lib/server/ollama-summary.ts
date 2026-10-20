@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { OLLAMA_SUMMARY_MODEL, OLLAMA_SERVER_URL } from '$app/env/private';
-import { selectedSummary, summarySelectionSchema, summarySentences } from './summary-extract.ts';
+import { validatedSummary, summaryDraftSchema, summarySentences } from './summary-extract.ts';
 import { ollamaServerOrigin } from './ollama-config.ts';
 import { readSummaryResponse, SummaryProviderError, summaryPrompt } from './summary-provider.ts';
 export { SummaryProviderError as OllamaSummaryError } from './summary-provider.ts';
@@ -20,7 +20,7 @@ export async function requestOllamaSummary(text: string) {
 			503
 		);
 	const sentences = summarySentences(text);
-	const selectionSchema = summarySelectionSchema(sentences.length);
+	const selectionSchema = summaryDraftSchema(sentences.length);
 	const signal = AbortSignal.timeout(90000);
 	let response: Response;
 	try {
@@ -76,5 +76,5 @@ export async function requestOllamaSummary(text: string) {
 			})
 		})
 		.parse(await readSummaryResponse(response));
-	return selectedSummary(sentences, JSON.parse(result.message.content));
+	return validatedSummary(sentences, JSON.parse(result.message.content));
 }

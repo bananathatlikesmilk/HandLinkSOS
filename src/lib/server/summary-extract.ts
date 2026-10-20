@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SummaryProviderError } from './summary-provider.ts';
 
 // This catches common embedded prompts, not every possible instruction or private detail.
 export function containsSummaryInstructions(text: string) {
@@ -14,8 +15,9 @@ export function summarySentences(text: string) {
 		.filter(Boolean);
 }
 
-export function summarySelectionSchema(sentenceCount: number) {
+export function summaryDraftSchema(sentenceCount: number) {
 	return z.strictObject({
+		summary: z.string().trim().min(1).max(1500),
 		sentenceIds: z
 			.array(
 				z
@@ -29,13 +31,25 @@ export function summarySelectionSchema(sentenceCount: number) {
 	});
 }
 
-export function selectedSummary(sentences: string[], selection: unknown) {
-	const { sentenceIds } = summarySelectionSchema(sentences.length).parse(selection);
-	if (sentenceIds.some((id, index) => index > 0 && id <= sentenceIds[index - 1]))
-		throw new Error('AI selected duplicate or reordered sentences.');
-	// Reconstruct from approved source, never from model-authored prose.
-	const summary = sentenceIds.map((id) => sentences[id]).join(' ');
-	if (!summary || summary.length > 1500 || summary.split(/\s+/).length > 150)
-		throw new Error('AI selection exceeded summary limits.');
+export function validatedSummary(sentences: string[], draft: unknown) {
+	const { sentenceIds, summary } = summaryDraftSchema(sentences.length).parse(draft);
+	if (new Set(sentenceIds).size !== sentenceIds.length)
+		throw new Error('AI returned duplicate source references.');
+	// References identify source material; they do not prove that a paraphrase is accurate.
+	if (summary.split(/\s+/).length > 150) throw new Error('AI draft exceeded summary limits.');
+	const source = sentences.join(' ').replace(/\s+/g, ' ').trim();
+	if (source.split(/\s+/).length > 40 && summary.replace(/\s+/g, ' ').trim() === source)
+		throw new SummaryProviderError(
+			'AI copied the full notes instead of summarizing. Generate a new draft after the cooldown.'
+		);
+	if (containsSummaryInstructions(summary)) throw new Error('AI returned embedded instructions.');
+	// Reject common added clinical/operational language seen in earlier model quality checks.
+	// This is a narrow regression guard, not a semantic fact checker. Dispatcher review is required.
+	for (const match of summary.matchAll(
+		/\b(?:immediate|immediately|urgent|urgently|recommend\w*|prescrib\w*|diagnos\w*)\b/gi
+	)) {
+		if (!new RegExp(`\\b${match[0]}\\b`, 'i').test(source))
+			throw new Error('AI added clinical or operational interpretation absent from the notes.');
+	}
 	return summary;
 }
