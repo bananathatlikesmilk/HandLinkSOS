@@ -559,12 +559,12 @@
 /* Shared appearance tokens. Components use semantic colors in both modes. */
 :root {
 	color-scheme: dark;
-	--app-bg: #101719;
-	--app-surface: #182226;
-	--app-surface-alt: #243238;
-	--app-text: #f0f5f6;
-	--app-muted: #bfccd0;
-	--app-border: #64777e;
+	--app-bg: #000000;
+	--app-surface: #111111;
+	--app-surface-alt: #222222;
+	--app-text: #f5f5f5;
+	--app-muted: #c4c4c4;
+	--app-border: #707070;
 	--app-accent: #9ee4d4;
 	--app-accent-text: #092f28;
 	--app-danger: #ffb4b4;

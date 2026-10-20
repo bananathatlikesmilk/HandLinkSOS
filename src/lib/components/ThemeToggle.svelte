@@ -46,17 +46,21 @@
 	class="theme-toggle btn btn-outline"
 	onclick={toggle}
 	aria-label={appearance === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+	title={appearance === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
 >
-	{#if appearance === 'dark'}<Sun size={20} aria-hidden="true" />Light mode{:else}<Moon
-			size={20}
-			aria-hidden="true"
-		/>Dark mode{/if}
+	{#if appearance === 'dark'}
+		<Sun size={20} aria-hidden="true" />
+	{:else}
+		<Moon size={20} aria-hidden="true" />
+	{/if}
 </button>
 
 <style>
 	.theme-toggle {
+		width: 48px;
 		min-height: 48px;
-		gap: 8px;
-		white-space: nowrap;
+		flex-shrink: 0;
+		padding: 0;
+		border-radius: 50%;
 	}
 </style>
