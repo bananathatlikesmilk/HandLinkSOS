@@ -123,16 +123,18 @@
 		<div class="permission-control">
 			<span class="permission-state" class:on={status?.location === 'granted'}
 				>{accessLabel(status?.location)}</span
-			><button
-				type="button"
+			><input
+				type="checkbox"
 				role="switch"
 				aria-label="Location access"
-				aria-checked={status?.location === 'granted'}
+				checked={status?.location === 'granted'}
 				class="permission-switch"
 				disabled={unavailable}
-				onclick={() => run(() => changeAccess('location'))}
-				><span class="switch-thumb"></span></button
-			>
+				onchange={(event) => {
+					event.currentTarget.checked = status?.location === 'granted';
+					void run(() => changeAccess('location'));
+				}}
+			/>
 		</div>
 	</div>
 	<div class="permission-row">
@@ -146,15 +148,18 @@
 		<div class="permission-control">
 			<span class="permission-state" class:on={status?.camera === 'granted'}
 				>{accessLabel(status?.camera)}</span
-			><button
-				type="button"
+			><input
+				type="checkbox"
 				role="switch"
 				aria-label="Camera access"
-				aria-checked={status?.camera === 'granted'}
+				checked={status?.camera === 'granted'}
 				class="permission-switch"
 				disabled={unavailable}
-				onclick={() => run(() => changeAccess('camera'))}><span class="switch-thumb"></span></button
-			>
+				onchange={(event) => {
+					event.currentTarget.checked = status?.camera === 'granted';
+					void run(() => changeAccess('camera'));
+				}}
+			/>
 		</div>
 	</div>
 	<div class="permission-row">
@@ -179,15 +184,18 @@
 			<span class="permission-state" class:on={status?.overlayActive}
 				>{native ? (status?.overlayActive ? 'On' : 'Off') : 'Android only'}</span
 			>
-			<button
-				type="button"
+			<input
+				type="checkbox"
 				role="switch"
-				aria-label="Floating button"
-				aria-checked={status?.overlayActive ?? false}
+				aria-label="Display over other apps"
+				checked={status?.overlayActive ?? false}
 				class="permission-switch"
 				disabled={unavailable || !native}
-				onclick={() => run(changeOverlay)}><span class="switch-thumb"></span></button
-			>
+				onchange={(event) => {
+					event.currentTarget.checked = status?.overlayActive ?? false;
+					void run(changeOverlay);
+				}}
+			/>
 		</div>
 	</div>
 	<div class="mt-4 flex flex-wrap gap-2">
@@ -255,8 +263,11 @@
 		color: var(--app-accent);
 	}
 	.permission-switch {
-		width: 60px;
-		min-height: 48px;
+		appearance: none;
+		width: 64px;
+		height: 40px;
+		min-height: 40px;
+		margin-block: 4px;
 		padding: 6px;
 		border: 2px solid var(--app-border);
 		border-radius: 999px;
@@ -266,19 +277,22 @@
 		cursor: pointer;
 		flex-shrink: 0;
 	}
-	.switch-thumb {
+	.permission-switch::before {
+		content: '';
+		display: block;
+		flex-shrink: 0;
 		width: 28px;
 		height: 28px;
 		background: var(--app-muted);
 		border-radius: 50%;
 		transition: transform 150ms;
 	}
-	.permission-switch[aria-checked='true'] {
+	.permission-switch:checked {
 		background: var(--app-accent);
 		border-color: var(--app-accent);
 	}
-	.permission-switch[aria-checked='true'] .switch-thumb {
-		transform: translateX(16px);
+	.permission-switch:checked::before {
+		transform: translateX(20px);
 		background: var(--app-accent-text);
 	}
 	.permission-switch:disabled {

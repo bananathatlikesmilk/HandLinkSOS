@@ -92,7 +92,8 @@ test('floating switch requests display permission, starts, hides and stops on lo
 	await installNativeBridge(page);
 	await login(page.request, await provision());
 	await page.goto('/user/settings');
-	const toggle = page.getByRole('switch', { name: 'Floating button', exact: true });
+	const toggle = page.getByRole('switch', { name: 'Display over other apps', exact: true });
+	await expect(toggle).toHaveAttribute('type', 'checkbox');
 	await expect(toggle).not.toBeChecked();
 	await toggle.click();
 	await expect(toggle).toBeChecked();
@@ -119,7 +120,7 @@ test('late overlay permission result cannot leave a floating button after logout
 			globalThis as unknown as { __handlinkNativeTest: NativeTestState }
 		).__handlinkNativeTest.overlayDelay = true;
 	});
-	await page.getByRole('switch', { name: 'Floating button', exact: true }).click();
+	await page.getByRole('switch', { name: 'Display over other apps', exact: true }).click();
 	await expect.poll(async () => (await state(page)).overlayStarts).toBe(1);
 	await page.getByRole('button', { name: 'Log out', exact: true }).click();
 	await expect(page).toHaveURL('/login');
@@ -160,7 +161,9 @@ test('browser Settings includes camera and explains that overlays need Android',
 	await expect(privacyNotes).toHaveCount(0);
 	await expect(notifications).toBeVisible();
 	await page.setViewportSize({ width: 390, height: 844 });
-	await expect(page.getByRole('switch', { name: 'Floating button', exact: true })).toBeDisabled();
+	await expect(
+		page.getByRole('switch', { name: 'Display over other apps', exact: true })
+	).toBeDisabled();
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
@@ -204,6 +207,11 @@ test('permission switches show actual state and open settings when blocked or di
 	await login(page.request, await provision());
 	await page.goto('/user/settings');
 	const camera = page.getByRole('switch', { name: 'Camera access', exact: true });
+	await expect(camera).toHaveAttribute('type', 'checkbox');
+	await expect(page.getByRole('switch', { name: 'Location access', exact: true })).toHaveAttribute(
+		'type',
+		'checkbox'
+	);
 	await expect(camera).not.toBeChecked();
 	await camera.click();
 	await expect.poll(async () => (await state(page)).appSettingsOpens).toBe(1);
