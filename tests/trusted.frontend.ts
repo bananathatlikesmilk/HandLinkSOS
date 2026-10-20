@@ -45,7 +45,9 @@ async function showQr(page: Page, owner: Awaited<ReturnType<typeof provision>>) 
 	const contents = await qr.evaluate((el) => el.outerHTML);
 	for (const secret of [owner.email, owner.profileId, privateMedical])
 		expect(contents).not.toContain(secret);
-	return await qr.screenshot();
+	const screenshot = await qr.screenshot();
+	await test.info().attach('trusted-profile-qr', { body: screenshot, contentType: 'image/png' });
+	return screenshot;
 }
 
 test('real QR image requests access; owner approval adds SOS and removal revokes it', async ({
@@ -73,7 +75,9 @@ test('real QR image requests access; owner approval adds SOS and removal revokes
 		await expect(
 			scanner.getByRole('heading', { name: 'Invitation found', exact: true })
 		).toBeVisible();
-		await scanner.getByLabel('Your relationship to this person', { exact: true }).fill('Sibling');
+		await scanner
+			.getByLabel('Your relationship to this person', { exact: true })
+			.selectOption('Sibling');
 		await scanner.getByRole('button', { name: 'Request trusted access', exact: true }).click();
 		await expect(
 			scanner.getByRole('heading', { name: 'Request sent to Casey Reyes', exact: true })
@@ -170,11 +174,66 @@ test('locking a displayed QR invalidates its image; scanner handles unreadable u
 		await scanner
 			.locator('input[type=file]')
 			.setInputFiles({ name: 'locked.png', mimeType: 'image/png', buffer: png });
-		await scanner.getByLabel('Your relationship to this person', { exact: true }).fill('Friend');
+		await scanner
+			.getByLabel('Your relationship to this person', { exact: true })
+			.selectOption('Friend');
 		await scanner.getByRole('button', { name: 'Request trusted access', exact: true }).click();
 		await expect(scanner.getByRole('alert')).toContainText('already used or locked');
 		expect((await (await scanner.request.get('/api/trusted')).json()).connections).toEqual([]);
 	} finally {
 		await scannerContext.close();
+	}
+});
+
+test('a live QR scan releases every camera track after decoding', async ({ page, browser }) => {
+	test.setTimeout(90000);
+	const owner = await provision();
+	const requester = await provision();
+	await login(page.request, owner);
+	const png = await showQr(page, owner);
+	const context = await browser.newContext({ baseURL: origin });
+	try {
+		await login(context.request, requester);
+		const scanner = await context.newPage();
+		await scanner.addInitScript((imageData) => {
+			const tracks: MediaStreamTrack[] = [];
+			Object.assign(globalThis, { __qrCameraTracks: tracks });
+			Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+				configurable: true,
+				value: async () => {
+					// Feed the real decoder a real video stream containing a generated invitation.
+					const image = new Image();
+					image.src = `data:image/png;base64,${imageData}`;
+					await image.decode();
+					const canvas = document.createElement('canvas');
+					canvas.width = image.naturalWidth;
+					canvas.height = image.naturalHeight;
+					const stream = canvas.captureStream(10);
+					canvas.getContext('2d')!.drawImage(image, 0, 0);
+					tracks.push(...stream.getTracks());
+					return stream;
+				}
+			});
+		}, png.toString('base64'));
+		await scanner.goto('/user/profiles/scan');
+		await scanner.waitForLoadState('networkidle');
+		await scanner.getByRole('button', { name: 'Start camera', exact: true }).click();
+		await expect(
+			scanner.getByRole('heading', { name: 'Invitation found', exact: true })
+		).toBeVisible();
+		await expect(scanner.getByText('Camera is off.', { exact: true })).toBeVisible();
+		await expect
+			.poll(() =>
+				scanner.evaluate(() => {
+					const tracks = (
+						globalThis as typeof globalThis & { __qrCameraTracks: MediaStreamTrack[] }
+					).__qrCameraTracks;
+					return tracks.length > 0 && tracks.every((track) => track.readyState === 'ended');
+				})
+			)
+			.toBe(true);
+		await expect(scanner.locator('video')).toHaveJSProperty('srcObject', null);
+	} finally {
+		await context.close();
 	}
 });

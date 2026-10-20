@@ -63,7 +63,7 @@ function seedCode(
 }
 
 for (const portal of ['user', 'admin', 'dispatch'] as const) {
-	test(`${portal} login links to email verification and returns to the correct portal`, async ({
+	test(`${portal} login links to email verification and returns to universal login`, async ({
 		page
 	}) => {
 		test.setTimeout(60000);
@@ -88,10 +88,9 @@ for (const portal of ['user', 'admin', 'dispatch'] as const) {
 			});
 			await page.setViewportSize({ width: 390, height: 844 });
 			await page.goto(`/${portal}/login`);
+			await expect(page).toHaveURL('/login');
 			await page.waitForLoadState('networkidle');
-			await page
-				.getByRole('textbox', { name: portal === 'user' ? 'Email' : 'Email address', exact: true })
-				.fill(actor.email);
+			await page.getByRole('textbox', { name: 'Email', exact: true }).fill(actor.email);
 			await page.getByRole('link', { name: 'Verify email', exact: true }).click();
 			await expect(
 				page.getByRole('heading', { name: 'Verify your email', exact: true })
@@ -101,14 +100,14 @@ for (const portal of ['user', 'admin', 'dispatch'] as const) {
 			);
 			await expect(
 				page.getByRole('link', { name: 'Back to sign in', exact: true })
-			).toHaveAttribute('href', `/${portal}/login`);
+			).toHaveAttribute('href', '/login');
 			expect(sendCount).toBe(0);
 			await page.getByRole('button', { name: 'Send verification code', exact: true }).click();
 			await expect(page.getByRole('status')).toContainText('new code');
 			expect(sendCount).toBe(1);
 			await page.getByLabel('6-digit verification code', { exact: true }).fill(code);
 			await page.getByRole('button', { name: 'Verify email', exact: true }).click();
-			await expect(page).toHaveURL(`/${portal}/login`);
+			await expect(page).toHaveURL('/login');
 			expect(
 				client.prepare('SELECT email_verified FROM user WHERE id=?').get(actor.id)
 			).toMatchObject({ email_verified: 1 });
@@ -128,7 +127,7 @@ test('verification ignores unsupported return destinations', async ({ page }) =>
 	await page.goto('/user/verify?portal=https%3A%2F%2Fattacker.example');
 	await expect(page.getByRole('link', { name: 'Back to sign in', exact: true })).toHaveAttribute(
 		'href',
-		'/user/login'
+		'/login'
 	);
 });
 
@@ -244,7 +243,7 @@ test('invalid, expired, locked-out, and wrong-email codes cannot change a passwo
 
 for (const role of ['admin', 'dispatcher']) {
 	const portal = role === 'admin' ? 'admin' : 'dispatch';
-	test(`${role} recovery verifies the code, checks confirmation, and returns to its own login`, async ({
+	test(`${role} recovery verifies the code, checks confirmation, and returns to universal login`, async ({
 		page
 	}) => {
 		const actor = await identity(role);
@@ -284,10 +283,10 @@ for (const role of ['admin', 'dispatcher']) {
 			true
 		);
 		await page.getByRole('link', { name: 'Back to sign in', exact: true }).click();
-		await expect(page).toHaveURL(`/${portal}/login`);
-		await page.getByLabel('Email address', { exact: true }).fill(actor.email);
+		await expect(page).toHaveURL('/login');
+		await page.getByLabel('Email', { exact: true }).fill(actor.email);
 		await page.getByLabel('Password', { exact: true }).fill(newPassword);
-		await page.getByRole('button', { name: 'Continue', exact: true }).click();
+		await page.getByRole('button', { name: 'Log In', exact: true }).click();
 		await expect(page).toHaveURL(`/${portal}/security`);
 	});
 }

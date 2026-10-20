@@ -35,11 +35,11 @@ test('User login survives a browser restart, skips welcome, and logout revokes t
 		await expect(reopened).toHaveURL('/user/dashboard');
 		await reopened.goto('/user/settings');
 		await reopened.getByRole('button', { name: 'Log out', exact: true }).click();
-		await expect(reopened).toHaveURL('/user/login');
+		await expect(reopened).toHaveURL('/login');
 		// Even a previously saved cookie must fail after explicit logout revokes its DB session.
 		await restarted.addCookies(restored.cookies);
 		await reopened.goto('/user/dashboard');
-		await expect(reopened).toHaveURL('/user/login');
+		await expect(reopened).toHaveURL('/login');
 	} finally {
 		await restarted.close();
 	}
@@ -111,7 +111,7 @@ test('overlay needs separate display permission and explicit enable; hide and lo
 		page.getByRole('button', { name: 'Hide floating button', exact: true })
 	).toBeVisible();
 	await page.getByRole('button', { name: 'Log out', exact: true }).click();
-	await expect(page).toHaveURL('/user/login');
+	await expect(page).toHaveURL('/login');
 	expect((await state(page)).overlayActive).toBe(false);
 });
 
@@ -130,7 +130,7 @@ test('late overlay permission result cannot leave a floating button after logout
 	await page.getByRole('button', { name: 'Enable floating button', exact: true }).click();
 	await expect.poll(async () => (await state(page)).overlayStarts).toBe(1);
 	await page.getByRole('button', { name: 'Log out', exact: true }).click();
-	await expect(page).toHaveURL('/user/login');
+	await expect(page).toHaveURL('/login');
 	await page.evaluate(() => {
 		(
 			globalThis as unknown as { __handlinkNativeTest: NativeTestState }

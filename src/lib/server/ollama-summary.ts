@@ -1,10 +1,13 @@
 import { z } from 'zod';
-import { OLLAMA_SUMMARY_MODEL } from '$app/env/private';
+import { OLLAMA_SUMMARY_MODEL, OLLAMA_SERVER_URL } from '$app/env/private';
 import { selectedSummary, summarySelectionSchema, summarySentences } from './summary-extract.ts';
 
 const localModel = OLLAMA_SUMMARY_MODEL?.trim() || 'qwen2.5:3b';
+const server = OLLAMA_SERVER_URL?.trim() || 'http://127.0.0.1:11434';
 export const aiConfigured =
-	/^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,89}$/.test(localModel) && !/(?:[:.-])cloud$/i.test(localModel);
+	['http://127.0.0.1:11434', 'http://localhost:11434', 'http://ollama:11434'].includes(server) &&
+	/^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,89}$/.test(localModel) &&
+	!/(?:[:.-])cloud$/i.test(localModel);
 export const summaryModel = `ollama:${localModel}`;
 
 export class OllamaSummaryError extends Error {
@@ -26,7 +29,7 @@ export async function requestOllamaSummary(text: string) {
 	const signal = AbortSignal.timeout(90000);
 	let response: Response;
 	try {
-		response = await fetch('http://127.0.0.1:11434/api/chat', {
+		response = await fetch(`${server}/api/chat`, {
 			method: 'POST',
 			signal,
 			redirect: 'error',

@@ -24,7 +24,7 @@ async function identity(role = 'user') {
 
 test('real User login, profile saving, reload and logout work', async ({ page }) => {
 	const account = await identity();
-	await page.goto('/user/login');
+	await page.goto('/login');
 	await page.waitForLoadState('networkidle');
 	await page.getByLabel('Email', { exact: true }).fill(account.email);
 	await page.getByLabel('Password', { exact: true }).fill(account.password);
@@ -52,27 +52,29 @@ test('real User login, profile saving, reload and logout work', async ({ page })
 	await contact.getByLabel('Last name', { exact: true }).fill('Reyes');
 	await contact.getByLabel('Phone number', { exact: true }).fill('09171234567');
 	await contact.getByLabel('Email', { exact: true }).fill('robin@example.com');
-	await contact.getByLabel('Relationship', { exact: true }).fill('Sibling');
+	await contact.getByLabel('Relationship', { exact: true }).selectOption('Sibling');
 	await page.getByRole('button', { name: 'Save changes', exact: true }).click();
 	await expect(page).toHaveURL('/user/profiles/details');
 	await page.reload();
 	await expect(page.locator('body')).toContainText('PRIVATE-ALLERGY');
 	await expect(page.locator('body')).toContainText('+639171234567');
 	await page.goto('/user/sharing');
-	await expect(page.getByRole('heading', { name: 'Feature not connected yet' })).toBeVisible();
+	await expect(
+		page.getByRole('heading', { name: 'Share location to your circle', exact: true })
+	).toBeVisible();
 	await page.goto('/user/settings');
 	await page.getByRole('button', { name: 'Log out', exact: true }).click();
-	await expect(page).toHaveURL('/user/login');
+	await expect(page).toHaveURL('/login');
 	await expect(signedIn).toHaveCount(0);
 	await page.goto('/user/profiles');
-	await expect(page).toHaveURL('/user/login');
+	await expect(page).toHaveURL('/login');
 });
 
 for (const [role, path] of [
 	['dispatcher', 'dispatch'],
 	['admin', 'admin']
 ]) {
-	test(`${role} logs into only its own portal and signs out`, async ({ page }) => {
+	test(`universal login routes ${role} to its portal and signs out`, async ({ page }) => {
 		await page.setViewportSize(
 			role === 'dispatcher' ? { width: 390, height: 844 } : { width: 1366, height: 768 }
 		);
@@ -84,30 +86,32 @@ for (const [role, path] of [
 			data: {}
 		});
 		await page.goto(`/${path}/login`);
+		await expect(page).toHaveURL('/login');
 		await page.waitForLoadState('networkidle');
-		await page.getByLabel('Email address', { exact: true }).fill(account.email);
+		await page.getByLabel('Email', { exact: true }).fill(account.email);
 		await page.getByLabel('Password', { exact: true }).fill(account.password);
-		await page.getByRole('button', { name: 'Continue', exact: true }).click();
+		await page.getByRole('button', { name: 'Log In', exact: true }).click();
 		await page.getByLabel('Authenticator code', { exact: true }).fill(totp(setup!.totpURI));
 		await page.getByRole('button', { name: 'Verify code', exact: true }).click();
 		await expect(page).toHaveURL(`/${path}`);
+		const menu = page.getByRole('button', { name: 'Open navigation', exact: true });
+		if (await menu.isVisible()) await menu.click();
 		const signedIn = page.getByRole('region', { name: 'Signed-in account', exact: true });
 		await expect(signedIn).toContainText(account.email);
 		await expect(signedIn).toContainText('Test User');
 		await expect(signedIn).toContainText(role === 'admin' ? 'Administrator' : 'Dispatcher');
 		await page.reload();
+		if (await menu.isVisible()) await menu.click();
 		await expect(signedIn).toContainText(account.email);
 		expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
 			true
 		);
 		const forbidden = await page.request.get('/user/dashboard');
 		expect(forbidden.status()).toBe(403);
-		const menu = page.getByRole('button', { name: 'Open navigation', exact: true });
-		if (await menu.isVisible()) await menu.click();
-		await page.getByRole('link', { name: 'Log out', exact: true }).click();
-		await expect(page).toHaveURL(`/${path}/login`);
+		await page.getByRole('button', { name: 'Log out', exact: true }).click();
+		await expect(page).toHaveURL('/login');
 		await expect(signedIn).toHaveCount(0);
 		await page.goto(`/${path}`);
-		await expect(page).toHaveURL(`/${path}/login`);
+		await expect(page).toHaveURL('/login');
 	});
 }

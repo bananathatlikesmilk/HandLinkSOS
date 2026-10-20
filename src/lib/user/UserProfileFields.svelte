@@ -1,23 +1,55 @@
 <script lang="ts">
 	import { Plus, Trash2 } from '@lucide/svelte';
+	import { onMount } from 'svelte';
+	import RelationshipSelect from './RelationshipSelect.svelte';
 	import type { UserProfile } from './preview.svelte.ts';
 	let {
 		profile = $bindable(),
 		section = 'all'
 	}: { profile: UserProfile; section?: 'personal' | 'medical' | 'contacts' | 'all' } = $props();
 	const uid = $props.id();
+	let ready = $state(false);
 	const today = new Intl.DateTimeFormat('en-CA', {
 		timeZone: 'Asia/Manila',
 		year: 'numeric',
 		month: '2-digit',
 		day: '2-digit'
 	}).format(new Date());
+	onMount(() => {
+		if (!profile.phone) profile.phone = '+639';
+		for (const contact of profile.contacts) {
+			if (!contact.phone) contact.phone = '+639';
+		}
+		ready = true;
+	});
+	function normalizePhone(event: Event, assign: (value: string) => void) {
+		const input = event.currentTarget as HTMLInputElement;
+		const raw = input.value;
+		const normalized = raw.startsWith('09')
+			? `+63${raw.slice(1)}`
+			: raw.startsWith('9')
+				? `+63${raw}`
+				: raw.startsWith('639')
+					? `+${raw}`
+					: raw;
+		assign(normalized);
+		if (normalized !== raw) {
+			const start = input.selectionStart;
+			const end = input.selectionEnd;
+			input.value = normalized;
+			if (start !== null && end !== null)
+				input.setSelectionRange(
+					start + normalized.length - raw.length,
+					end + normalized.length - raw.length
+				);
+		}
+	}
 	function addContact() {
 		profile.contacts.push({
 			id: crypto.randomUUID(),
 			firstName: '',
 			lastName: '',
-			phone: '',
+			phone: '+639',
 			email: '',
 			relationship: ''
 		});
@@ -25,12 +57,13 @@
 </script>
 
 {#if section === 'personal' || section === 'all'}
-	<fieldset class="profile-section">
+	<fieldset class="profile-section" disabled={!ready}>
 		<legend>Personal information</legend>
 		<div class="profile-grid">
 			<label class="user-field" for="{uid}-first"
-				>First name<input
+				><span>First name<span aria-hidden="true"> *</span></span><input
 					id="{uid}-first"
+					aria-label="First name"
 					class="input"
 					bind:value={profile.firstName}
 					autocomplete="given-name"
@@ -39,8 +72,9 @@
 				/></label
 			>
 			<label class="user-field" for="{uid}-last"
-				>Last name<input
+				><span>Last name<span aria-hidden="true"> *</span></span><input
 					id="{uid}-last"
+					aria-label="Last name"
 					class="input"
 					bind:value={profile.lastName}
 					autocomplete="family-name"
@@ -49,8 +83,9 @@
 				/></label
 			>
 			<label class="user-field" for="{uid}-birth"
-				>Birthday<input
+				><span>Birthday<span aria-hidden="true"> *</span></span><input
 					id="{uid}-birth"
+					aria-label="Birthday"
 					type="date"
 					class="input"
 					bind:value={profile.birthday}
@@ -60,17 +95,24 @@
 				/></label
 			>
 			<label class="user-field" for="{uid}-sex"
-				>Sex<select id="{uid}-sex" class="select" bind:value={profile.sex} required
+				><span>Sex<span aria-hidden="true"> *</span></span><select
+					id="{uid}-sex"
+					aria-label="Sex"
+					class="select"
+					bind:value={profile.sex}
+					required
 					><option value="" disabled>Select sex</option><option>Female</option><option>Male</option
 					><option>Other</option><option>Prefer not to say</option></select
 				></label
 			>
 			<label class="user-field profile-wide" for="{uid}-phone"
-				>Phone number<input
+				><span>Phone number<span aria-hidden="true"> *</span></span><input
 					id="{uid}-phone"
+					aria-label="Phone number"
 					type="tel"
 					class="input"
-					bind:value={profile.phone}
+					value={profile.phone}
+					oninput={(event) => normalizePhone(event, (value) => (profile.phone = value))}
 					autocomplete="tel"
 					placeholder="+63 917 123 4567"
 					minlength="7"
@@ -82,8 +124,8 @@
 	</fieldset>
 {/if}
 {#if section === 'medical' || section === 'all'}
-	<fieldset class="profile-section">
-		<legend>Medical information</legend>
+	<fieldset class="profile-section" disabled={!ready}>
+		<legend>Medical information (optional)</legend>
 		<p class="user-copy">Optional details that can help a responder understand your needs.</p>
 		<label class="user-field" for="{uid}-blood"
 			>Blood type<select id="{uid}-blood" class="select" bind:value={profile.bloodType}
@@ -132,7 +174,7 @@
 	</fieldset>
 {/if}
 {#if section === 'contacts' || section === 'all'}
-	<fieldset class="profile-section">
+	<fieldset class="profile-section" disabled={!ready}>
 		<legend>Emergency contacts</legend>
 		<p class="user-copy">Choose people you trust to be contacted during an emergency.</p>
 		{#each profile.contacts as contact, index (contact.id)}
@@ -150,8 +192,9 @@
 				</div>
 				<div class="profile-grid">
 					<label class="user-field" for="{uid}-{contact.id}-first"
-						>First name<input
+						><span>First name<span aria-hidden="true"> *</span></span><input
 							id="{uid}-{contact.id}-first"
+							aria-label="First name"
 							class="input"
 							bind:value={contact.firstName}
 							required
@@ -159,8 +202,9 @@
 						/></label
 					>
 					<label class="user-field" for="{uid}-{contact.id}-last"
-						>Last name<input
+						><span>Last name<span aria-hidden="true"> *</span></span><input
 							id="{uid}-{contact.id}-last"
+							aria-label="Last name"
 							class="input"
 							bind:value={contact.lastName}
 							required
@@ -168,11 +212,13 @@
 						/></label
 					>
 					<label class="user-field profile-wide" for="{uid}-{contact.id}-phone"
-						>Phone number<input
+						><span>Phone number<span aria-hidden="true"> *</span></span><input
 							id="{uid}-{contact.id}-phone"
+							aria-label="Phone number"
 							class="input"
 							type="tel"
-							bind:value={contact.phone}
+							value={contact.phone}
+							oninput={(event) => normalizePhone(event, (value) => (contact.phone = value))}
 							placeholder="+63 917 123 4567"
 							minlength="7"
 							maxlength="25"
@@ -180,8 +226,9 @@
 						/></label
 					>
 					<label class="user-field profile-wide" for="{uid}-{contact.id}-email"
-						>Email<input
+						><span>Email<span aria-hidden="true"> *</span></span><input
 							id="{uid}-{contact.id}-email"
+							aria-label="Email"
 							class="input"
 							type="email"
 							bind:value={contact.email}
@@ -189,16 +236,12 @@
 							required
 						/></label
 					>
-					<label class="user-field profile-wide" for="{uid}-{contact.id}-relationship"
-						>Relationship<input
+					<div class="profile-wide">
+						<RelationshipSelect
 							id="{uid}-{contact.id}-relationship"
-							class="input"
 							bind:value={contact.relationship}
-							placeholder="For example, parent or friend"
-							maxlength="60"
-							required
-						/></label
-					>
+						/>
+					</div>
 				</div>
 			</section>
 		{/each}

@@ -15,9 +15,21 @@ HandLink uses Ollama on the same computer as the HandLink server. No OpenAI API 
 4. Keep Ollama running. If its background application is not running, use `ollama serve` in a separate terminal.
 5. Restart HandLink with `pnpm dev` and use `http://localhost:5173`.
 
-The default model requires no HandLink environment change. To select another downloaded local model, set `OLLAMA_SUMMARY_MODEL` in the private server `.env` and restart HandLink. Cloud model tags are rejected. The API address is fixed to `http://127.0.0.1:11434/api/chat`, and redirects are rejected. Keep Ollama bound to loopback; do not expose its unauthenticated API publicly.
+The default model requires no HandLink environment change. To select another downloaded local model, set `OLLAMA_SUMMARY_MODEL` in the private server `.env` and restart HandLink. Cloud model tags are rejected. Development uses `http://127.0.0.1:11434/api/chat`; the Docker extension below uses the private Ollama service. Redirects are rejected. Keep a standalone Ollama installation bound to loopback; do not expose its unauthenticated API publicly.
 
 The phone does not run the model. It uses the HandLink server, which calls its own local Ollama installation. A future deployed server needs its own Ollama process, sufficient memory, and the model installed on that server.
+
+## Server Docker deployment
+
+Use the optional private Ollama service with the production configuration:
+
+```powershell
+docker compose -f compose.production.yaml -f compose.ollama.yaml up -d --build
+```
+
+If push is also configured, include `-f compose.firebase.yaml` before `up`. The Ollama service runs on the server, stores downloaded models in a persistent volume, and publishes no host port. The initialization service downloads `qwen2.5:3b`; the app waits for successful initialization. Initial download needs internet and several GB of disk/memory. Generation uses the server CPU by default and can be slower on small hosts.
+
+`OLLAMA_SERVER_URL` defaults to local loopback for development. The Docker extension sets it to `http://ollama:11434` on the private Compose network. Only approved loopback/private-service origins are accepted; arbitrary remote URLs and redirects remain blocked. Keep private model text out of logs. These files must be deployed by the server operator; local edits do not update the running server.
 
 ## Dispatcher workflow
 

@@ -1,18 +1,26 @@
 <script lang="ts">
-	import { goto, invalidateAll } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { Eye, EyeOff, Pause, Play } from '@lucide/svelte';
 	import StaffBrand from './StaffBrand.svelte';
+	import ThemeToggle from './ThemeToggle.svelte';
+	import { onMount } from 'svelte';
+	let ready = $state(false);
+	onMount(() => {
+		ready = true;
+	});
 	let {
 		mode = 'login',
 		role = 'dispatch'
-	}: { mode?: 'login' | 'recovery'; role?: 'dispatch' | 'admin' } = $props();
-	const loginPath = $derived(
-		role === 'admin' ? ('/admin/login' as const) : ('/dispatch/login' as const)
-	);
+	}: { mode?: 'login' | 'recovery'; role?: 'dispatch' | 'admin' | 'universal' } = $props();
+	const loginPath = $derived('/login' as const);
 	const recoveryPath = $derived(
-		role === 'admin' ? ('/admin/forgot-password' as const) : ('/dispatch/forgot-password' as const)
+		role === 'universal'
+			? ('/user/forgot-password' as const)
+			: role === 'admin'
+				? ('/admin/forgot-password' as const)
+				: ('/dispatch/forgot-password' as const)
 	);
 	let email = $state('');
 	let password = $state('');
@@ -23,7 +31,7 @@
 	let twoFactor = $state(false);
 	let useBackupCode = $state(false);
 	let code = $state('');
-	const title = $derived(mode === 'recovery' ? 'Forgot password?' : 'Login');
+	const title = $derived(mode === 'recovery' ? 'Forgot password?' : 'Log In');
 	let recoveryStage = $state<'email' | 'code' | 'password' | 'success'>('email');
 	let recoveryCode = $state('');
 	let newPassword = $state('');
@@ -125,8 +133,8 @@
 		});
 		if (!session?.user) throw new Error('Unable to check your login. Please try again.');
 		if (
-			session.user.role !== (role === 'admin' ? 'admin' : 'dispatcher') ||
-			!session.user.emailVerified
+			!session.user.emailVerified ||
+			!['user', 'admin', 'dispatcher'].includes(session.user.role ?? 'user')
 		) {
 			await fetch('/api/auth/sign-out', {
 				method: 'POST',
@@ -141,18 +149,8 @@
 		}
 		password = '';
 		code = '';
-		await invalidateAll();
-		await goto(
-			resolve(
-				session.user.twoFactorEnabled
-					? role === 'admin'
-						? '/admin'
-						: '/dispatch'
-					: role === 'admin'
-						? '/admin/security'
-						: '/dispatch/security'
-			)
-		);
+		// The server chooses the workspace from the current database role and session MFA proof.
+		await goto(resolve('/login'), { invalidateAll: true });
 	}
 
 	async function submit(event: SubmitEvent) {
@@ -175,7 +173,7 @@
 							? useBackupCode
 								? { code: code.trim(), trustDevice: false, disableSession: false }
 								: { code, trustDevice: false }
-							: { email: email.trim(), password, rememberMe: false }
+							: { email: email.trim(), password, rememberMe: true }
 					)
 				}
 			);
@@ -212,18 +210,20 @@
 
 <svelte:head>
 	<title>{mode === 'login' ? 'Sign in' : 'Reset password'} · HandLink</title>
-	<meta name="description" content="Sign in to your HandLink staff account." />
+	<meta name="description" content="Sign in to your HandLink account." />
 </svelte:head>
 <div
 	class="auth-shell handlink-staff"
 	class:background-paused={backgroundPaused}
 	data-theme="handlink-staff"
 >
-	<header class="auth-brand"><StaffBrand href={loginPath} /></header>
+	<header class="auth-brand"><StaffBrand href={loginPath} /><ThemeToggle /></header>
 	<main class="auth-main" id="main-content">
 		<div class="auth-content">
 			<h1 id="auth-title">{title}</h1>
-			<p class="role-label">{role === 'admin' ? 'Administrator' : 'Dispatcher'}</p>
+			<p class="role-label">
+				{mode === 'login' ? 'User · Dispatcher · Admin' : 'Account recovery'}
+			</p>
 			{#if mode === 'recovery'}
 				{#if !emailConfigured}
 					<p class="auth-subtitle" role="status">
@@ -237,7 +237,7 @@
 				</p>
 				{#if recoveryStage !== 'success'}
 					<form method="POST" onsubmit={submitRecovery} class="auth-form" aria-busy={busy}>
-						<fieldset class="recovery-fields" disabled={busy}>
+						<fieldset class="recovery-fields" disabled={busy || !ready}>
 							{#if recoveryStage === 'email'}
 								<div class="field">
 									<label for="recovery-email">Email address</label>
@@ -326,76 +326,87 @@
 				<a href={resolve(loginPath)} class="continue-button recovery-link">Back to sign in</a>
 			{:else}
 				<form method="POST" onsubmit={submit} class="auth-form">
-					{#if !twoFactor}
-						<div class="field">
-							<label for="email">Email address</label><input
-								id="email"
-								class="input w-full"
-								type="email"
-								autocomplete="username"
-								placeholder="you@example.com"
-								maxlength="254"
-								bind:value={email}
-								required
-							/>
-						</div>
-						<div class="field">
-							<label for="password">Password</label>
-							<div class="password-field">
-								<input
-									id="password"
+					<fieldset class="login-fields" disabled={busy || !ready}>
+						{#if !twoFactor}
+							<div class="field">
+								<label for="email">Email <span aria-hidden="true">*</span></label><input
+									id="email"
+									aria-label="Email"
 									class="input w-full"
-									type={showPassword ? 'text' : 'password'}
-									autocomplete="current-password"
-									placeholder="Enter your password"
-									minlength="12"
-									maxlength="128"
-									bind:value={password}
+									type="email"
+									autocomplete="username"
+									placeholder="you@example.com"
+									maxlength="254"
+									bind:value={email}
 									required
-								/><button
-									type="button"
-									class="password-toggle"
-									aria-label={showPassword ? 'Hide password' : 'Show password'}
-									aria-pressed={showPassword}
-									onclick={() => (showPassword = !showPassword)}
-									>{#if showPassword}<EyeOff size={19} />{:else}<Eye size={19} />{/if}</button
-								>
+								/>
 							</div>
-							<a class="forgot-link" href={resolve(recoveryPath)}>Forgot Password?</a>
+							<div class="field">
+								<label for="password">Password <span aria-hidden="true">*</span></label>
+								<div class="password-field">
+									<input
+										id="password"
+										aria-label="Password"
+										class="input w-full"
+										type={showPassword ? 'text' : 'password'}
+										autocomplete="current-password"
+										placeholder="Enter your password"
+										minlength="12"
+										maxlength="128"
+										bind:value={password}
+										required
+									/><button
+										type="button"
+										class="password-toggle"
+										aria-label={showPassword ? 'Hide password' : 'Show password'}
+										aria-pressed={showPassword}
+										onclick={() => (showPassword = !showPassword)}
+										>{#if showPassword}<EyeOff size={19} />{:else}<Eye size={19} />{/if}</button
+									>
+								</div>
+								<a class="forgot-link" href={resolve(recoveryPath)}>Forgot Password?</a>
+							</div>
+						{:else}
+							<p class="auth-subtitle">
+								{useBackupCode
+									? 'Enter one of your saved backup codes. Each backup code can only be used once.'
+									: 'Enter the six-digit code from your authenticator app.'}
+							</p>
+							<div class="field">
+								<label for="verification-code"
+									>{useBackupCode ? 'Backup code' : 'Authenticator code'}
+									<span aria-hidden="true">*</span></label
+								><input
+									id="verification-code"
+									aria-label={useBackupCode ? 'Backup code' : 'Authenticator code'}
+									class="input w-full"
+									type="text"
+									inputmode={useBackupCode ? 'text' : 'numeric'}
+									autocomplete={useBackupCode ? 'off' : 'one-time-code'}
+									pattern={useBackupCode ? '[A-Za-z0-9]{5}-[A-Za-z0-9]{5}' : '[0-9]{6}'}
+									maxlength={useBackupCode ? 11 : 6}
+									bind:value={code}
+									required
+								/>
+							</div>
+							<button type="button" class="forgot-link" disabled={busy} onclick={toggleBackupCode}>
+								{useBackupCode ? 'Use authenticator code' : 'Use a backup code'}
+							</button>
+						{/if}
+						{#if error}<p class="form-error" role="alert">{error}</p>{/if}
+						<div class="form-actions">
+							<button class="continue-button" type="submit" disabled={busy}
+								>{busy ? 'Signing in...' : twoFactor ? 'Verify code' : 'Log In'}</button
+							>
 						</div>
-					{:else}
-						<p class="auth-subtitle">
-							{useBackupCode
-								? 'Enter one of your saved backup codes. Each backup code can only be used once.'
-								: 'Enter the six-digit code from your authenticator app.'}
-						</p>
-						<div class="field">
-							<label for="verification-code"
-								>{useBackupCode ? 'Backup code' : 'Authenticator code'}</label
-							><input
-								id="verification-code"
-								class="input w-full"
-								type="text"
-								inputmode={useBackupCode ? 'text' : 'numeric'}
-								autocomplete={useBackupCode ? 'off' : 'one-time-code'}
-								pattern={useBackupCode ? '[A-Za-z0-9]{5}-[A-Za-z0-9]{5}' : '[0-9]{6}'}
-								maxlength={useBackupCode ? 11 : 6}
-								bind:value={code}
-								required
-							/>
-						</div>
-						<button type="button" class="forgot-link" disabled={busy} onclick={toggleBackupCode}>
-							{useBackupCode ? 'Use authenticator code' : 'Use a backup code'}
-						</button>
-					{/if}
-					{#if error}<p class="form-error" role="alert">{error}</p>{/if}
-					<div class="form-actions">
-						<button class="continue-button" type="submit" disabled={busy}
-							>{busy ? 'Signing in...' : twoFactor ? 'Verify code' : 'Continue'}</button
-						>
-					</div>
+					</fieldset>
 				</form>
 				{#if !twoFactor}
+					<p class="verification-link">
+						New to HandLink? <a class="forgot-link" href={resolve('/user/register')}
+							>Create account</a
+						>
+					</p>
 					<p class="verification-link">
 						Need email verification? <a
 							class="forgot-link"
@@ -421,6 +432,9 @@
 </div>
 
 <style>
+	.login-fields {
+		display: contents;
+	}
 	.auth-shell {
 		position: relative;
 		isolation: isolate;
@@ -507,12 +521,15 @@
 		pointer-events: none;
 	}
 	.auth-brand {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 16px;
 		position: absolute;
 		top: 32px;
 		left: 0;
 		right: 0;
-		display: flex;
-		justify-content: center;
+		padding-inline: clamp(16px, 4vw, 64px);
 	}
 	.auth-main {
 		display: grid;

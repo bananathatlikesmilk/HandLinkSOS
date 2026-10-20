@@ -276,6 +276,23 @@ export const incidentEvent = sqliteTable(
 	]
 );
 
+export const incidentAddendum = sqliteTable(
+	'incident_addendum',
+	{
+		id: id(),
+		incidentId: text('incident_id')
+			.notNull()
+			.references(() => incident.id, { onDelete: 'restrict' }),
+		actorUserId: accountReference('actor_user_id'),
+		notes: text('notes').notNull(),
+		createdAt: created()
+	},
+	(t) => [
+		index('addendum_incident_idx').on(t.incidentId, t.createdAt),
+		check('addendum_notes_length', sql`length(trim(${t.notes})) between 1 and 2000`)
+	]
+);
+
 export const incidentCancellation = sqliteTable(
 	'incident_cancellation',
 	{

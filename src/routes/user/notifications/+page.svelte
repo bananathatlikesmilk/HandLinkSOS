@@ -16,11 +16,13 @@
 	let loading = $state(true);
 	let error = $state('');
 	let notice = $state('');
+	let lastUpdated = $state('');
+	let announcement = $state('');
 	let busy = $state('');
 	let reasons = $state<Record<string, string>>({});
 	let stopped = false;
 	let accountId = '';
-	let listRequest: AbortController | null = null;
+	let listRequest = $state<AbortController | null>(null);
 	let actionRequest: AbortController | null = null;
 	async function refresh() {
 		const identity = data.account?.id ?? '';
@@ -47,7 +49,13 @@
 				pageSize: number;
 			}>(`/api/notifications?page=${currentPage}`, { signal: controller.signal });
 			if (stopped || controller.signal.aborted || data.account?.id !== identity) return;
+			if (
+				lastUpdated &&
+				result.notifications.some((item) => !notifications.some((old) => old.id === item.id))
+			)
+				announcement = 'New updates are available.';
 			notifications = result.notifications;
+			lastUpdated = new Date().toLocaleTimeString();
 			total = result.total;
 			pageSize = result.pageSize;
 			currentPage = result.page;
@@ -133,12 +141,14 @@
 		void refresh();
 		const interval = setInterval(refresh, 5000);
 		document.addEventListener('visibilitychange', refresh);
+		window.addEventListener('user-notifications-change', refresh);
 		return () => {
 			stopped = true;
 			listRequest?.abort();
 			actionRequest?.abort();
 			clearInterval(interval);
 			document.removeEventListener('visibilitychange', refresh);
+			window.removeEventListener('user-notifications-change', refresh);
 		};
 	});
 </script>
@@ -150,8 +160,17 @@
 		<h1 class="user-title">Notifications</h1>
 	</div>
 	<p class="user-copy mt-3">
-		SOS and location-sharing updates. Updates refresh while this app is open.
+		Updates refresh every 5 seconds while visible. {#if lastUpdated}Last updated {lastUpdated}.{/if}
 	</p>
+	<div class="user-actions mt-4">
+		<button
+			type="button"
+			class="btn btn-outline"
+			disabled={!!listRequest || !!busy}
+			onclick={() => void refresh()}>Refresh updates</button
+		><a class="btn btn-outline" href={resolve('/user/settings')}>Phone notification settings</a>
+	</div>
+	<p class="sr-only" role="status">{announcement}</p>
 	{#if error}<p class="mt-4 alert alert-error" role="alert">{error}</p>{/if}
 	{#if notice}<p class="mt-4 alert" role="status">{notice}</p>{/if}
 	{#if loading}<p class="user-copy mt-5" role="status">

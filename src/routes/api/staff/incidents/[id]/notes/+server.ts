@@ -6,5 +6,7 @@ import type { RequestHandler } from './$types';
 export const POST: RequestHandler = async (event) => {
 	requireStaff(event);
 	const input = await readInput(event, noteInput);
-	return privateJson(changeIncident(event, event.params.id, 'note', input.notes));
+	return privateJson(
+		changeIncident(event, event.params.id, 'note', input.notes, input.expectedNoteId)
+	);
 };

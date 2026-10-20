@@ -9,6 +9,7 @@ import {
 	incident,
 	incidentReference,
 	incidentEvent,
+	incidentAddendum,
 	incidentCancellation,
 	notification,
 	medicalProfile,
@@ -300,6 +301,20 @@ export function getIncidentReport(event: RequestEvent, id: string | undefined): 
 		const { row } = accessibleIncident(event, id, true);
 		return {
 			incident: summary(row.id),
+			addenda: db
+				.select({
+					id: incidentAddendum.id,
+					notes: incidentAddendum.notes,
+					createdAt: incidentAddendum.createdAt,
+					authorName: user.name,
+					actorUserId: incidentAddendum.actorUserId
+				})
+				.from(incidentAddendum)
+				.innerJoin(user, eq(user.id, incidentAddendum.actorUserId))
+				.where(eq(incidentAddendum.incidentId, row.id))
+				.orderBy(incidentAddendum.createdAt, incidentAddendum.id)
+				.all()
+				.map((item) => ({ ...item, createdAt: item.createdAt.toISOString() })),
 			ai: getAiSummaryState(row.id),
 			cancellation: getCancellation(row.id),
 			callerRelationship: row.callerRelationship,
@@ -311,10 +326,47 @@ export function getIncidentReport(event: RequestEvent, id: string | undefined): 
 	});
 }
 
+export function addReportAddendum(
+	event: RequestEvent,
+	id: string | undefined,
+	input: { id: string; notes: string }
+): IncidentReport {
+	return db.transaction(
+		(tx) => {
+			const { actor, row } = accessibleIncident(event, id, true);
+			if (actor.role !== 'dispatcher' || row.dispatcherUserId !== actor.id)
+				error(403, 'Only the assigned dispatcher can add a report addendum.');
+			if (row.status !== 'Resolved')
+				error(409, 'Use incident notes while handling an active incident.');
+			const previous = tx
+				.select()
+				.from(incidentAddendum)
+				.where(eq(incidentAddendum.id, input.id))
+				.get();
+			if (previous) {
+				if (
+					previous.incidentId !== row.id ||
+					previous.actorUserId !== actor.id ||
+					previous.notes !== input.notes
+				)
+					error(409, 'This addendum request ID was already used.');
+				return getIncidentReport(event, row.id);
+			}
+			tx.insert(incidentAddendum)
+				.values({ id: input.id, incidentId: row.id, actorUserId: actor.id, notes: input.notes })
+				.run();
+			// Addenda are append-only. Original notes, resolution, and approved AI source remain unchanged.
+			return getIncidentReport(event, row.id);
+		},
+		{ behavior: 'immediate' }
+	);
+}
+
 export function getIncidentDetail(event: RequestEvent, id: string | undefined): IncidentDetail {
 	return db.transaction(() => {
 		const { actor, row } = accessibleIncident(event, id);
 		const result: IncidentDetail = {
+			noteId: null,
 			cancellation: null,
 			incident: summary(row.id),
 			personal: null,
@@ -381,6 +433,7 @@ export function getIncidentDetail(event: RequestEvent, id: string | undefined): 
 				createdAt: createdAt.toISOString()
 			}));
 		result.notes = latestNote(row.id);
+		result.noteId = latestIncidentNote(row.id)?.id ?? null;
 		return result;
 	});
 }
@@ -389,7 +442,8 @@ export function changeIncident(
 	event: RequestEvent,
 	id: string | undefined,
 	action: 'confirm' | 'On route' | 'Resolved' | 'note',
-	notes = ''
+	notes = '',
+	expectedNoteId?: string | null
 ) {
 	return db.transaction(
 		(tx) => {
@@ -408,6 +462,14 @@ export function changeIncident(
 					error(403, 'Only the assigned dispatcher can update this incident.');
 				if (action === 'note') {
 					if (row.status === 'Resolved') error(409, 'Resolved incidents cannot be edited.');
+					const latest = latestIncidentNote(row.id);
+					// An uncertain retry of an identical note must not create another note version.
+					if (latest?.notes === notes) return getIncidentDetail(event, row.id);
+					if (expectedNoteId !== undefined && expectedNoteId !== (latest?.id ?? null))
+						error(
+							409,
+							'Notes changed in another tab. Copy your draft, refresh, and review before saving.'
+						);
 				} else {
 					if (action === 'Resolved' && getCancellation(row.id)?.decision === 'pending')
 						error(409, 'Review pending cancellation first.');

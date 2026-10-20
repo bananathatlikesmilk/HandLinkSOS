@@ -6,6 +6,7 @@
 	import { BrowserQRCodeReader, type IScannerControls } from '@zxing/browser';
 	import { apiRequest } from '#lib/client/request.ts';
 	import type { TrustedConnection } from '#lib/trusted.ts';
+	import RelationshipSelect from '#lib/user/RelationshipSelect.svelte';
 	let video: HTMLVideoElement | undefined;
 	let controls: IScannerControls | undefined;
 	let generation = 0;
@@ -22,13 +23,22 @@
 	function attachVideo(element: HTMLVideoElement) {
 		video = element;
 		return () => {
-			video = undefined;
+			if (video === element) {
+				stopCamera();
+				video = undefined;
+			} else stopPreview(element);
 		};
+	}
+	function stopPreview(element: HTMLVideoElement | undefined) {
+		const stream = element?.srcObject;
+		if (stream && 'getTracks' in stream) for (const track of stream.getTracks()) track.stop();
+		if (element) element.srcObject = null;
 	}
 	function stopCamera() {
 		generation += 1;
 		controls?.stop();
 		controls = undefined;
+		stopPreview(video);
 		scanning = false;
 		starting = false;
 	}
@@ -72,7 +82,7 @@
 			scanning = true;
 		} catch {
 			if (!alive || request !== generation) return;
-			starting = false;
+			stopCamera();
 			error =
 				'Camera unavailable or permission denied. Allow camera access, or upload a QR image instead.';
 		}
@@ -131,6 +141,12 @@
 		stopCamera();
 	});
 </script>
+
+<svelte:document
+	onvisibilitychange={() => {
+		if (typeof document !== 'undefined' && document.hidden) stopCamera();
+	}}
+/>
 
 <svelte:head><title>Scan QR · HandLink</title></svelte:head>
 <div class="space-y-6">
@@ -202,16 +218,11 @@
 					Continue only with someone you trust. They will see your name and relationship.
 				</p>
 				<form class="space-y-4" onsubmit={requestAccess}>
-					<label class="user-field"
-						>Your relationship to this person<input
-							class="input w-full"
-							bind:value={relationship}
-							placeholder="For example: daughter, friend, caregiver"
-							maxlength="80"
-							required
-							disabled={submitting}
-						/></label
-					>
+					<RelationshipSelect
+						label="Your relationship to this person"
+						bind:value={relationship}
+						disabled={submitting}
+					/>
 					<div class="user-actions">
 						<button
 							type="button"

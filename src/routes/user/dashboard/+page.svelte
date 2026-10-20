@@ -137,7 +137,7 @@
 	.self-sos {
 		width: 213px;
 		height: 213px;
-		border: 2px solid #a9ac9e;
+		border: 2px solid var(--app-border);
 		border-radius: 50%;
 		background: transparent;
 		display: flex;
@@ -146,14 +146,14 @@
 		align-items: center;
 		justify-content: center;
 		margin: auto;
-		color: #efefe8;
+		color: var(--app-text);
 		transition:
 			border-color 150ms,
 			background 150ms;
 	}
 	.self-sos:hover:not(:disabled) {
-		border-color: #f2f2e7;
-		background: #ffffff08;
+		border-color: var(--app-accent);
+		background: var(--app-surface-alt);
 	}
 	.self-sos span {
 		font-size: 18px;
@@ -161,7 +161,7 @@
 		font-weight: 300;
 	}
 	.self-sos small {
-		color: #c0c5b0;
+		color: var(--app-muted);
 		font-size: 11px;
 		letter-spacing: 2px;
 	}
@@ -173,7 +173,7 @@
 		font-weight: 500;
 	}
 	.trusted-section a {
-		color: #ddd5ad;
+		color: var(--app-accent);
 		font-size: 12px;
 		display: flex;
 		align-items: center;
@@ -186,7 +186,7 @@
 		margin-top: 12px;
 	}
 	.trusted-sos {
-		border: 1px solid #727660;
+		border: 1px solid var(--app-border);
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -195,15 +195,15 @@
 		font-size: 14px;
 		letter-spacing: 1.3px;
 		background: transparent;
-		color: #e4e7d5;
+		color: var(--app-text);
 	}
 	.trusted-sos:hover {
-		background: #ffffff07;
+		background: var(--app-surface-alt);
 	}
 	.trusted-help {
 		font-size: 12px;
 		line-height: 1.6;
-		color: #bfc6ad;
+		color: var(--app-muted);
 		margin-top: 12px;
 	}
 	.dashboard-actions {
@@ -213,12 +213,12 @@
 		margin-top: 35px;
 	}
 	.dashboard-actions .share-link {
-		color: #e5d18b;
-		border-color: #82774d;
+		color: var(--app-accent);
+		border-color: var(--app-border);
 	}
 	.emergency-note {
 		font-size: 12px;
-		color: #c1c7b3;
+		color: var(--app-muted);
 		line-height: 1.7;
 		text-align: center;
 		margin-top: 25px;

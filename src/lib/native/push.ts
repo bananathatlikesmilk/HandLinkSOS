@@ -42,6 +42,13 @@ function initialize() {
 			})
 		);
 		listeners.push(
+			await PushNotifications.addListener('pushNotificationReceived', () => {
+				// Refresh authorized account data; never display a push payload directly.
+				if (account && optedIn(account))
+					window.dispatchEvent(new Event('user-notifications-change'));
+			})
+		);
+		listeners.push(
 			await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
 				// Never navigate to a URL supplied by a push payload.
 				if (action.notification.data?.screen === 'notifications')
@@ -97,11 +104,12 @@ async function register(id: string) {
 }
 
 export async function getPushStatus() {
-	if (!pushAvailable()) return { configured: false, enabled: false };
+	if (!pushAvailable()) return { configured: false, enabled: false, permission: null };
 	const status = await apiRequest<{ configured: boolean; enabled: boolean }>('/api/push/devices');
 	const permission = await PushNotifications.checkPermissions();
 	return {
 		configured: status.configured,
+		permission: permission.receive,
 		enabled:
 			status.enabled && Boolean(account && optedIn(account)) && permission.receive === 'granted'
 	};

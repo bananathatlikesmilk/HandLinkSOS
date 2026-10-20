@@ -3,7 +3,8 @@
 	import { page } from '$app/state';
 	import { afterNavigate } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { Bell, ChevronLeft, Settings } from '@lucide/svelte';
+	import { Bell, ChevronLeft, Home, Users, MapPin, Settings } from '@lucide/svelte';
+	import ThemeToggle from '#lib/components/ThemeToggle.svelte';
 	import { apiRequest } from '#lib/client/request.ts';
 	import type { LocationNotification } from '#lib/notifications.ts';
 	import { USER_PREVIEW, UserPreview } from '#lib/user/preview.svelte.ts';
@@ -14,6 +15,13 @@
 	import type { LayoutProps } from './$types';
 	let { children, data }: LayoutProps = $props();
 	let unreadCount = $state(0);
+	const navigation = [
+		{ href: '/user/dashboard', label: 'Home', icon: Home },
+		{ href: '/user/profiles', label: 'Profiles', icon: Users },
+		{ href: '/user/sharing', label: 'Location', icon: MapPin },
+		{ href: '/user/notifications', label: 'Updates', icon: Bell },
+		{ href: '/user/settings', label: 'Settings', icon: Settings }
+	] as const;
 	let locationWarning = $state<(LocationNotification & { accountId: string }) | null>(null);
 	let refreshNotificationsOnNavigate = () => {};
 	const preview = new UserPreview();
@@ -115,24 +123,36 @@
 
 <svelte:head><meta name="theme-color" content="#17180f" /></svelte:head>
 <a href="#user-content" class="skip-link">Skip to User screen</a>
-<div class="user-preview" data-theme="handlink-user">
-	<div class="user-device">
+<div class="user-preview" class:has-navigation={!authPage} data-theme="handlink-user">
+	{#if !authPage}
+		<nav class="user-navigation" aria-label="Main navigation">
+			{#each navigation as link (link.href)}
+				<a
+					href={resolve(link.href)}
+					class:current={page.url.pathname.startsWith(link.href)}
+					aria-current={page.url.pathname.startsWith(link.href) ? 'page' : undefined}
+					aria-label={link.label === 'Updates' && unreadCount > 0
+						? `Updates, ${unreadCount} unread`
+						: link.label}
+				>
+					<span class="navigation-icon"
+						><link.icon
+							size={23}
+							aria-hidden="true"
+						/>{#if link.label === 'Updates' && unreadCount > 0}<span class="navigation-badge"
+								>{unreadCount > 99 ? '99+' : unreadCount}</span
+							>{/if}</span
+					>
+					<span>{link.label}</span>
+				</a>
+			{/each}
+		</nav>
+	{/if}
+	<div class="user-device" class:with-navigation={!authPage}>
 		{#if !welcome}<header class="user-header">
 				<UserBrand />
 				<div class="header-controls">
-					{#if !authPage}<a
-							class="btn btn-square btn-ghost"
-							href={resolve('/user/notifications')}
-							aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : 'Notifications'}
-						>
-							<Bell size={20} strokeWidth={1.4} />{#if unreadCount > 0}<span
-									class="notification-count">{unreadCount > 99 ? '99+' : unreadCount}</span
-								>{/if}</a
-						><a
-							class="btn btn-square btn-ghost"
-							href={resolve('/user/settings')}
-							aria-label="Settings"><Settings size={23} strokeWidth={1.3} /></a
-						>{/if}
+					<ThemeToggle />
 				</div>
 			</header>{/if}
 		{#if data.account && !authPage}
@@ -187,6 +207,10 @@
 
 <style>
 	.user-header {
+		position: sticky;
+		top: 0;
+		z-index: 25;
+		background: var(--app-surface, #17180f);
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -215,21 +239,18 @@
 	}
 	.account-label,
 	.account-email {
-		color: #d1d5c1;
+		color: var(--app-muted);
 	}
 	.account-email {
 		flex-basis: 100%;
 	}
 	.account-role {
-		color: #e1ca79;
+		color: var(--app-accent);
 	}
-	.header-controls .btn {
-		position: relative;
-	}
-	.notification-count {
+	.navigation-badge {
 		position: absolute;
-		right: 3px;
-		top: 1px;
+		right: -10px;
+		top: -5px;
 		font-size: 10px;
 		min-width: 15px;
 		height: 15px;
@@ -238,6 +259,69 @@
 		color: #17180f;
 		display: grid;
 		place-items: center;
+	}
+	.user-navigation {
+		position: fixed;
+		z-index: 40;
+		bottom: 0;
+		inset-inline: 0;
+		display: grid;
+		grid-template-columns: repeat(5, minmax(0, 1fr));
+		background: var(--app-surface, #17180f);
+		color: var(--app-text);
+		border-top: 1px solid var(--app-border);
+		padding: 6px 4px max(6px, env(safe-area-inset-bottom));
+	}
+	.user-navigation a {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		align-items: center;
+		gap: 5px;
+		min-height: 58px;
+		padding: 6px 2px;
+		border-radius: 12px;
+		color: var(--app-muted);
+		font-size: 12px;
+		font-weight: 600;
+	}
+	.user-navigation a.current {
+		background: var(--app-accent);
+		color: var(--app-accent-text);
+	}
+	.navigation-icon {
+		position: relative;
+	}
+	.with-navigation {
+		padding-bottom: 84px;
+	}
+	@media (min-width: 1100px) {
+		.has-navigation {
+			padding-left: 220px;
+		}
+		.user-navigation {
+			top: 0;
+			bottom: 0;
+			right: auto;
+			width: 220px;
+			display: flex;
+			flex-direction: column;
+			padding: 100px 16px 24px;
+			gap: 12px;
+			border-right: 1px solid var(--app-border);
+			border-top: 0;
+		}
+		.user-navigation a {
+			flex-direction: row;
+			justify-content: flex-start;
+			padding: 14px 18px;
+			gap: 14px;
+			font-size: 16px;
+		}
+		.with-navigation {
+			max-width: 900px;
+			padding-bottom: 0;
+		}
 	}
 	.user-back {
 		padding: 14px 24px 0;
@@ -248,7 +332,7 @@
 		gap: 4px;
 		min-height: 44px;
 		font-size: 13px;
-		color: #d6dac8;
+		color: var(--app-text);
 	}
 	.user-footer {
 		padding: 35px 25px 23px;
@@ -256,7 +340,7 @@
 		display: flex;
 		justify-content: space-between;
 		gap: 10px;
-		color: #d1d5c1;
+		color: var(--app-muted);
 		background: linear-gradient(0deg, #ffffff19, transparent);
 	}
 	.notification-banner {
@@ -267,7 +351,7 @@
 		padding: 14px;
 		border: 1px solid #e1ca79;
 		border-radius: 10px;
-		color: #e1ca79;
+		color: var(--app-accent);
 		font-size: 13px;
 	}
 	.sharing-warning {

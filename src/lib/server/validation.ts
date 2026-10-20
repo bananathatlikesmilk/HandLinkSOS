@@ -99,7 +99,14 @@ export const cancellationReviewInput = z.strictObject({ decision: z.enum(['appro
 export const notificationListInput = z.strictObject({
 	page: z.coerce.number().int().min(1).max(100000).default(1)
 });
-export const noteInput = z.strictObject({ notes: z.string().trim().min(1).max(2000) });
+export const noteInput = z.strictObject({
+	notes: z.string().trim().min(1).max(2000),
+	expectedNoteId: z.uuid().nullable().optional()
+});
+export const addendumInput = z.strictObject({
+	id: z.uuid(),
+	notes: z.string().trim().min(1).max(2000)
+});
 export const incidentListInput = z.strictObject({
 	view: z.enum(['alerts', 'reports']).default('alerts'),
 	search: z.string().trim().max(100).default(''),

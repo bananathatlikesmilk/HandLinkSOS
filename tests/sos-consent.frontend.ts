@@ -32,7 +32,7 @@ test('mutual request stays pending until separate approval; beneficiary sees SOS
 		});
 		await expect(mutual).not.toBeChecked();
 		await mutual.check();
-		await incoming.getByLabel('Your relationship to this person').fill('Sibling');
+		await incoming.getByLabel('Your relationship to this person').selectOption('Sibling');
 		await incoming.getByRole('button', { name: 'Approve', exact: true }).click();
 		await expect(
 			page.getByText('Waiting for approval. You cannot send SOS for this person yet.')
@@ -50,10 +50,10 @@ test('mutual request stays pending until separate approval; beneficiary sees SOS
 		});
 		expect(created.status()).toBe(201);
 		const { id, reference } = (await created.json()).incident;
-		await expect(page.getByRole('link', { name: 'Notifications, 1 unread' })).toBeVisible({
+		await expect(page.getByRole('link', { name: 'Updates, 1 unread' })).toBeVisible({
 			timeout: 15000
 		});
-		await page.getByRole('link', { name: 'Notifications, 1 unread' }).click();
+		await page.getByRole('link', { name: 'Updates, 1 unread' }).click();
 		await expect(
 			page.getByRole('heading', { name: 'Casey Reyes sent an SOS for you' })
 		).toBeVisible();
@@ -85,7 +85,7 @@ test('mutual request stays pending until separate approval; beneficiary sees SOS
 		await expect(page.getByText('Cancellation approved', { exact: true })).toBeVisible({
 			timeout: 15000
 		});
-		await expect(page.getByRole('link', { name: 'Notifications, 1 unread' })).toBeVisible({
+		await expect(page.getByRole('link', { name: 'Updates, 1 unread' })).toBeVisible({
 			timeout: 15000
 		});
 		await page.route('**/api/notifications?*', (route) =>

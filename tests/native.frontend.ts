@@ -176,7 +176,7 @@ test('logout stops native updates; settings requests native location without cre
 		)
 	).toBe(true);
 	await page.getByRole('button', { name: 'Log out', exact: true }).click();
-	await expect(page).toHaveURL(/\/user\/login$/);
+	await expect(page).toHaveURL(/\/login$/);
 	await expect
 		.poll(() =>
 			page.evaluate(

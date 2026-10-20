@@ -193,7 +193,7 @@
 		margin-top: 6px;
 		font-size: 12px;
 		line-height: 1.7;
-		color: #c7cfb7;
+		color: var(--app-muted);
 	}
 	button {
 		min-height: 44px;

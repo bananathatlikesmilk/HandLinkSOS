@@ -1,7 +1,10 @@
 <script lang="ts">
+	/* eslint svelte/no-navigation-without-resolve: "off" -- beforeNavigate supplies a destination already resolved by SvelteKit. */
 	import { onMount } from 'svelte';
 	import IncidentCancellationReview from './IncidentCancellationReview.svelte';
 	import { resolve } from '$app/paths';
+	import { beforeNavigate, goto } from '$app/navigation';
+	import { page as route, navigating as navigationState } from '$app/state';
 	import { Check, Search, Info, ShieldCheck, Siren } from '@lucide/svelte';
 	import type { IncidentDetail, IncidentSummary, IncidentStatus } from '#lib/incidents.ts';
 	let { role = 'dispatch' }: { role?: 'dispatch' | 'admin' } = $props();
@@ -18,6 +21,14 @@
 	let detail = $state('Personal information');
 	let verballyConfirmed = $state(false);
 	let draftNotes = $state('');
+	let savingNotes = $state(false);
+	let noteError = $state('');
+	let notesTimer: ReturnType<typeof setTimeout> | undefined;
+	let savePromise: Promise<boolean> | undefined;
+	let noteConflict = false;
+	let navigating = $state(false);
+	const leaving = $derived(navigating || !!navigationState.to);
+	const notesDirty = $derived(!!selected && draftNotes.trim() !== selected.notes.trim());
 	let notice = $state('');
 	let queueError = $state('');
 	let detailError = $state('');
@@ -29,7 +40,10 @@
 	let detailController: AbortController | undefined;
 	let disposed = false;
 	const ownIncident = $derived(
-		role === 'dispatch' && !!selected && selected.incident.dispatcherUserId === currentUserId
+		role === 'dispatch' &&
+			!!selected &&
+			route.data.account?.id === currentUserId &&
+			selected.incident.dispatcherUserId === currentUserId
 	);
 	const totalPages = $derived(Math.max(1, Math.ceil(total / pageSize)));
 	const endpoint = resolve('/api/staff/incidents');
@@ -45,7 +59,10 @@
 				selected = null;
 			}
 			if (response.status === 404) selected = null;
-			throw new Error(result?.message ?? 'Request failed. Refresh or sign in again.');
+			throw Object.assign(
+				new Error(result?.message ?? 'Request failed. Refresh or sign in again.'),
+				{ status: response.status }
+			);
 		}
 		if (!result) throw new Error('Invalid server response. Try refreshing this page.');
 		return result as T;
@@ -60,9 +77,13 @@
 				signal: controller.signal
 			});
 			if (controller.signal.aborted || disposed || id !== selectedId) return;
-			selected = result;
+			const keepDraft = preserveDraft && (notesDirty || savingNotes);
+			selected =
+				keepDraft && selected
+					? { ...result, notes: selected.notes, noteId: selected.noteId }
+					: result;
 			detailError = '';
-			if (!preserveDraft) draftNotes = result.notes;
+			if (!keepDraft) draftNotes = result.notes;
 		} catch (cause) {
 			if (!controller.signal.aborted && !disposed && id === selectedId) {
 				detailError = cause instanceof Error ? cause.message : 'Unable to load incident.';
@@ -71,8 +92,11 @@
 			if (detailController === controller && !disposed) detailLoading = false;
 		}
 	}
-	function selectIncident(id: string) {
-		if (busy) return;
+	async function selectIncident(id: string) {
+		if (busy || navigating || !(await flushNotes()) || navigating) return;
+		clearTimeout(notesTimer);
+		noteError = '';
+		noteConflict = false;
 		selectedId = id;
 		selected = null;
 		detail = 'Personal information';
@@ -84,7 +108,7 @@
 		void loadDetail(id);
 	}
 	async function loadQueue(poll = false) {
-		if (busy || (poll && queueController)) return;
+		if (busy || savingNotes || navigating || (poll && queueController)) return;
 		queueController?.abort();
 		const controller = new AbortController();
 		queueController = controller;
@@ -122,7 +146,11 @@
 			}
 		}
 	}
-	function changeQuery(nextPage = 1) {
+	async function changeQuery(nextPage = 1) {
+		if (leaving || !(await flushNotes()) || leaving) return;
+		clearTimeout(notesTimer);
+		noteError = '';
+		noteConflict = false;
 		page = nextPage;
 		appliedSearch = search.trim();
 		detailController?.abort();
@@ -132,8 +160,109 @@
 		draftNotes = '';
 		void loadQueue();
 	}
+	function notesChanged(value: string) {
+		if (leaving) return;
+		draftNotes = value;
+		clearTimeout(notesTimer);
+		if (noteConflict) return;
+		noteError = '';
+		if (notesDirty && value.trim()) notesTimer = setTimeout(() => void flushNotes(), 1200);
+	}
+	async function flushNotes(): Promise<boolean> {
+		clearTimeout(notesTimer);
+		if (savePromise) return savePromise;
+		if (!notesDirty) return true;
+		if (!ownIncident || !selected || selected.incident.status === 'Resolved') {
+			noteError = 'These notes cannot be edited. Copy your draft before leaving.';
+			return false;
+		}
+		if (!draftNotes.trim()) {
+			noteError = 'Notes cannot be blank. Restore saved notes or enter text.';
+			return false;
+		}
+		if (noteConflict) return false;
+		const id = selected.incident.id;
+		const accountId = route.data.account?.id;
+		const current = () => !disposed && selectedId === id && route.data.account?.id === accountId;
+		queueController?.abort();
+		detailController?.abort();
+		savingNotes = true;
+		savePromise = (async () => {
+			try {
+				while (current() && selected && notesDirty && draftNotes.trim()) {
+					const submitted = draftNotes.trim();
+					const result: IncidentDetail = await request<IncidentDetail>(
+						`${endpoint}/${encodeURIComponent(id)}/notes`,
+						{
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ notes: submitted, expectedNoteId: selected.noteId })
+						}
+					);
+					if (!current()) return false;
+					selected = result;
+					if (draftNotes.trim() === submitted) draftNotes = result.notes;
+					noteError = '';
+				}
+				return current() && !notesDirty;
+			} catch (cause) {
+				if (current()) {
+					noteConflict = (cause as { status?: number }).status === 409;
+					noteError = noteConflict
+						? 'Notes changed elsewhere or this case closed. Copy your draft, then reload saved notes.'
+						: cause instanceof Error
+							? cause.message
+							: 'Notes were not saved. Retry before leaving.';
+				}
+				return false;
+			} finally {
+				savingNotes = false;
+				savePromise = undefined;
+			}
+		})();
+		return savePromise;
+	}
+	async function reloadNotes() {
+		if (
+			leaving ||
+			savingNotes ||
+			(notesDirty && !window.confirm('Discard your unsaved draft and reload saved notes?'))
+		)
+			return;
+		clearTimeout(notesTimer);
+		noteConflict = false;
+		noteError = '';
+		await loadDetail(selectedId);
+	}
+	beforeNavigate((navigation) => {
+		if (navigating || (!notesDirty && !savingNotes)) return;
+		navigation.cancel();
+		const destination = navigation.to?.url;
+		if (navigation.willUnload || !destination) {
+			void flushNotes();
+			return;
+		}
+		void flushNotes().then(async (saved) => {
+			if (!saved || disposed) return;
+			navigating = true;
+			queueController?.abort();
+			detailController?.abort();
+			try {
+				await goto(destination);
+			} catch {
+				if (!disposed) actionError = 'Unable to open that page. Your notes are saved.';
+			} finally {
+				navigating = false;
+			}
+		});
+	});
 	async function mutate(action: 'confirm' | 'status' | 'notes', status?: IncidentStatus) {
-		if (busy || !selected) return;
+		if (leaving) return;
+		if (action === 'notes') {
+			await flushNotes();
+			return;
+		}
+		if (busy || !selected || !(await flushNotes()) || leaving) return;
 		busy = true;
 		actionError = '';
 		notice = '';
@@ -146,25 +275,17 @@
 				{
 					method: action === 'status' ? 'PATCH' : 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify(
-						action === 'confirm'
-							? { verballyConfirmed }
-							: action === 'notes'
-								? { notes: draftNotes.trim() }
-								: { status }
-					)
+					body: JSON.stringify(action === 'confirm' ? { verballyConfirmed } : { status })
 				}
 			);
 			if (disposed) return;
 			selected = result;
-			if (action === 'notes' || action === 'confirm') draftNotes = result.notes;
+			if (action === 'confirm') draftNotes = result.notes;
 			if (action === 'confirm') verballyConfirmed = false;
 			notice =
 				action === 'confirm'
 					? 'Incident confirmed. Registered information is now available.'
-					: action === 'notes'
-						? 'Additional information saved.'
-						: `Incident marked ${status?.toLowerCase()}.`;
+					: `Incident marked ${status?.toLowerCase()}.`;
 		} catch (cause) {
 			if (!disposed)
 				actionError =
@@ -193,6 +314,7 @@
 		return () => {
 			disposed = true;
 			clearInterval(interval);
+			clearTimeout(notesTimer);
 			document.removeEventListener('visibilitychange', refresh);
 			queueController?.abort();
 			detailController?.abort();
@@ -212,8 +334,10 @@
 				<h1 class="page-heading">{role === 'admin' ? 'Active incidents' : 'SOS alerts'}</h1>
 			</div>
 		</div>
-		<button class="btn btn-outline btn-sm" disabled={busy || loading} onclick={() => loadQueue()}
-			>Refresh alerts</button
+		<button
+			class="btn btn-outline btn-sm"
+			disabled={busy || leaving || loading}
+			onclick={() => loadQueue()}>Refresh alerts</button
 		>
 	</header>
 	<p class="response-purpose">
@@ -227,7 +351,9 @@
 	</p>
 	{#if queueError}<p class="alert alert-error" role="alert">
 			{queueError} Last loaded alerts may be outdated.
-			<button class="btn btn-sm" onclick={() => loadQueue()} disabled={busy}>Retry alerts</button>
+			<button class="btn btn-sm" onclick={() => loadQueue()} disabled={busy || leaving}
+				>Retry alerts</button
+			>
 		</p>{/if}
 	{#if notice}<p class="alert" role="status"><Check size={17} />{notice}</p>{/if}
 	{#if actionError}<p class="alert alert-error" role="alert">{actionError}</p>{/if}
@@ -256,7 +382,7 @@
 						placeholder="Search name or incident reference"
 						maxlength="100"
 						bind:value={search}
-						disabled={busy}
+						disabled={busy || leaving}
 					/></label
 				>
 				<select
@@ -264,13 +390,13 @@
 					aria-label="Filter incidents"
 					bind:value={filter}
 					onchange={() => changeQuery()}
-					disabled={busy}
+					disabled={busy || leaving}
 				>
 					<option>Active</option><option>All</option><option>Not assigned</option><option
 						>In progress</option
 					><option>On route</option><option>Resolved</option>
 				</select>
-				<button class="btn btn-outline btn-sm" disabled={busy}>Search alerts</button>
+				<button class="btn btn-outline btn-sm" disabled={busy || leaving}>Search alerts</button>
 			</form>
 			{#if loading}<p class="empty-queue" role="status">Loading alerts...</p>{/if}
 			<div class="queue-items">
@@ -279,7 +405,7 @@
 						class="incident-row"
 						class:selected={selectedId === incident.id}
 						aria-pressed={selectedId === incident.id}
-						disabled={busy}
+						disabled={busy || leaving}
 						onclick={() => selectIncident(incident.id)}
 					>
 						<span class="queue-row-top"
@@ -307,11 +433,11 @@
 				<div class="flex gap-2">
 					<button
 						class="btn btn-ghost btn-sm"
-						disabled={busy || loading || page <= 1}
+						disabled={busy || leaving || loading || page <= 1}
 						onclick={() => changeQuery(page - 1)}>Previous</button
 					><button
 						class="btn btn-ghost btn-sm"
-						disabled={busy || loading || page >= totalPages}
+						disabled={busy || leaving || loading || page >= totalPages}
 						onclick={() => changeQuery(page + 1)}>Next</button
 					>
 				</div>
@@ -325,7 +451,7 @@
 			{#if detailError}<p class="mb-4 alert alert-error" role="alert">
 					{detailError}<button
 						class="btn btn-sm"
-						disabled={busy}
+						disabled={busy || leaving}
 						onclick={() => loadDetail(selectedId, true)}>Retry incident</button
 					>
 				</p>{/if}
@@ -341,19 +467,16 @@
 								: selected.incident.status}
 						</p>
 					</div>
-					{#if role === 'dispatch' && selected.incident.status === 'Not assigned'}<button
-							class="confirm-button btn"
-							disabled={!verballyConfirmed || busy || !!detailError}
-							onclick={() => mutate('confirm')}>Confirm incident</button
-						>{/if}
 				</header>
-				<dl class="detail-dl mb-6">
-					{#each [['Started', date(selected.incident.startedAt)], ['Confirmed', date(selected.incident.confirmedAt)], ['Ended', date(selected.incident.endedAt)], ['Dispatcher', selected.incident.dispatcherName || 'Not assigned']] as [label, value] (label)}<div
-						>
-							<dt>{label}</dt>
-							<dd>{value}</dd>
-						</div>{/each}
-				</dl>
+				<table class="detail-table mb-6">
+					<tbody>
+						{#each [['Started', date(selected.incident.startedAt)], ['Confirmed', date(selected.incident.confirmedAt)], ['Ended', date(selected.incident.endedAt)], ['Dispatcher', selected.incident.dispatcherName || 'Not assigned']] as [label, value] (label)}<tr
+							>
+								<th scope="row">{label}</th>
+								<td>{value}</td>
+							</tr>{/each}
+					</tbody>
+				</table>
 				{#key selected.incident.id}
 					<IncidentCancellationReview
 						incidentId={selected.incident.id}
@@ -361,7 +484,7 @@
 						canReview={ownIncident &&
 							selected.incident.status !== 'Resolved' &&
 							selected.incident.status !== 'Not assigned'}
-						disabled={busy || !!detailError}
+						disabled={busy || leaving || !!detailError}
 						onBusyChange={cancellationBusy}
 						onReviewed={async () => {
 							if (!disposed) await loadQueue();
@@ -383,24 +506,31 @@
 									? 'Verbally confirm the caller’s name and phone number before opening registered information.'
 									: 'Only the assigned dispatcher can view registered information and update this incident.'}
 						</p>
-						<dl class="detail-dl">
-							<div>
-								<dt>Caller name</dt>
-								<dd>{selected.incident.callerName}</dd>
-							</div>
-							<div>
-								<dt>Caller phone number</dt>
-								<dd>{selected.incident.callerPhone}</dd>
-							</div>
-						</dl>
+						<table class="detail-table">
+							<tbody>
+								<tr>
+									<th scope="row">Caller name</th>
+									<td>{selected.incident.callerName}</td>
+								</tr>
+								<tr>
+									<th scope="row">Caller phone number</th>
+									<td>{selected.incident.callerPhone}</td>
+								</tr>
+							</tbody>
+						</table>
 						{#if role === 'dispatch' && selected.incident.status === 'Not assigned'}<label
 								class="confirmation-check"
 								><input
 									class="checkbox"
 									type="checkbox"
 									bind:checked={verballyConfirmed}
-									disabled={busy}
+									disabled={busy || leaving}
 								/> I verbally confirmed the caller’s name and phone number.</label
+							>{/if}
+						{#if role === 'dispatch' && selected.incident.status === 'Not assigned'}<button
+								class="confirm-button btn"
+								disabled={!verballyConfirmed || busy || !!detailError}
+								onclick={() => mutate('confirm')}>Confirm incident</button
 							>{/if}
 					</div>
 				{:else}
@@ -414,29 +544,37 @@
 							>{/each}
 					</div>
 					{#if detail === 'Personal information'}
-						<dl class="detail-dl">
-							{#each [['First name', selected.personal.firstName], ['Last name', selected.personal.lastName], ['Age', selected.personal.age + ' years'], ['Sex', selected.personal.sex], ['Longitude', selected.personal.longitude.toFixed(6)], ['Latitude', selected.personal.latitude.toFixed(6)], ['Phone number', selected.personal.phone], ['Status', selected.incident.status], ['Incident reference', selected.incident.reference], ['Pinged location', selected.personal.locationLabel]] as [label, value] (label)}<div
-								>
-									<dt>{label}</dt>
-									<dd>{value || 'Not provided'}</dd>
-								</div>{/each}
-						</dl>
+						<table class="detail-table">
+							<tbody>
+								{#each [['First name', selected.personal.firstName], ['Last name', selected.personal.lastName], ['Age', selected.personal.age + ' years'], ['Sex', selected.personal.sex], ['Longitude', selected.personal.longitude.toFixed(6)], ['Latitude', selected.personal.latitude.toFixed(6)], ['Phone number', selected.personal.phone], ['Status', selected.incident.status], ['Incident reference', selected.incident.reference], ['Pinged location', selected.personal.locationLabel]] as [label, value] (label)}<tr
+									>
+										<th scope="row">{label}</th>
+										<td>{value || 'Not provided'}</td>
+									</tr>{/each}
+							</tbody>
+						</table>
 					{:else if detail === 'Medical information'}
-						{#if selected.medical}<dl class="detail-dl">
-								{#each [['Blood type', selected.medical.bloodType], ['Chronic conditions', selected.medical.chronicCondition], ['Allergies', selected.medical.allergies], ['Current medications', selected.medical.currentMedications], ['Additional medical information', selected.medical.additionalInformation]] as [label, value] (label)}<div
-									>
-										<dt>{label}</dt>
-										<dd>{value || 'Not provided'}</dd>
-									</div>{/each}
-							</dl>{:else}<p class="muted">No medical information registered.</p>{/if}
+						{#if selected.medical}<table class="detail-table">
+								<tbody>
+									{#each [['Blood type', selected.medical.bloodType], ['Chronic conditions', selected.medical.chronicCondition], ['Allergies', selected.medical.allergies], ['Current medications', selected.medical.currentMedications], ['Additional medical information', selected.medical.additionalInformation]] as [label, value] (label)}<tr
+										>
+											<th scope="row">{label}</th>
+											<td>{value || 'Not provided'}</td>
+										</tr>{/each}
+								</tbody>
+							</table>{:else}<p class="muted">No medical information registered.</p>{/if}
 					{:else if detail === 'Emergency contacts'}
-						{#each selected.emergencyContacts as contact, index (index)}<dl class="detail-dl mb-6">
-								{#each [['First name', contact.firstName], ['Last name', contact.lastName], ['Relationship', contact.relationship], ['Phone number', contact.phone], ['Email', contact.email]] as [label, value] (label)}<div
-									>
-										<dt>{label}</dt>
-										<dd>{value || 'Not provided'}</dd>
-									</div>{/each}
-							</dl>{:else}<p class="muted">No emergency contacts registered.</p>{/each}
+						{#each selected.emergencyContacts as contact, index (index)}<table
+								class="detail-table mb-6"
+							>
+								<tbody>
+									{#each [['First name', contact.firstName], ['Last name', contact.lastName], ['Relationship', contact.relationship], ['Phone number', contact.phone], ['Email', contact.email]] as [label, value] (label)}<tr
+										>
+											<th scope="row">{label}</th>
+											<td>{value || 'Not provided'}</td>
+										</tr>{/each}
+								</tbody>
+							</table>{:else}<p class="muted">No emergency contacts registered.</p>{/each}
 					{:else}
 						<form
 							class="detail-content"
@@ -450,17 +588,41 @@
 									class="textarea min-h-40 w-full"
 									maxlength="2000"
 									required
-									bind:value={draftNotes}
-									disabled={busy || !ownIncident || selected.incident.status === 'Resolved'}
-								></textarea></label
+									value={draftNotes}
+									oninput={(event) => notesChanged(event.currentTarget.value)}
+									onblur={() => void flushNotes()}
+									disabled={busy ||
+										leaving ||
+										!ownIncident ||
+										selected.incident.status === 'Resolved'}></textarea></label
 							>
 							<button
 								class="btn btn-outline"
 								disabled={busy ||
+									leaving ||
 									!ownIncident ||
 									selected.incident.status === 'Resolved' ||
-									!draftNotes.trim()}>Save notes</button
+									!draftNotes.trim() ||
+									savingNotes ||
+									!notesDirty}>Save notes</button
 							>
+
+							<p role="status" class="muted">
+								{savingNotes
+									? 'Saving notes...'
+									: noteError
+										? 'Notes not saved'
+										: notesDirty
+											? 'Unsaved changes'
+											: 'Notes saved'}
+							</p>
+							{#if noteError}<p role="alert" class="alert alert-error">{noteError}</p>{/if}
+							{#if noteError || notesDirty}<button
+									type="button"
+									class="btn btn-outline"
+									disabled={savingNotes}
+									onclick={reloadNotes}>Reload saved notes</button
+								>{/if}
 							{#if selected.incident.status === 'Resolved'}<p class="muted">
 									Resolved incident notes are read-only.
 								</p>{/if}
@@ -472,15 +634,23 @@
 						<button
 							class="on-route-button btn"
 							disabled={busy ||
+								leaving ||
 								!!detailError ||
 								!ownIncident ||
+								notesDirty ||
+								savingNotes ||
+								!!noteError ||
 								selected.incident.status !== 'In progress'}
 							onclick={() => mutate('status', 'On route')}>Mark on route</button
 						><button
 							class="resolved-button btn"
 							disabled={busy ||
+								leaving ||
 								!!detailError ||
 								!ownIncident ||
+								notesDirty ||
+								savingNotes ||
+								!!noteError ||
 								selected.incident.status !== 'On route' ||
 								selected.cancellation?.decision === 'pending'}
 							onclick={() => mutate('status', 'Resolved')}>Mark resolved</button
@@ -624,24 +794,25 @@
 		border-color: #f1dd71;
 		color: #f1dd71;
 	}
-	.detail-dl {
-		display: grid;
-		gap: 16px;
+	.detail-table {
+		width: 100%;
+		border-collapse: collapse;
+		table-layout: fixed;
 	}
-	.detail-dl > div {
-		display: flex;
-		gap: 20px;
-		justify-content: space-between;
-		padding-bottom: 12px;
-		border-bottom: 1px solid #555;
+
+	.detail-table th,
+	.detail-table td {
+		padding: 12px 10px;
+		border: 1px solid var(--color-base-300, #555);
 		font-size: 14px;
-	}
-	.detail-dl dt {
-		color: #c3c4bb;
-	}
-	.detail-dl dd {
-		text-align: right;
+		text-align: left;
+		vertical-align: top;
 		overflow-wrap: anywhere;
+	}
+	.detail-table th {
+		width: 38%;
+		font-weight: 600;
+		background: var(--color-base-200, #34352d);
 	}
 	.confirmation-panel,
 	.detail-content {
@@ -696,7 +867,8 @@
 		.incident-details {
 			padding: 18px;
 		}
-		.detail-dl > div {
+		.detail-table th,
+		.detail-table td {
 			font-size: 13px;
 		}
 	}

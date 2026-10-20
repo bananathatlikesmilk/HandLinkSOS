@@ -1,6 +1,11 @@
 import { defineEnvVars } from '@sveltejs/kit/env';
 
 export const variables = defineEnvVars({
+	OLLAMA_SERVER_URL: {
+		description:
+			'Server-only Ollama origin. Local loopback by default; http://ollama:11434 for the private Docker service.',
+		schema: (value) => value
+	},
 	FIREBASE_SERVICE_ACCOUNT_FILE: {
 		description:
 			'Absolute path to the private Firebase service account JSON. Server only; never package in the APK.',

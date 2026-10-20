@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { ArrowLeft, ArrowRight } from '@lucide/svelte';
+	import { ArrowLeft, ArrowRight, Eye, EyeOff } from '@lucide/svelte';
 	import UserProfileFields from '#lib/user/UserProfileFields.svelte';
 	import { emptyProfile } from '#lib/user/preview.svelte.ts';
 	import { page } from '$app/state';
@@ -23,11 +23,38 @@
 	let step = $state(0);
 	let password = $state('');
 	let repeatedPassword = $state('');
+	let showPassword = $state(false);
+	let showConfirmation = $state(false);
 	let error = $state('');
 	const sections = ['personal', 'medical', 'contacts'] as const;
 	const titles = ['Personal information', 'Medical information', 'Emergency contacts'];
+	function clearValidation(event: Event) {
+		const field = event.target;
+		if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement)
+			field.setCustomValidity('');
+	}
+	function validStep(form: HTMLFormElement) {
+		for (const field of form.querySelectorAll<HTMLInputElement | HTMLSelectElement>(
+			'input[required], select[required]'
+		)) {
+			field.setCustomValidity('');
+			if (!field.value.trim()) field.setCustomValidity('Complete this required field.');
+			if (field instanceof HTMLInputElement && field.type === 'tel') {
+				const number = field.value.trim().replace(/[\s()-]/g, '');
+				if (
+					!/^\+[1-9]\d{7,14}$/.test(number) ||
+					(number.startsWith('+639') && !/^\+639\d{9}$/.test(number))
+				)
+					field.setCustomValidity('Enter a complete phone number, such as +639171234567.');
+			}
+		}
+		if (form.checkValidity()) return true;
+		form.reportValidity();
+		return false;
+	}
 	async function next(event: SubmitEvent) {
 		event.preventDefault();
+		if (busy || !validStep(event.currentTarget as HTMLFormElement)) return;
 		error = '';
 		if (step < 2) {
 			step += 1;
@@ -77,15 +104,17 @@
 				<span>{index + 1}</span>{title}
 			</li>{/each}
 	</ol>
-	<form onsubmit={next}>
+	<p class="user-copy">Fields marked <span aria-hidden="true">*</span> are required.</p>
+	<form onsubmit={next} oninput={clearValidation}>
 		<UserProfileFields bind:profile section={sections[step]} />
 		{#if step === 2}
 			<div class="user-divider"></div>
 			<h2 class="account-heading">Account details</h2>
 			<div class="account-fields">
 				<label class="user-field" for="register-email"
-					>Your email<input
+					><span>Your email<span aria-hidden="true"> *</span></span><input
 						id="register-email"
+						aria-label="Your email"
 						class="input"
 						type="email"
 						bind:value={profile.email}
@@ -95,31 +124,53 @@
 					/></label
 				>
 				<div class="user-field">
-					<label for="register-password">Password</label><input
-						id="register-password"
-						class="input"
-						type="password"
-						bind:value={password}
-						autocomplete="new-password"
-						aria-describedby="register-password-help"
-						minlength="12"
-						maxlength="128"
-						required
-					/>
+					<label for="register-password">Password<span aria-hidden="true"> *</span></label>
+					<div class="password-control">
+						<input
+							id="register-password"
+							aria-label="Password"
+							class="input"
+							type={showPassword ? 'text' : 'password'}
+							bind:value={password}
+							autocomplete="new-password"
+							aria-describedby="register-password-help"
+							minlength="12"
+							maxlength="128"
+							required
+						/><button
+							type="button"
+							class="btn btn-ghost"
+							aria-label={showPassword ? 'Hide password' : 'Show password'}
+							aria-pressed={showPassword}
+							onclick={() => (showPassword = !showPassword)}
+							>{#if showPassword}<EyeOff size={20} />{:else}<Eye size={20} />{/if}</button
+						>
+					</div>
 					<p id="register-password-help" class="user-copy">Use at least 12 characters.</p>
 				</div>
-				<label class="user-field" for="register-repeat"
-					>Re-password<input
-						id="register-repeat"
-						class="input"
-						type="password"
-						bind:value={repeatedPassword}
-						autocomplete="new-password"
-						minlength="12"
-						maxlength="128"
-						required
-					/></label
-				>
+				<div class="user-field">
+					<label for="register-repeat">Confirm password<span aria-hidden="true"> *</span></label>
+					<div class="password-control">
+						<input
+							id="register-repeat"
+							aria-label="Confirm password"
+							class="input"
+							type={showConfirmation ? 'text' : 'password'}
+							bind:value={repeatedPassword}
+							autocomplete="new-password"
+							minlength="12"
+							maxlength="128"
+							required
+						/><button
+							type="button"
+							class="btn btn-ghost"
+							aria-label={showConfirmation ? 'Hide confirm password' : 'Show confirm password'}
+							aria-pressed={showConfirmation}
+							onclick={() => (showConfirmation = !showConfirmation)}
+							>{#if showConfirmation}<EyeOff size={20} />{:else}<Eye size={20} />{/if}</button
+						>
+					</div>
+				</div>
 			</div>
 		{/if}
 		{#if error}<p class="user-error" role="alert">{error}</p>{/if}
@@ -148,6 +199,15 @@
 </section>
 
 <style>
+	.password-control {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+	.password-control input {
+		flex: 1;
+		min-width: 0;
+	}
 	.registration-progress {
 		list-style: none;
 		display: grid;

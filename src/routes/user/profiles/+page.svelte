@@ -5,6 +5,7 @@
 	import { getUserPreview } from '#lib/user/preview.svelte.ts';
 	import { apiRequest } from '#lib/client/request.ts';
 	import type { TrustedConnection } from '#lib/trusted.ts';
+	import RelationshipSelect from '#lib/user/RelationshipSelect.svelte';
 	const preview = getUserPreview();
 	let revealed = $state('');
 	let removing = $state<TrustedConnection | null>(null);
@@ -233,17 +234,14 @@
 						<span>Also request permission to send SOS for them</span>
 					</label>
 					{#if mutualRequests[connection.id]}
-						<label class="form-control block space-y-2">
-							<span>Your relationship to this person</span>
-							<input
-								class="input-bordered input w-full"
-								bind:value={mutualRelationships[connection.id]}
-								required
-								minlength={1}
-								maxlength={100}
-								disabled={busy}
-							/>
-						</label>
+						<RelationshipSelect
+							label="Your relationship to this person"
+							bind:value={
+								() => mutualRelationships[connection.id] ?? '',
+								(value) => (mutualRelationships[connection.id] = value)
+							}
+							disabled={busy}
+						/>
 						<p class="user-copy text-sm">
 							They must approve your separate request. Approving theirs only lets them send SOS for
 							you.

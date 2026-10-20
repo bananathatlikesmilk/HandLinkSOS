@@ -1,0 +1,39 @@
+# Optional private, server-side local inference. No Ollama host port is published.
+services:
+  app:
+    environment:
+      OLLAMA_SERVER_URL: http://ollama:11434
+      OLLAMA_SUMMARY_MODEL: qwen2.5:3b
+    depends_on:
+      ollama:
+        condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
+
+  ollama:
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_NO_CLOUD: '1'
+      OLLAMA_HOST: 0.0.0.0:11434
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ['CMD-SHELL', 'OLLAMA_HOST=http://127.0.0.1:11434 ollama list >/dev/null']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  ollama-pull:
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ['ollama', 'pull', 'qwen2.5:3b']
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: 'on-failure:3'
+
+volumes:
+  ollama-models:

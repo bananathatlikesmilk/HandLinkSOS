@@ -10,6 +10,8 @@ const origin = `http://127.0.0.1:${port}`;
 export default defineConfig({
 	testMatch: [
 		'tests/profile.api.ts',
+		'tests/usability.api.ts',
+		'tests/usability.frontend.ts',
 		'tests/accounts.api.ts',
 		'tests/staff-profile.frontend.ts',
 		'tests/incidents.api.ts',

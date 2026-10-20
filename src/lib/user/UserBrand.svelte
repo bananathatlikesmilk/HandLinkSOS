@@ -18,7 +18,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 7px;
-		color: #e4e3dc;
+		color: var(--app-text, #e4e3dc);
 		font-size: 19px;
 		letter-spacing: 1px;
 		font-weight: 300;
@@ -39,6 +39,9 @@
 		max-width: 100%;
 		min-width: 0;
 		aspect-ratio: 1;
+	}
+	:global([data-appearance='light']) .user-emblem {
+		mix-blend-mode: normal;
 	}
 	.large img {
 		display: block;

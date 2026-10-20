@@ -191,7 +191,7 @@
 		align-items: center;
 		justify-content: space-between;
 		padding: 24px 0;
-		border-bottom: 1px solid #484d38;
+		border-bottom: 1px solid var(--app-border);
 	}
 	.setting-row strong {
 		font-size: 14px;
@@ -199,7 +199,7 @@
 	}
 	.setting-row p {
 		font-size: 12px;
-		color: #c7cfb7;
+		color: var(--app-muted);
 		line-height: 1.7;
 	}
 	.setting-row p {

@@ -6,14 +6,7 @@
 	import { untrack } from 'svelte';
 	import { accountRequest } from '#lib/user/account.ts';
 	let email = $state(untrack(() => page.url.searchParams.get('email') ?? ''));
-	const portal = $derived(page.url.searchParams.get('portal'));
-	const loginPath = $derived(
-		portal === 'admin'
-			? ('/admin/login' as const)
-			: portal === 'dispatch'
-				? ('/dispatch/login' as const)
-				: ('/user/login' as const)
-	);
+	const loginPath = '/login' as const;
 	let busy = $state(false);
 	let code = $state('');
 	let error = $state('');

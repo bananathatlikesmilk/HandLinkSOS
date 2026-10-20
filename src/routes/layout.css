@@ -555,3 +555,282 @@
 		max-width: 100%;
 	}
 }
+
+/* Shared appearance tokens. Components use semantic colors in both modes. */
+:root {
+	color-scheme: dark;
+	--app-bg: #101719;
+	--app-surface: #182226;
+	--app-surface-alt: #243238;
+	--app-text: #f0f5f6;
+	--app-muted: #bfccd0;
+	--app-border: #64777e;
+	--app-accent: #9ee4d4;
+	--app-accent-text: #092f28;
+	--app-danger: #ffb4b4;
+}
+:root[data-appearance='light'] {
+	color-scheme: light;
+	--app-bg: #eef3f5;
+	--app-surface: #ffffff;
+	--app-surface-alt: #e4eef1;
+	--app-text: #182d34;
+	--app-muted: #465f69;
+	--app-border: #81969f;
+	--app-accent: #146756;
+	--app-accent-text: #ffffff;
+	--app-danger: #a51e2b;
+}
+body {
+	background: var(--app-bg);
+	color: var(--app-text);
+}
+[data-theme='handlink-user'],
+[data-theme='handlink-staff'] {
+	color-scheme: inherit;
+	--color-base-100: var(--app-surface);
+	--color-base-200: var(--app-surface-alt);
+	--color-base-300: var(--app-border);
+	--color-base-content: var(--app-text);
+	--color-primary: var(--app-accent);
+	--color-primary-content: var(--app-accent-text);
+	--color-secondary: var(--app-surface-alt);
+	--color-secondary-content: var(--app-text);
+	--color-neutral: var(--app-surface-alt);
+	--color-neutral-content: var(--app-text);
+	--color-error: var(--app-danger);
+}
+:is(.handlink-staff, .user-preview) :is(.btn, .btn-sm, .input, .select) {
+	min-height: 48px;
+}
+:is(.handlink-staff, .user-preview) .btn {
+	font-size: 1rem;
+	font-weight: 650;
+}
+:is(.handlink-staff, .user-preview) :is(.input, .select, .textarea) {
+	background: var(--app-surface);
+	border-color: var(--app-border);
+	color: var(--app-text);
+	font-size: 1rem;
+}
+:is(.handlink-staff, .user-preview) :is(input, textarea)::placeholder {
+	color: var(--app-muted);
+	opacity: 1;
+}
+:is(.handlink-staff, .user-preview) .btn-primary {
+	background: var(--app-accent);
+	border-color: var(--app-accent);
+	color: var(--app-accent-text);
+}
+:is(.handlink-staff, .user-preview) .btn-primary:hover {
+	background: var(--app-accent);
+	filter: brightness(1.08);
+}
+:is(.handlink-staff, .user-preview) :is(.btn-outline, .btn-ghost) {
+	color: var(--app-text);
+}
+:is(.handlink-staff, .user-preview) .btn-outline {
+	border-color: var(--app-border);
+}
+:is(.handlink-staff, .user-preview) .btn:disabled {
+	background: var(--app-surface-alt);
+	border-color: var(--app-border);
+	color: var(--app-muted);
+	opacity: 0.7;
+}
+:is(.handlink-staff, .user-preview) :is(.panel, .modal-box, .user-panel) {
+	background: var(--app-surface);
+	border-color: var(--app-border);
+	color: var(--app-text);
+}
+:is(.handlink-staff, .user-preview) :is(.page-heading, .user-title, .user-field, .section-heading) {
+	color: var(--app-text);
+}
+:is(.handlink-staff, .user-preview)
+	:is(.muted, .eyebrow, .user-copy, .user-kicker, .text-slate-500, .text-slate-400) {
+	color: var(--app-muted);
+}
+.user-preview {
+	background: var(--app-bg);
+	color: var(--app-text);
+}
+.user-device {
+	background: var(--app-surface);
+	border-color: var(--app-border);
+}
+:is(.handlink-staff, .user-preview) :focus-visible {
+	outline-color: var(--app-accent);
+}
+:is(.handlink-staff, .user-preview) .skip-link {
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+}
+:is(.handlink-staff, .user-preview) input[type='date'] {
+	color-scheme: inherit;
+}
+.handlink-staff .staff-brand {
+	color: var(--app-text);
+}
+.handlink-staff .staff-brand .emblem {
+	mix-blend-mode: normal;
+}
+.handlink-staff
+	:is(
+		.table th,
+		.report-fields dt,
+		.report-choice small,
+		.notes-copy,
+		.report-footer,
+		.empty-report
+	) {
+	color: var(--app-muted);
+}
+.handlink-staff :is(.preview-note, .summary-block, .icon-box, .badge-ghost) {
+	background: var(--app-surface-alt);
+	border-color: var(--app-border);
+	color: var(--app-text);
+}
+.handlink-staff
+	:is(.table :where(th, td), .report-fields, .report-fields > div, .report-footer, .report-choice) {
+	border-color: var(--app-border);
+}
+/* Legacy feature styles retain SOS/report cues; explicit light overrides avoid pale text on white. */
+:root[data-appearance='light']
+	.handlink-staff
+	:is(
+		.response-cue,
+		.response-purpose,
+		.list-heading,
+		.incident-id,
+		.row-footer,
+		.queue-footnote,
+		.detail-dl dt,
+		.detail-tabs button,
+		.detail-content,
+		.records-cue,
+		.document-label,
+		.archive-heading,
+		.archive-copy,
+		.record-icon,
+		.report-choice small,
+		.report-fields dt,
+		.notes-copy,
+		.report-footer,
+		.empty-report
+	) {
+	color: var(--app-text) !important;
+}
+:root[data-appearance='light']
+	.handlink-staff
+	:is(.report-archive, .report-document, .record-icon, .response-icon, .summary-block) {
+	background: var(--app-surface) !important;
+	color: var(--app-text) !important;
+}
+:root[data-appearance='light']
+	.handlink-staff
+	:is(
+		.incident-row:hover,
+		.incident-row.selected,
+		.report-choice:hover,
+		.report-choice.active,
+		.detail-tabs button.active
+	) {
+	background: var(--app-surface-alt) !important;
+	color: var(--app-text) !important;
+}
+:root[data-appearance='light'] .handlink-staff .incident-status.resolved {
+	color: #23613b;
+}
+:root[data-appearance='light'] :is(.handlink-staff, .user-preview) :is(.alert, .user-notice) {
+	background: #e5f2e8;
+	border-color: #6b906e;
+	color: #234d2d;
+}
+:root[data-appearance='light'] .user-preview .user-error {
+	background: #fff0ee;
+	border-color: #b36a63;
+	color: #8c2424;
+}
+:is(.handlink-staff, .user-preview) .user-divider {
+	border-color: var(--app-border);
+}
+:root[data-appearance='light'] .user-preview .toggle {
+	background-color: #bccbd0;
+	color: white;
+}
+:root[data-appearance='light'] .user-preview .toggle:checked {
+	background-color: var(--app-accent);
+}
+:is(.handlink-staff, .user-preview) main {
+	scroll-margin-top: 160px;
+}
+
+/* Feature controls use the same semantic palette as their navigation and panels. */
+.user-preview
+	:is(.self-sos, .trusted-sos, .profile-shortcut, .trusted-row, .trusted-card, .qr-box) {
+	color: var(--app-text);
+	border-color: var(--app-border);
+}
+.user-preview :is(.trusted-row, .trusted-card, .qr-box) {
+	background: var(--app-surface);
+}
+.user-preview :is(.self-sos:hover, .trusted-sos:hover, .profile-shortcut:hover) {
+	background: var(--app-surface-alt);
+}
+.user-preview
+	:is(
+		.self-sos small,
+		.trusted-help,
+		.emergency-note,
+		.notification-date,
+		.account-email,
+		.account-label,
+		.user-back a,
+		.user-footer,
+		.permission-details p,
+		.setting-row p,
+		.sharing-active
+	) {
+	color: var(--app-muted);
+}
+.user-preview :is(.trusted-section a, .share-link, .sharing-symbol, .time-left, .account-role) {
+	color: var(--app-accent);
+}
+.user-preview .user-brand {
+	color: var(--app-text);
+}
+:root[data-appearance='light'] .user-preview :is(.sos-notification, .deactivate-confirm) {
+	background: var(--app-surface-alt);
+	color: var(--app-text);
+	border-color: var(--app-border);
+}
+:root[data-appearance='light'] .auth-shell {
+	background: var(--app-bg);
+	color: var(--app-text);
+}
+:root[data-appearance='light'] .auth-shell::before {
+	opacity: 0.16;
+}
+:root[data-appearance='light'] .auth-shell::after {
+	background: transparent;
+}
+:root[data-appearance='light'] .auth-shell .auth-content {
+	text-shadow: none;
+}
+:root[data-appearance='light']
+	.auth-shell
+	:is(
+		.role-label,
+		.auth-subtitle,
+		.verification-link,
+		.field label,
+		.forgot-link,
+		.password-toggle
+	) {
+	color: var(--app-text);
+}
+:root[data-appearance='light'] .auth-shell .continue-button {
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+	border-color: var(--app-accent);
+}

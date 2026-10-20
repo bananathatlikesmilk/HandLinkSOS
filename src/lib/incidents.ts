@@ -25,6 +25,7 @@ export type IncidentSummary = {
 };
 
 export type IncidentDetail = {
+	noteId: string | null;
 	cancellation: IncidentCancellation | null;
 	incident: IncidentSummary;
 	personal: null | {
@@ -56,6 +57,13 @@ export type IncidentDetail = {
 };
 
 export type IncidentReport = {
+	addenda: {
+		id: string;
+		notes: string;
+		createdAt: string;
+		authorName: string;
+		actorUserId: string;
+	}[];
 	ai: import('./ai-summary.ts').AiSummaryState;
 	cancellation: IncidentCancellation | null;
 	incident: IncidentSummary;

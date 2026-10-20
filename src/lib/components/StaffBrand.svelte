@@ -4,8 +4,10 @@
 	let {
 		large = false,
 		href = '/dispatch/login'
-	}: { large?: boolean; href?: '/dispatch/login' | '/admin/login' | '/dispatch' | '/admin' } =
-		$props();
+	}: {
+		large?: boolean;
+		href?: '/login' | '/dispatch/login' | '/admin/login' | '/dispatch' | '/admin';
+	} = $props();
 </script>
 
 <a class="staff-brand" class:large href={resolve(href)} aria-label="HandLink home">
@@ -18,7 +20,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 9px;
-		color: #eeeeec;
+		color: var(--app-text, #eeeeec);
 		font-size: 26px;
 		font-weight: 300;
 		letter-spacing: 1px;
@@ -37,6 +39,9 @@
 		font-size: 34px;
 		flex-wrap: wrap;
 		justify-content: center;
+	}
+	:global([data-appearance='light']) .emblem {
+		mix-blend-mode: normal;
 	}
 	.large .emblem {
 		flex-basis: 100%;

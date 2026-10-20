@@ -129,6 +129,11 @@ test('cancel sends nothing; a real SOS reaches dispatcher confirmation and resol
 		await expect(confirm).toBeDisabled();
 		await expect(staff.getByText(privateMedical, { exact: true })).toHaveCount(0);
 		await staff.getByRole('checkbox', { name: /I verbally confirmed/ }).check();
+		const checkboxBounds = await staff
+			.getByRole('checkbox', { name: /I verbally confirmed/ })
+			.boundingBox();
+		const confirmBounds = await confirm.boundingBox();
+		expect(confirmBounds!.y).toBeGreaterThan(checkboxBounds!.y);
 		await confirm.click();
 		await staff.getByRole('button', { name: 'Medical information', exact: true }).click();
 		await expect(staff.getByText(privateMedical, { exact: true })).toBeVisible();
@@ -136,8 +141,7 @@ test('cancel sends nothing; a real SOS reaches dispatcher confirmation and resol
 		await staff
 			.getByRole('textbox', { name: 'Additional information', exact: true })
 			.fill('Caller reports chest pain.');
-		await staff.getByRole('button', { name: 'Save notes', exact: true }).click();
-		await expect(staff.getByText('Additional information saved.', { exact: true })).toBeVisible();
+		await expect(staff.getByText('Notes saved', { exact: true })).toBeVisible();
 		await staff.goto('/dispatch/reports');
 		await expect(
 			staff.getByRole('heading', { name: 'Incident reports', exact: true })
@@ -151,6 +155,34 @@ test('cancel sends nothing; a real SOS reaches dispatcher confirmation and resol
 		await expect(staff.getByText('Caller reports chest pain.', { exact: true })).toBeVisible();
 		await expect(staff.getByRole('button', { name: 'Mark on route', exact: true })).toBeDisabled();
 		await expect(staff.getByRole('button', { name: 'Mark resolved', exact: true })).toBeDisabled();
+		await staff
+			.getByRole('textbox', { name: 'Addendum', exact: false })
+			.fill('Caller confirmed safe after follow-up.');
+		let lostAddendumResponse = false;
+		await staff.route(`**/api/staff/reports/${id}/addenda`, async (route) => {
+			if (!lostAddendumResponse) {
+				lostAddendumResponse = true;
+				const saved = await route.fetch();
+				expect(saved.ok()).toBe(true);
+				await route.abort('failed');
+			} else await route.continue();
+		});
+		await staff.getByRole('button', { name: 'Save addendum', exact: true }).click();
+		await expect(staff.getByRole('alert')).toBeVisible();
+		await expect(staff.getByRole('textbox', { name: 'Addendum', exact: false })).toHaveValue(
+			'Caller confirmed safe after follow-up.'
+		);
+		await staff.getByRole('button', { name: 'Save addendum', exact: true }).click();
+		await expect(
+			staff.getByText('Addendum saved. Original notes kept.', { exact: true })
+		).toBeVisible();
+		await expect(
+			staff.getByText('Caller confirmed safe after follow-up.', { exact: true })
+		).toHaveCount(1);
+		await expect(staff.getByText('Caller reports chest pain.', { exact: true })).toBeVisible();
+		const report = await (await staff.request.get(`/api/staff/reports/${id}`)).json();
+		expect(report.addenda).toHaveLength(1);
+		expect(report.notes).toBe('Caller reports chest pain.');
 		await page.goto('/user/dashboard');
 		await expect(page.getByText('Resolved', { exact: true })).toBeVisible();
 		await page.reload();
@@ -162,6 +194,78 @@ test('cancel sends nothing; a real SOS reaches dispatcher confirmation and resol
 	} finally {
 		await staffContext.close();
 	}
+});
+
+test('dispatcher autosave preserves newer typing, rejects stale edits and flushes before navigation', async ({
+	page,
+	request
+}) => {
+	test.setTimeout(60000);
+	const caller = await provision();
+	await login(request, caller);
+	const created = await request.post('/api/incidents', { headers, data: sos(caller.profileId) });
+	const { id, reference } = (await created.json()).incident;
+	await login(page.request, await provision('dispatcher'));
+	expect(
+		(
+			await page.request.post(`/api/staff/incidents/${id}/confirm`, {
+				headers,
+				data: { verballyConfirmed: true }
+			})
+		).ok()
+	).toBe(true);
+	await page.goto('/dispatch');
+	await page.getByRole('button').filter({ hasText: reference }).click();
+	await page.getByRole('button', { name: 'Additional information', exact: true }).click();
+	const notes = page.getByRole('textbox', { name: 'Additional information', exact: true });
+	let releaseSave!: () => void;
+	const saveGate = new Promise<void>((resolve) => {
+		releaseSave = resolve;
+	});
+	let delayed = false;
+	await page.route(`**/api/staff/incidents/${id}/notes`, async (route) => {
+		if (!delayed) {
+			delayed = true;
+			const response = await route.fetch();
+			await saveGate;
+			await route.fulfill({ response });
+		} else await route.continue();
+	});
+	await notes.fill('First note.');
+	await expect(page.getByText('Saving notes...', { exact: true })).toBeVisible();
+	await notes.fill('Newer note typed while saving.');
+	await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+	await expect(notes).toHaveValue('Newer note typed while saving.');
+	await expect(page.getByRole('button', { name: 'Mark on route', exact: true })).toBeDisabled();
+	releaseSave();
+	await expect(page.getByText('Notes saved', { exact: true })).toBeVisible();
+	await expect(notes).toHaveValue('Newer note typed while saving.');
+	expect((await (await page.request.get(`/api/staff/incidents/${id}`)).json()).notes).toBe(
+		'Newer note typed while saving.'
+	);
+	await notes.fill('Unsaved local draft.');
+	expect(
+		(
+			await page.request.post(`/api/staff/incidents/${id}/notes`, {
+				headers,
+				data: { notes: 'Other tab saved this.' }
+			})
+		).ok()
+	).toBe(true);
+	await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+	await expect(notes).toHaveValue('Unsaved local draft.');
+	await expect(
+		page.getByRole('alert').filter({ hasText: 'Notes changed elsewhere' })
+	).toBeVisible();
+	await expect(notes).toHaveValue('Unsaved local draft.');
+	await expect(page.getByRole('button', { name: 'Mark on route', exact: true })).toBeDisabled();
+	page.once('dialog', (dialog) => dialog.accept());
+	await page.getByRole('button', { name: 'Reload saved notes', exact: true }).click();
+	await expect(notes).toHaveValue('Other tab saved this.');
+	await notes.fill('Final note before navigating.');
+	await page.getByRole('link', { name: 'Incident reports', exact: true }).click();
+	await expect(page).toHaveURL('/dispatch/reports');
+	await expect(page.getByText('Final note before navigating.', { exact: true })).toBeVisible();
 });
 
 test('lost SOS response can retry after reload without a duplicate incident', async ({ page }) => {
@@ -304,7 +408,7 @@ test('web never opens phone links automatically and offers only an explicit Andr
 	await page.getByRole('button', { name: 'Start SOS for Casey Reyes', exact: true }).click();
 	await expect(page).toHaveURL(/\/user\/call\?incident=/, { timeout: 15000 });
 	expect(await attempts()).toEqual([]);
-	await expect(page.getByRole('status')).toHaveCount(0);
+	await expect(page.getByRole('main').getByRole('status')).toHaveCount(0);
 	await expect(page.getByRole('link', { name: 'Open phone dialer', exact: true })).toHaveAttribute(
 		'href',
 		'intent:911#Intent;scheme=tel;action=android.intent.action.DIAL;end'

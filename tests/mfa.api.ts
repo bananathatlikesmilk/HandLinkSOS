@@ -172,11 +172,11 @@ for (const role of ['admin', 'dispatcher']) {
 	test(`${role}: browser setup and lost-phone backup login work`, async ({ page }) => {
 		const actor = await identity(role);
 		await page.setViewportSize({ width: 390, height: 844 });
-		await page.goto(`/${portal}/login`);
+		await page.goto('/login');
 		await page.waitForLoadState('networkidle');
-		await page.getByLabel('Email address', { exact: true }).fill(actor.email);
+		await page.getByLabel('Email', { exact: true }).fill(actor.email);
 		await page.getByLabel('Password', { exact: true }).fill(password);
-		await page.getByRole('button', { name: 'Continue', exact: true }).click();
+		await page.getByRole('button', { name: 'Log In', exact: true }).click();
 		await expect(page).toHaveURL(`/${portal}/security`);
 		await page.getByLabel('Current password', { exact: true }).fill(password);
 		await page.getByRole('button', { name: 'Start authenticator setup', exact: true }).click();
@@ -205,11 +205,11 @@ for (const role of ['admin', 'dispatcher']) {
 		await page.getByRole('link', { name: 'Continue to workspace', exact: true }).click();
 		await expect(page).toHaveURL(`/${portal}`);
 		await post(page.request, 'sign-out', {});
-		await page.goto(`/${portal}/login`);
+		await page.goto('/login');
 		await page.waitForLoadState('networkidle');
-		await page.getByLabel('Email address', { exact: true }).fill(actor.email);
+		await page.getByLabel('Email', { exact: true }).fill(actor.email);
 		await page.getByLabel('Password', { exact: true }).fill(password);
-		await page.getByRole('button', { name: 'Continue', exact: true }).click();
+		await page.getByRole('button', { name: 'Log In', exact: true }).click();
 		await page.getByRole('button', { name: 'Use a backup code', exact: true }).click();
 		await page.getByLabel('Backup code', { exact: true }).fill(backupCode);
 		await page.getByRole('button', { name: 'Verify code', exact: true }).click();
