@@ -335,6 +335,7 @@ test('denied location never starts a countdown or submits SOS', async ({ page })
 		{ timeout: 20000 }
 	);
 	await expect(page.getByRole('button', { name: 'Retry location', exact: true })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Send SOS now', exact: true })).toHaveCount(0);
 	const db = database();
 	try {
 		expect(
@@ -343,6 +344,37 @@ test('denied location never starts a countdown or submits SOS', async ({ page })
 	} finally {
 		db.close();
 	}
+});
+
+test('true emergency option sends before countdown expires and repeated taps create one SOS', async ({
+	page
+}) => {
+	const caller = await provision();
+	await login(page.request, caller);
+	await page.context().grantPermissions(['geolocation']);
+	await page.context().setGeolocation({ latitude: 14.5995, longitude: 120.9842, accuracy: 10 });
+	await page.addInitScript(() => {
+		localStorage.setItem('handlink:initial-device-permissions:v1', 'attempted');
+		// Hold the countdown at five seconds: only the explicit bypass can submit this alert.
+		const fixed = Date.now();
+		Date.now = () => fixed;
+	});
+	let sends = 0;
+	await page.route('**/api/incidents', async (route) => {
+		if (route.request().method() === 'POST') sends++;
+		await route.continue();
+	});
+	await page.goto(`/user/sos?profile=${caller.profileId}`);
+	await expect(page.getByRole('timer')).toHaveAttribute('aria-label', '5 seconds remaining');
+	await expect(page.getByRole('button', { name: 'Cancel SOS', exact: true })).toBeVisible();
+	expect(sends).toBe(0);
+	await page.getByRole('button', { name: 'Send SOS now', exact: true }).evaluate((element) => {
+		(element as HTMLButtonElement).click();
+		(element as HTMLButtonElement).click();
+	});
+	await expect(page).toHaveURL(/\/user\/call\?incident=/);
+	expect(sends).toBe(1);
+	expect((await (await page.request.get('/api/incidents')).json()).incidents).toHaveLength(1);
 });
 
 test('Android opens the 911 dialer only after saved SOS; cancellation and refresh never launch it', async ({

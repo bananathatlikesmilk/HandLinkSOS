@@ -213,6 +213,14 @@
 			<div class="countdown-ring" role="timer" aria-label={countdown + ' seconds remaining'}>
 				<Siren size={30} strokeWidth={1.2} /><strong>{countdown}</strong><span>SECONDS</span>
 			</div>
+			<p class="user-copy mb-3">True emergency? Skip the countdown.</p>
+			<button
+				type="button"
+				class="btn mb-4 w-full btn-error"
+				onclick={() => {
+					if (phase === 'countdown') void submit();
+				}}><Siren size={18} /> Send SOS now</button
+			>
 		{/if}
 		<button class="btn w-full btn-primary" onclick={cancel}><X size={18} /> Cancel SOS</button>
 	{:else if phase === 'cancelled'}
