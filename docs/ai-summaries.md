@@ -15,13 +15,19 @@ HandLink uses Ollama on the same computer as the HandLink server. No OpenAI API 
 4. Keep Ollama running. If its background application is not running, use `ollama serve` in a separate terminal.
 5. Restart HandLink with `pnpm dev` and use `http://localhost:5173`.
 
-The default model requires no HandLink environment change. To select another downloaded local model, set `OLLAMA_SUMMARY_MODEL` in the private server `.env` and restart HandLink. Cloud model tags are rejected. Development uses `http://127.0.0.1:11434/api/chat`; the Docker extension below uses the private Ollama service. Redirects are rejected. Keep a standalone Ollama installation bound to loopback; do not expose its unauthenticated API publicly.
+The default model requires no HandLink environment change. To select another downloaded local model, set `OLLAMA_SUMMARY_MODEL` in the private server `.env` and restart HandLink. Cloud model tags are rejected. `OLLAMA_SERVER_URL` selects the server address without a host allowlist. Only an absent setting defaults to `http://127.0.0.1:11434`; an empty or invalid setting produces a configuration error instead of silently using localhost. Supply an HTTP(S) origin without credentials, a path, query, or fragment. Redirects are rejected. Keep Ollama on a trusted network; do not expose its unauthenticated API publicly.
 
 The phone does not run the model. It uses the HandLink server, which calls its own local Ollama installation. A future deployed server needs its own Ollama process, sufficient memory, and the model installed on that server.
 
 ## Server Docker deployment
 
-Use the optional private Ollama service with the production configuration:
+To use the optional private Ollama service, set this in the server `.env`:
+
+```dotenv
+OLLAMA_SERVER_URL=http://ollama:11434
+```
+
+Then use the production configuration:
 
 ```powershell
 docker compose -f compose.production.yaml -f compose.ollama.yaml up -d --build
@@ -29,7 +35,7 @@ docker compose -f compose.production.yaml -f compose.ollama.yaml up -d --build
 
 If push is also configured, include `-f compose.firebase.yaml` before `up`. The Ollama service runs on the server, stores downloaded models in a persistent volume, and publishes no host port. The initialization service downloads `qwen2.5:3b`; the app waits for successful initialization. Initial download needs internet and several GB of disk/memory. Generation uses the server CPU by default and can be slower on small hosts.
 
-`OLLAMA_SERVER_URL` defaults to local loopback for development. The Docker extension sets it to `http://ollama:11434` on the private Compose network. Only approved loopback/private-service origins are accepted; arbitrary remote URLs and redirects remain blocked. Keep private model text out of logs. These files must be deployed by the server operator; local edits do not update the running server.
+The Docker extension does not override `OLLAMA_SERVER_URL` from `.env`. To use an existing Ollama server instead, configure its address, for example `OLLAMA_SERVER_URL=http://192.168.254.63:11434`. The app uses that origin and calls `/api/chat`. Server operators control this setting; browser requests cannot select the destination. Recreate the app container after changing its environment. Keep private model text out of logs. These files must be deployed by the server operator; local edits do not update the running server.
 
 ## Dispatcher workflow
 

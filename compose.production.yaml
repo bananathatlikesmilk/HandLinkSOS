@@ -11,6 +11,7 @@ services:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 3000
+      OLLAMA_SERVER_URL: ${OLLAMA_SERVER_URL-http://127.0.0.1:11434}
       DATABASE_URL: /app/data/local.db
       ORIGIN: ${ORIGIN:?Set ORIGIN in .env}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}

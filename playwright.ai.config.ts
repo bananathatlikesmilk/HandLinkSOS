@@ -9,6 +9,7 @@ export default defineConfig({
 		env: {
 			...(!Array.isArray(base.webServer) ? base.webServer?.env : {}),
 			OLLAMA_SUMMARY_MODEL: 'qwen2.5:3b',
+			OLLAMA_SERVER_URL: 'http://127.0.0.1:11434',
 			NODE_OPTIONS: '--import=./tests/ollama-mock.mjs'
 		}
 	}

@@ -3,7 +3,7 @@ import { defineEnvVars } from '@sveltejs/kit/env';
 export const variables = defineEnvVars({
 	OLLAMA_SERVER_URL: {
 		description:
-			'Server-only Ollama origin. Local loopback by default; http://ollama:11434 for the private Docker service.',
+			'Server-only HTTP(S) Ollama origin. Uses the configured address; defaults to http://127.0.0.1:11434 only when absent.',
 		schema: (value) => value
 	},
 	FIREBASE_SERVICE_ACCOUNT_FILE: {

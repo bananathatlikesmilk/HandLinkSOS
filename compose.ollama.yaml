@@ -2,7 +2,6 @@
 services:
   app:
     environment:
-      OLLAMA_SERVER_URL: http://ollama:11434
       OLLAMA_SUMMARY_MODEL: qwen2.5:3b
     depends_on:
       ollama:

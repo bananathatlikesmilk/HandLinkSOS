@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import { OLLAMA_SUMMARY_MODEL, OLLAMA_SERVER_URL } from '$app/env/private';
 import { selectedSummary, summarySelectionSchema, summarySentences } from './summary-extract.ts';
+import { ollamaServerOrigin } from './ollama-config.ts';
 
 const localModel = OLLAMA_SUMMARY_MODEL?.trim() || 'qwen2.5:3b';
-const server = OLLAMA_SERVER_URL?.trim() || 'http://127.0.0.1:11434';
+const server = ollamaServerOrigin(OLLAMA_SERVER_URL);
 export const aiConfigured =
-	['http://127.0.0.1:11434', 'http://localhost:11434', 'http://ollama:11434'].includes(server) &&
+	server !== null &&
 	/^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,89}$/.test(localModel) &&
 	!/(?:[:.-])cloud$/i.test(localModel);
 export const summaryModel = `ollama:${localModel}`;
@@ -21,7 +22,7 @@ export class OllamaSummaryError extends Error {
 export async function requestOllamaSummary(text: string) {
 	if (!aiConfigured)
 		throw new OllamaSummaryError(
-			'Configure a local Ollama summary model. Cloud models are not supported.',
+			'Configure OLLAMA_SERVER_URL as an HTTP(S) origin and select a local Ollama model. Cloud models are not supported.',
 			503
 		);
 	const sentences = summarySentences(text);
