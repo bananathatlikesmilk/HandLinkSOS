@@ -2,6 +2,7 @@
 	import { Plus, Trash2 } from '@lucide/svelte';
 	import { onMount } from 'svelte';
 	import { localPhone } from '#lib/phone.ts';
+	import { latestEligibleBirthday } from '#lib/birthday.ts';
 	import RelationshipSelect from './RelationshipSelect.svelte';
 	import type { UserProfile } from './preview.svelte.ts';
 	let {
@@ -10,12 +11,7 @@
 	}: { profile: UserProfile; section?: 'personal' | 'medical' | 'contacts' | 'all' } = $props();
 	const uid = $props.id();
 	let ready = $state(false);
-	const today = new Intl.DateTimeFormat('en-CA', {
-		timeZone: 'Asia/Manila',
-		year: 'numeric',
-		month: '2-digit',
-		day: '2-digit'
-	}).format(new Date());
+	const latestBirthday = latestEligibleBirthday();
 	onMount(() => {
 		if (!profile.phone) profile.phone = '09';
 		for (const contact of profile.contacts) {
@@ -75,9 +71,10 @@
 					class="input"
 					bind:value={profile.birthday}
 					autocomplete="bday"
-					max={today}
+					max={latestBirthday}
+					aria-describedby="{uid}-birthday-help"
 					required
-				/></label
+				/><small id="{uid}-birthday-help">Must be at least 2 years old.</small></label
 			>
 			<label class="user-field" for="{uid}-sex"
 				><span>Sex<span aria-hidden="true"> *</span></span><select

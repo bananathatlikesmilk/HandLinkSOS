@@ -1,6 +1,7 @@
 import { expect, test, type Locator } from '@playwright/test';
 import { headers, login, password, provision } from './incident-fixture';
 import { enrollStaffMfa, totp } from './mfa-fixture';
+import { latestEligibleBirthday } from '../src/lib/birthday';
 
 test('welcome and registration share the login animation and readable mobile light theme', async ({
 	page
@@ -217,6 +218,25 @@ test('registration blocks incomplete personal fields and limits local phone to 1
 	await expect(page.getByRole('combobox', { name: 'Relationship', exact: true })).toHaveValue(
 		'Friend'
 	);
+});
+
+test('registration rejects birthdays under age two and accepts the exact cutoff', async ({
+	page
+}) => {
+	await page.goto('/user/register');
+	const birthday = page.getByLabel('Birthday', { exact: true });
+	await expect(birthday).toHaveAttribute('max', latestEligibleBirthday());
+	await page.getByLabel('First name', { exact: true }).fill('Casey');
+	await page.getByLabel('Last name', { exact: true }).fill('Reyes');
+	await page.getByLabel('Sex', { exact: true }).selectOption('Female');
+	await page.getByLabel('Phone number', { exact: true }).fill('09911223344');
+	await birthday.fill(new Date().toISOString().slice(0, 10));
+	await page.getByRole('button', { name: 'Continue', exact: true }).click();
+	await expect(page.getByRole('alert')).toContainText('Birthday: Must be at least 2 years old.');
+	await expect(birthday).toHaveAttribute('aria-invalid', 'true');
+	await birthday.fill(latestEligibleBirthday());
+	await page.getByRole('button', { name: 'Continue', exact: true }).click();
+	await expect(page.getByRole('group', { name: /Medical information/ })).toBeVisible();
 });
 
 test('registration shows duplicate phone and email feedback before submission', async ({

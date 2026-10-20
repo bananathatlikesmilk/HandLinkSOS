@@ -39,7 +39,10 @@ export function validateForm(form: HTMLFormElement) {
 		else if (field instanceof HTMLInputElement && field.type === 'email')
 			message = 'Enter a valid email, such as name@example.com.';
 		else if (validity.rangeOverflow && field instanceof HTMLInputElement && field.type === 'date')
-			message = 'Choose a date that is not in the future.';
+			message =
+				field.getAttribute('aria-label') === 'Birthday'
+					? 'Must be at least 2 years old. Choose an earlier birthday.'
+					: `Choose a date on or before ${field.max}.`;
 		else if (validity.tooShort)
 			message = `Use at least ${(field as HTMLInputElement).minLength} characters.`;
 		else if (validity.tooLong)

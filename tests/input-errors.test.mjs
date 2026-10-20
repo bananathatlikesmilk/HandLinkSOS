@@ -35,7 +35,7 @@ test('validation identifies nested fields and safe rules without echoing input v
 	assert.match(text, /First name: This field is required/);
 	assert.match(text, /Phone number: Use 11 digits starting with 09/);
 	assert.match(text, /Emergency contact 1 - Email: Enter a valid email/);
-	assert.match(text, /Birthday: Birthday must be a real date that is not in the future/);
+	assert.match(text, /Birthday: Enter a real birthday for someone at least 2 years old/);
 	assert.doesNotMatch(JSON.stringify(problems), /PRIVATE|input|stack|received/);
 	const staff = staffAccountInput.safeParse({
 		name: 'Casey',

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { canonicalPhone } from '#lib/phone.ts';
+import { eligibleBirthday } from '#lib/birthday.ts';
 
 const name = z.string().trim().min(1).max(100);
 export const emptyInput = z.strictObject({});
@@ -38,17 +39,10 @@ export const phoneInput = z
 const birthday = z
 	.string()
 	.regex(/^\d{4}-\d{2}-\d{2}$/)
-	.refine((value) => {
-		const date = new Date(`${value}T00:00:00Z`);
-		if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) return false;
-		const today = new Intl.DateTimeFormat('en-CA', {
-			timeZone: 'Asia/Manila',
-			year: 'numeric',
-			month: '2-digit',
-			day: '2-digit'
-		}).format(new Date());
-		return value <= today;
-	}, 'Birthday must be a real date that is not in the future.');
+	.refine(
+		(value) => eligibleBirthday(value),
+		'Enter a real birthday for someone at least 2 years old.'
+	);
 const medicalText = z.string().trim().max(1000);
 
 export const profileInput = z.strictObject({

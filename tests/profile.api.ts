@@ -2,6 +2,7 @@ import { expect, test, type APIRequestContext } from '@playwright/test';
 import Database from 'better-sqlite3';
 import { hashPassword } from 'better-auth/crypto';
 import { signInWithRateLimit } from './auth-fixture';
+import { latestEligibleBirthday } from '../src/lib/birthday';
 
 const origin = 'http://127.0.0.1:4174';
 const headers = { Origin: origin };
@@ -142,6 +143,22 @@ test('invalid input returns named fields and correction rules without submitted 
 		])
 	);
 	expect(JSON.stringify(body)).not.toContain('PRIVATE');
+});
+
+test('profile API enforces age two even when browser birthday checks are bypassed', async ({
+	request
+}) => {
+	await signIn(request);
+	const cutoff = latestEligibleBirthday();
+	const younger = new Date(`${cutoff}T00:00:00Z`);
+	younger.setUTCDate(younger.getUTCDate() + 1);
+	const data = { ...input, phone: '09911223345', birthday: younger.toISOString().slice(0, 10) };
+	const rejected = await request.put('/api/profile', { headers, data });
+	expect(rejected.status()).toBe(422);
+	expect((await rejected.json()).message).toContain('at least 2 years old');
+	expect(
+		(await request.put('/api/profile', { headers, data: { ...data, birthday: cutoff } })).status()
+	).toBe(200);
 });
 
 test('public registration cannot grant a staff role', async ({ request }) => {
