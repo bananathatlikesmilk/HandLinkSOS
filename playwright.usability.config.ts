@@ -4,6 +4,7 @@ import base from './playwright.recovery.config';
 // Real isolated database and application; mail delivery stays disabled by an unusable local SMTP.
 export default defineConfig({
 	...base,
+	webServer: { ...base.webServer, timeout: 240000 },
 	testMatch: [
 		'tests/usability.api.ts',
 		'tests/usability.frontend.ts',

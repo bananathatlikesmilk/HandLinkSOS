@@ -81,35 +81,27 @@ test('denied initial access leaves dashboard usable and camera can be retried in
 			globalThis as unknown as { __handlinkNativeTest: NativeTestState }
 		).__handlinkNativeTest.permissionDeny = false;
 	});
-	await page.getByRole('button', { name: 'Allow camera', exact: true }).click();
+	await page.getByRole('switch', { name: 'Camera access', exact: true }).click();
 	await expect.poll(async () => (await state(page)).cameraPermission).toBe('granted');
 	expect((await state(page)).cameraRequests).toBe(1);
 });
 
-test('overlay needs separate display permission and explicit enable; hide and logout stop it', async ({
+test('floating switch requests display permission, starts, hides and stops on logout', async ({
 	page
 }) => {
 	await installNativeBridge(page);
 	await login(page.request, await provision());
 	await page.goto('/user/settings');
-	await expect(
-		page.getByRole('button', { name: 'Enable floating button', exact: true })
-	).toBeDisabled();
-	await page.getByRole('button', { name: 'Allow display over apps', exact: true }).click();
-	await expect(
-		page.getByRole('button', { name: 'Enable floating button', exact: true })
-	).toBeEnabled();
-	expect((await state(page)).overlayStarts).toBe(0);
-	await page.getByRole('button', { name: 'Enable floating button', exact: true }).click();
-	await expect(
-		page.getByRole('button', { name: 'Hide floating button', exact: true })
-	).toBeVisible();
-	await page.getByRole('button', { name: 'Hide floating button', exact: true }).click();
-	await expect.poll(async () => (await state(page)).overlayActive).toBe(false);
-	await page.getByRole('button', { name: 'Enable floating button', exact: true }).click();
-	await expect(
-		page.getByRole('button', { name: 'Hide floating button', exact: true })
-	).toBeVisible();
+	const toggle = page.getByRole('switch', { name: 'Floating button', exact: true });
+	await expect(toggle).not.toBeChecked();
+	await toggle.click();
+	await expect(toggle).toBeChecked();
+	expect((await state(page)).overlayAllowed).toBe(true);
+	expect((await state(page)).overlayStarts).toBe(1);
+	await toggle.click();
+	await expect(toggle).not.toBeChecked();
+	await toggle.click();
+	await expect(toggle).toBeChecked();
 	await page.getByRole('button', { name: 'Log out', exact: true }).click();
 	await expect(page).toHaveURL('/login');
 	expect((await state(page)).overlayActive).toBe(false);
@@ -121,13 +113,13 @@ test('late overlay permission result cannot leave a floating button after logout
 	await installNativeBridge(page);
 	await login(page.request, await provision());
 	await page.goto('/user/settings');
-	await page.getByRole('button', { name: 'Allow display over apps', exact: true }).click();
+
 	await page.evaluate(() => {
 		(
 			globalThis as unknown as { __handlinkNativeTest: NativeTestState }
 		).__handlinkNativeTest.overlayDelay = true;
 	});
-	await page.getByRole('button', { name: 'Enable floating button', exact: true }).click();
+	await page.getByRole('switch', { name: 'Floating button', exact: true }).click();
 	await expect.poll(async () => (await state(page)).overlayStarts).toBe(1);
 	await page.getByRole('button', { name: 'Log out', exact: true }).click();
 	await expect(page).toHaveURL('/login');
@@ -168,9 +160,7 @@ test('browser Settings includes camera and explains that overlays need Android',
 	await expect(privacyNotes).toHaveCount(0);
 	await expect(notifications).toBeVisible();
 	await page.setViewportSize({ width: 390, height: 844 });
-	await expect(
-		page.getByRole('button', { name: 'Enable floating button', exact: true })
-	).toHaveCount(0);
+	await expect(page.getByRole('switch', { name: 'Floating button', exact: true })).toBeDisabled();
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
@@ -188,7 +178,7 @@ test('camera permission check releases all browser camera tracks immediately', a
 	});
 	await login(page.request, await provision());
 	await page.goto('/user/settings');
-	await page.getByRole('button', { name: 'Allow camera', exact: true }).click();
+	await page.getByRole('switch', { name: 'Camera access', exact: true }).click();
 	await expect
 		.poll(() =>
 			page.evaluate(
@@ -205,4 +195,37 @@ test('camera permission check releases all browser camera tracks immediately', a
 					.__permissionCameraTest.options
 		)
 	).toEqual({ video: true, audio: false });
+});
+
+test('permission switches show actual state and open settings when blocked or disabling', async ({
+	page
+}) => {
+	await installNativeBridge(page, { denyInitialPermissions: true });
+	await login(page.request, await provision());
+	await page.goto('/user/settings');
+	const camera = page.getByRole('switch', { name: 'Camera access', exact: true });
+	await expect(camera).not.toBeChecked();
+	await camera.click();
+	await expect.poll(async () => (await state(page)).appSettingsOpens).toBe(1);
+	await expect(camera).not.toBeChecked();
+	await expect(
+		page.getByText('Access is still off. Allow camera in Android Settings.', { exact: true })
+	).toBeVisible();
+	await page.evaluate(() => {
+		const device = (globalThis as unknown as { __handlinkNativeTest: NativeTestState })
+			.__handlinkNativeTest;
+		device.cameraPermission = 'granted';
+		window.dispatchEvent(new Event('focus'));
+	});
+	await expect(camera).toBeChecked();
+	await camera.click();
+	await expect.poll(async () => (await state(page)).appSettingsOpens).toBe(2);
+	await expect(camera).toBeChecked();
+	await page.evaluate(() => {
+		const device = (globalThis as unknown as { __handlinkNativeTest: NativeTestState })
+			.__handlinkNativeTest;
+		device.cameraPermission = 'denied';
+		window.dispatchEvent(new Event('focus'));
+	});
+	await expect(camera).not.toBeChecked();
 });

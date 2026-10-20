@@ -20,6 +20,7 @@
 	let native = $state(false);
 	let working = $state(false);
 	let error = $state('');
+	let notice = $state('');
 	let mounted = false;
 	let accountId: string | undefined;
 	const unavailable = $derived(disabled || working || !status);
@@ -28,17 +29,52 @@
 	}
 	function accessLabel(access: AccessState | undefined) {
 		return access === 'granted'
-			? 'Allowed'
+			? 'On'
 			: access === 'denied'
-				? 'Not allowed'
+				? 'Off (blocked)'
 				: access === 'prompt'
-					? 'Not requested'
+					? 'Off'
 					: 'Not checked';
+	}
+	async function changeAccess(kind: 'location' | 'camera') {
+		if (!status) return;
+		if (status[kind] === 'granted') {
+			notice = native
+				? 'Change ' + kind + ' permission in Android Settings, then return here.'
+				: 'Change ' + kind + ' permission in your browser site settings, then return here.';
+			if (native) await openApplicationSettings();
+			return;
+		}
+		const result = await (kind === 'camera' ? requestCameraAccess() : requestLocationAccess());
+		if (!current()) return;
+		status = result;
+		if (result[kind] !== 'granted') {
+			notice = native
+				? 'Access is still off. Allow ' + kind + ' in Android Settings.'
+				: 'Access is still off. Allow ' + kind + ' in your browser site settings.';
+			if (native) await openApplicationSettings();
+		}
+		return result;
+	}
+	async function changeOverlay() {
+		if (status?.overlayActive) return stopFloatingButton();
+		if (!status?.overlayAllowed) {
+			await openOverlaySettings();
+			if (!current()) return;
+			const latest = await getPermissionStatus();
+			status = latest;
+			if (!latest.overlayAllowed) {
+				notice = 'Allow display over other apps to show the floating button.';
+				return latest;
+			}
+		}
+		await enableFloatingButton();
 	}
 	async function run(action: () => Promise<UserPermissionStatus | void>) {
 		if (!current() || disabled || working) return;
 		working = true;
 		error = '';
+		notice = '';
 		try {
 			const result = await action();
 			if (!current()) return;
@@ -81,28 +117,45 @@
 			<MapPin size={20} aria-hidden="true" />
 			<div>
 				<h3>Location access</h3>
-				<p>{accessLabel(status?.location)}. For SOS and sharing.</p>
+				<p>For SOS and sharing.</p>
 			</div>
 		</div>
-		<button
-			class="btn btn-outline btn-sm"
-			disabled={unavailable}
-			onclick={() => run(requestLocationAccess)}>Allow location</button
-		>
+		<div class="permission-control">
+			<span class="permission-state" class:on={status?.location === 'granted'}
+				>{accessLabel(status?.location)}</span
+			><button
+				type="button"
+				role="switch"
+				aria-label="Location access"
+				aria-checked={status?.location === 'granted'}
+				class="permission-switch"
+				disabled={unavailable}
+				onclick={() => run(() => changeAccess('location'))}
+				><span class="switch-thumb"></span></button
+			>
+		</div>
 	</div>
 	<div class="permission-row">
 		<div class="permission-details">
 			<Camera size={20} aria-hidden="true" />
 			<div>
 				<h3>Camera access</h3>
-				<p>{accessLabel(status?.camera)}. For QR scanning.</p>
+				<p>For QR scanning.</p>
 			</div>
 		</div>
-		<button
-			class="btn btn-outline btn-sm"
-			disabled={unavailable}
-			onclick={() => run(requestCameraAccess)}>Allow camera</button
-		>
+		<div class="permission-control">
+			<span class="permission-state" class:on={status?.camera === 'granted'}
+				>{accessLabel(status?.camera)}</span
+			><button
+				type="button"
+				role="switch"
+				aria-label="Camera access"
+				aria-checked={status?.camera === 'granted'}
+				class="permission-switch"
+				disabled={unavailable}
+				onclick={() => run(() => changeAccess('camera'))}><span class="switch-thumb"></span></button
+			>
+		</div>
 	</div>
 	<div class="permission-row">
 		<div class="permission-details">
@@ -122,28 +175,20 @@
 					</p>{/if}
 			</div>
 		</div>
-		{#if native}
-			<div class="flex flex-wrap gap-2">
-				{#if !status?.overlayAllowed}<button
-						class="btn btn-outline btn-sm"
-						disabled={unavailable}
-						onclick={() => run(openOverlaySettings)}>Allow display over apps</button
-					>{/if}
-				{#if status?.overlayActive}
-					<button
-						class="btn btn-outline btn-sm"
-						disabled={unavailable}
-						onclick={() => run(stopFloatingButton)}>Hide floating button</button
-					>
-				{:else}
-					<button
-						class="btn btn-outline btn-sm"
-						disabled={unavailable || !status?.overlayAllowed}
-						onclick={() => run(enableFloatingButton)}>Enable floating button</button
-					>
-				{/if}
-			</div>
-		{/if}
+		<div class="permission-control">
+			<span class="permission-state" class:on={status?.overlayActive}
+				>{native ? (status?.overlayActive ? 'On' : 'Off') : 'Android only'}</span
+			>
+			<button
+				type="button"
+				role="switch"
+				aria-label="Floating button"
+				aria-checked={status?.overlayActive ?? false}
+				class="permission-switch"
+				disabled={unavailable || !native}
+				onclick={() => run(changeOverlay)}><span class="switch-thumb"></span></button
+			>
+		</div>
 	</div>
 	<div class="mt-4 flex flex-wrap gap-2">
 		<button
@@ -161,6 +206,7 @@
 			</p>{/if}
 	</div>
 	{#if status?.message}<p class="user-copy mt-3 text-sm" role="status">{status.message}</p>{/if}
+	{#if notice}<p class="user-copy mt-3 text-sm" role="status">{notice}</p>{/if}
 	{#if error}<p class="user-error mt-3" role="alert">{error}</p>{/if}
 </section>
 
@@ -171,14 +217,14 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 16px;
-		border-bottom: 1px solid #484d38;
+		border-bottom: 1px solid var(--app-border);
 		padding-block: 20px;
 	}
 	.permission-details {
 		display: flex;
 		align-items: flex-start;
 		gap: 12px;
-		flex: 1 1 220px;
+		flex: 1 1 150px;
 		min-width: 0;
 	}
 	.permission-details :global(svg) {
@@ -194,6 +240,50 @@
 		font-size: 12px;
 		line-height: 1.7;
 		color: var(--app-muted);
+	}
+	.permission-control {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+	.permission-state {
+		font-size: 14px;
+		font-weight: 650;
+		color: var(--app-muted);
+	}
+	.permission-state.on {
+		color: var(--app-accent);
+	}
+	.permission-switch {
+		width: 60px;
+		min-height: 48px;
+		padding: 6px;
+		border: 2px solid var(--app-border);
+		border-radius: 999px;
+		background: var(--app-surface-alt);
+		display: flex;
+		align-items: center;
+		cursor: pointer;
+		flex-shrink: 0;
+	}
+	.switch-thumb {
+		width: 28px;
+		height: 28px;
+		background: var(--app-muted);
+		border-radius: 50%;
+		transition: transform 150ms;
+	}
+	.permission-switch[aria-checked='true'] {
+		background: var(--app-accent);
+		border-color: var(--app-accent);
+	}
+	.permission-switch[aria-checked='true'] .switch-thumb {
+		transform: translateX(16px);
+		background: var(--app-accent-text);
+	}
+	.permission-switch:disabled {
+		cursor: not-allowed;
+		opacity: 0.6;
 	}
 	button {
 		min-height: 44px;

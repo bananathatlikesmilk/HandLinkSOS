@@ -14,6 +14,8 @@ The Admin dashboard reads actual database counts, including accounts and inciden
 
 The QR scanner releases camera tracks after a successful scan, when hidden, and when leaving the page. Camera access still requires the device owner's permission.
 
+App permissions use switches with visible On, Off, or Blocked labels. Location and camera switches request access; when Android refuses to show another permission prompt, the app opens its Android settings. Turning an allowed permission off also opens Android settings because applications cannot revoke their own system permissions. The switch reflects the actual permission when the user returns. In a browser, changing an already allowed permission requires the browser's site settings. The floating-button switch requests overlay access if needed, starts the button after approval, and stops it directly when switched off. Its state reports whether the floating button is running, separately from the Android overlay permission.
+
 ## Dispatcher notes and resolved reports
 
 Dispatchers confirm the verbal confirmation checkbox before using the confirmation button underneath it. Personal, contact, and medical information appears in tables.

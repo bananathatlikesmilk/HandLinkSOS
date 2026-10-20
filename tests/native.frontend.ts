@@ -132,7 +132,7 @@ test('denied native permission leaves sharing active; late enable cannot restart
 	expect((await (await page.request.get('/api/sharing')).json()).own.status).toBe('cancelled');
 });
 
-test('logout stops native updates; settings requests native location without creating sharing', async ({
+test('logout stops native updates; location switch opens settings without creating sharing', async ({
 	page
 }) => {
 	test.setTimeout(90000);
@@ -142,13 +142,13 @@ test('logout stops native updates; settings requests native location without cre
 	await login(page.request, owner);
 	await installNativeBridge(page);
 	await page.goto('/user/settings');
-	await page.getByRole('button', { name: 'Allow location', exact: true }).click();
+	await page.getByRole('switch', { name: 'Location access', exact: true }).click();
 	await expect
 		.poll(() =>
 			page.evaluate(
 				() =>
 					(globalThis as unknown as { __handlinkNativeTest: NativeTestState }).__handlinkNativeTest
-						.locationRequests
+						.appSettingsOpens
 			)
 		)
 		.toBe(1);

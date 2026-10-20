@@ -19,6 +19,7 @@ export async function installNativeBridge(
 			denyDialer: false,
 			initialRequests: 0,
 			cameraRequests: 0,
+			appSettingsOpens: 0,
 			locationRequests: 0,
 			permissionDeny: options.denyInitialPermissions ?? false,
 			cameraPermission: 'prompt',
@@ -107,6 +108,7 @@ export async function installNativeBridge(
 								? 'denied'
 								: 'granted';
 						}
+						if (method === 'openAppSettings') state.appSettingsOpens++;
 						if (method === 'requestCamera') {
 							state.cameraRequests++;
 							state.cameraPermission = state.permissionDeny ? 'denied' : 'granted';
@@ -206,6 +208,7 @@ export async function installNativeBridge(
 }
 
 export type NativeTestState = {
+	appSettingsOpens: number;
 	initialRequests: number;
 	cameraRequests: number;
 	locationRequests: number;
