@@ -10,6 +10,8 @@ Recovery files are stored locally under `.git/history-backups/2026-10-21T01-49-0
 
 ## How to use this file on a phone
 
+**ChatGPT synchronization limitation (21 October 2026):** Repository instructions require future relevant Codex sessions to maintain these local records. This is not a background synchronization service. No available connected tool or discovered plugin provides upload/replacement of files inside the user's ChatGPT Project. No automatic sync was configured. For now, replace the uploaded context/history files manually when using the phone. Official documentation distinguishes local folder access from ChatGPT Project sources: [Projects and chats](https://learn.chatgpt.com/docs/projects).
+
 **Git publishing update, 21 October 2026:** The user committed the authorship-maintenance records and explicitly authorized a force-push. Published local `main` at `3f48759` to `origin/main` using an explicit force-with-lease against the previously observed remote commit. A fresh remote query confirmed the matching full commit ID. All 44 published commits use `bananathatlikesmilk` as author and committer. This supersedes the earlier unpushed/uncommitted status above; it does not verify production deployment. The records of this publishing action remain local, uncommitted edits.
 
 Share this file and [CODEX_HISTORY.md](CODEX_HISTORY.md) with ChatGPT. Ask it to teach from these records and identify uncertainty before making implementation claims. Repository links require access to the source; uploaded Markdown alone does not give ChatGPT access to the repository, server, device, database, or earlier chats.

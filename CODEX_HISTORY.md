@@ -267,3 +267,13 @@ The following entries have fuller assistant/tool evidence in the available conve
 **Work and verification:** The working tree was clean and local `main` had advanced to `3f487594bf04a2a85b733fd807510f329b502878`, including the user's additional commit. Queried the remote and confirmed it still pointed to `364d17f7a5294fd3a8132e5b3763117c5d12e4ca`. Pushed `main` with an explicit force-with-lease requiring that exact remote value. Git reported a successful forced update. A fresh remote query confirmed that GitHub `main` matches local `main`. All 44 commits in the published history have `bananathatlikesmilk` as author and committer.
 
 **Limits:** No application behavior changed and no production deployment was verified. Collaborators with the original history must reconcile their checkouts. Recovery files from H026 remain available. This entry and the project-context publishing update remain uncommitted; no extra commit was created automatically.
+
+### H028 — Request automatic synchronization to ChatGPT Projects
+
+**Date:** 21 October 2026, Asia/Manila.
+
+**User request:** Automatically update project context and related records inside the user's ChatGPT Project.
+
+**Investigation and explanation:** Checked available integrations, searched the plugin directory, and consulted official OpenAI documentation at https://learn.chatgpt.com/docs/projects. No available tool or discovered plugin supported replacing uploaded files in that ChatGPT Project. Local AGENTS.md already instructs future relevant sessions to maintain repository records; this does not run a background sync or grant access to ChatGPT Project storage. The IDE workspace and a ChatGPT Project are separate sources of context.
+
+**Outcome and limits:** No remote upload or automatic synchronization was configured. The practical current workflow is to replace uploaded PROJECT_CONTEXT.md and CODEX_HISTORY.md in the ChatGPT Project after meaningful updates. Additional plugins may exist in https://chatgpt.com/plugins, but this search did not establish a suitable integration. Updated these two local records only; no application changes, commit, or push occurred.
