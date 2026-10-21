@@ -243,3 +243,17 @@ The following entries have fuller assistant/tool evidence in the available conve
 **Verification/scope:** This task changes documentation only. Records are checked for formatting, local references, preservation of the original instructions, and credential-pattern leaks. Application builds/tests, server actions, APK packaging, database changes, Git commits/pushes, and credential rotation are not performed just to create these records.
 
 **Continuation:** Upload/share the two context/history Markdown files with phone ChatGPT. Include AGENTS.md when explaining the maintenance workflow. Sharing files does not automatically synchronize future changes or grant access to this repository/other conversations. Future meaningful sessions should update the current context and append a new historical entry.
+
+### H026 — Rewrite local commit authorship
+
+**Date:** 21 October 2026, Asia/Manila.
+
+**User request:** Change all repository commits to the current user, `bananathatlikesmilk`.
+
+**Inspection and decision:** Local `main` contained all 43 project commits, attributed to two identities. Used the requested lowercase name and the current configured Git email for both author and committer. Updated repository-local Git identity for future commits. Preserved remote-tracking and internal Codex refs so they continue to describe their original state. The user's request authorized the local rewrite; no remote force-push was performed.
+
+**Changes and recovery:** Created and verified an all-ref Git bundle before rewriting. Recovery metadata and a verified old-to-new commit mapping are under `.git/history-backups/2026-10-21T01-49-07-639Z/`. Rewrote `main` with Git's environment filter. HEAD changed from `364d17f` to `9966386`; both represent the same application and documentation contents before the record updates for this task. Original-history/recovery refs remain available.
+
+**Verification:** Compared all 43 original and rewritten raw commits. Only author/committer names, emails, and corresponding parent commit IDs changed. Trees, messages, timestamps, commit count, and parent topology were preserved. The working tree stayed unchanged through the rewrite. Remote-tracking `origin/main` still points to its original commit. Application tests were unnecessary because application behavior did not change.
+
+**Explanation and limits:** Git identifies commits by their content and metadata, so changing authorship changes commit IDs and descendant IDs. GitHub attribution also depends on the selected email being associated with the GitHub account; changing the author name alone does not prove account association. Existing configured email was retained; its GitHub verification status was not established. GitHub history remains unchanged until a deliberate coordinated force-push. `git log --all` still includes old identities through retained recovery/cache refs. PROJECT_CONTEXT.md and this history entry record the work and remain uncommitted; no extra commit was created automatically.

@@ -1,6 +1,12 @@
 # HandLink-SOS project context
 
-Last inspected: **21 October 2026, Asia/Manila**. Local branch: `main`. Inspected local HEAD: `dc7ca4d` (`birthday fix`). The working tree was clean before this documentation task. That establishes local commit state, not GitHub synchronization or production deployment.
+Last inspected: **21 October 2026, Asia/Manila**. Local branch: `main`. Current local HEAD after the authorship rewrite: `9966386` (`agents.md for gpt`). The original source inspection used `dc7ca4d` (`birthday fix`); that hash belongs to the pre-rewrite history. This establishes local commit state, not GitHub synchronization or production deployment.
+
+### Local Git authorship maintenance
+
+On 21 October 2026, all 43 commits in local `main` were rewritten to use `bananathatlikesmilk` as both author and committer, with the user's existing configured Git email. Repository-local Git configuration uses the same identity for future commits. Commit contents, messages, timestamps, and parent topology were verified unchanged. Commit IDs changed because Git includes authorship metadata in each commit's identity.
+
+Recovery files are stored locally under `.git/history-backups/2026-10-21T01-49-07-639Z/`: a verified `before.bundle`, original metadata, and the old-to-new commit mapping with verification results. Git's original-history ref, remote-tracking refs, and internal Codex refs retain their previous history. These recovery/cache refs can still show old identities when using `git log --all`; the rewritten project history is `main`. No remote push occurred. Publishing rewritten history requires a coordinated force-push and collaborators must reconcile existing checkouts. The context/history updates recording this task remain uncommitted unless the user commits them.
 
 ## How to use this file on a phone
 
