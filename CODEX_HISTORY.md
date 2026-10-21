@@ -257,3 +257,13 @@ The following entries have fuller assistant/tool evidence in the available conve
 **Verification:** Compared all 43 original and rewritten raw commits. Only author/committer names, emails, and corresponding parent commit IDs changed. Trees, messages, timestamps, commit count, and parent topology were preserved. The working tree stayed unchanged through the rewrite. Remote-tracking `origin/main` still points to its original commit. Application tests were unnecessary because application behavior did not change.
 
 **Explanation and limits:** Git identifies commits by their content and metadata, so changing authorship changes commit IDs and descendant IDs. GitHub attribution also depends on the selected email being associated with the GitHub account; changing the author name alone does not prove account association. Existing configured email was retained; its GitHub verification status was not established. GitHub history remains unchanged until a deliberate coordinated force-push. `git log --all` still includes old identities through retained recovery/cache refs. PROJECT_CONTEXT.md and this history entry record the work and remain uncommitted; no extra commit was created automatically.
+
+### H027 — Publish rewritten history to GitHub
+
+**Date:** 21 October 2026, Asia/Manila.
+
+**User request:** Force-push the authorship change.
+
+**Work and verification:** The working tree was clean and local `main` had advanced to `3f487594bf04a2a85b733fd807510f329b502878`, including the user's additional commit. Queried the remote and confirmed it still pointed to `364d17f7a5294fd3a8132e5b3763117c5d12e4ca`. Pushed `main` with an explicit force-with-lease requiring that exact remote value. Git reported a successful forced update. A fresh remote query confirmed that GitHub `main` matches local `main`. All 44 commits in the published history have `bananathatlikesmilk` as author and committer.
+
+**Limits:** No application behavior changed and no production deployment was verified. Collaborators with the original history must reconcile their checkouts. Recovery files from H026 remain available. This entry and the project-context publishing update remain uncommitted; no extra commit was created automatically.
