@@ -29,6 +29,7 @@ test('real User login, profile saving, reload and logout work', async ({ page })
 	await page.getByLabel('Email', { exact: true }).fill(account.email);
 	await page.getByLabel('Password', { exact: true }).fill(account.password);
 	await page.getByRole('button', { name: 'Log In', exact: true }).click();
+	await page.getByRole('button', { name: 'I understand. Continue', exact: true }).click();
 	await expect(page).toHaveURL('/user/dashboard');
 	const signedIn = page.getByRole('region', { name: 'Signed-in account', exact: true });
 	await expect(signedIn).toContainText(account.email);
@@ -93,6 +94,7 @@ for (const [role, path] of [
 		await page.getByRole('button', { name: 'Log In', exact: true }).click();
 		await page.getByLabel('Authenticator code', { exact: true }).fill(totp(setup!.totpURI));
 		await page.getByRole('button', { name: 'Verify code', exact: true }).click();
+		await page.getByRole('button', { name: 'I understand. Continue', exact: true }).click();
 		await expect(page).toHaveURL(`/${path}`);
 		const menu = page.getByRole('button', { name: 'Open navigation', exact: true });
 		if (await menu.isVisible()) await menu.click();

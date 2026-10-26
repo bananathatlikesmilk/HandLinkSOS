@@ -8,7 +8,51 @@ import {
 	provision,
 	sos
 } from './incident-fixture';
-import { challenge } from './trusted-fixture';
+import { challenge, invitation } from './trusted-fixture';
+
+test('mutual relationship selector offers the matching role instead of contradictory choices', async ({
+	page,
+	playwright
+}) => {
+	const owner = await provision();
+	const scanner = await provision();
+	await login(page.request, owner);
+	const other = await playwright.request.newContext({ baseURL: origin });
+	try {
+		await login(other, scanner);
+		const qr = await invitation(page.request, owner.id);
+		expect(
+			(
+				await other.post('/api/trusted/scan', {
+					headers,
+					data: { token: qr.token, relationship: 'Parent' }
+				})
+			).status()
+		).toBe(201);
+		await page.goto('/user/profiles');
+		const pending = page.getByRole('article', { name: 'Request from Casey Reyes', exact: true });
+		await expect(
+			pending.getByText('Their relationship to you: Parent.', { exact: true })
+		).toBeVisible();
+		await pending
+			.getByRole('checkbox', { name: 'Also request permission to send SOS for them' })
+			.check();
+		const relationship = pending.getByLabel('Your relationship to this person', { exact: true });
+		await expect(relationship).toHaveValue('Child');
+		await expect(relationship.locator('option:not([disabled])')).toHaveText(['Child']);
+		await pending.getByRole('button', { name: 'Approve', exact: true }).click();
+		await expect(pending).toHaveCount(0);
+		const { connections } = await (await page.request.get('/api/trusted')).json();
+		expect(connections).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ relationship: 'Parent', status: 'approved' }),
+				expect.objectContaining({ relationship: 'Child', status: 'pending' })
+			])
+		);
+	} finally {
+		await other.dispose();
+	}
+});
 
 async function showQr(page: Page, owner: Awaited<ReturnType<typeof provision>>) {
 	let code = '';

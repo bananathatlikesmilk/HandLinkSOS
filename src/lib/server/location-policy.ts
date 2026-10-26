@@ -1,8 +1,9 @@
-import { and, eq, gt, inArray, isNull, or } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, lte, or } from 'drizzle-orm';
 import type { db } from './db/index.ts';
 import type { SharingRecipient } from '../sharing.ts';
 import {
 	emergencyContact,
+	locationPoint,
 	locationRecipient,
 	locationSession,
 	profile,
@@ -105,6 +106,41 @@ export function sharingCandidates(
 			];
 		})
 		.sort((a, b) => a.name.localeCompare(b.name) || a.userId.localeCompare(b.userId));
+}
+
+export function sharedPointForRecipient(
+	executor: SharingExecutor,
+	ownerProfileId: string,
+	recipientUserId: string,
+	now = new Date()
+) {
+	if (
+		!activeSharingOwner(executor, ownerProfileId) ||
+		!sharingCandidates(executor, ownerProfileId).some((person) => person.userId === recipientUserId)
+	)
+		return undefined;
+	return executor
+		.select({
+			latitude: locationPoint.latitude,
+			longitude: locationPoint.longitude,
+			accuracy: locationPoint.accuracy,
+			recordedAt: locationPoint.recordedAt
+		})
+		.from(locationSession)
+		.innerJoin(locationRecipient, eq(locationRecipient.sessionId, locationSession.id))
+		.innerJoin(locationPoint, eq(locationPoint.sessionId, locationSession.id))
+		.where(
+			and(
+				eq(locationSession.ownerProfileId, ownerProfileId),
+				eq(locationRecipient.userId, recipientUserId),
+				isNull(locationRecipient.revokedAt),
+				isNull(locationSession.cancelledAt),
+				gt(locationSession.expiresAt, now),
+				lte(locationPoint.recordedAt, now)
+			)
+		)
+		.orderBy(desc(locationPoint.recordedAt), locationPoint.id)
+		.get();
 }
 
 // Persist revocation so restoring a relationship never revives an old location grant.

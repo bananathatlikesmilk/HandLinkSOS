@@ -1,11 +1,14 @@
 <script lang="ts">
+	import { relationshipOptions } from '#lib/relationships.ts';
+
 	let {
 		value = $bindable(''),
 		id,
 		name,
 		label = 'Relationship',
 		required = true,
-		disabled = false
+		disabled = false,
+		options = relationshipOptions
 	}: {
 		value?: string;
 		id?: string;
@@ -13,21 +16,9 @@
 		label?: string;
 		required?: boolean;
 		disabled?: boolean;
+		options?: readonly string[];
 	} = $props();
 	const uid = $props.id();
-	const options = [
-		'Parent',
-		'Child',
-		'Sibling',
-		'Spouse/Partner',
-		'Grandparent',
-		'Grandchild',
-		'Relative',
-		'Friend',
-		'Caregiver',
-		'Teacher',
-		'Other'
-	];
 </script>
 
 <label class="user-field" for={id ?? uid}>

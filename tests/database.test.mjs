@@ -39,6 +39,38 @@ function seed(client) {
 			.run(id, owner, 'First', 'Last', '2000-01-01', 'Female', '+639171234567', Date.now());
 }
 
+test('beneficiary location migration preserves incidents and rejects invalid snapshots', () => {
+	const client = new Database(':memory:');
+	client.pragma('foreign_keys=ON');
+	try {
+		const migrations = readMigrationFiles({ migrationsFolder: './drizzle' });
+		for (const migration of migrations.slice(0, 14))
+			for (const statement of migration.sql) client.exec(statement);
+		seed(client);
+		client
+			.prepare(
+				"INSERT INTO incident (id,person_profile_id,caller_user_id,caller_name,latitude,longitude,idempotency_key) VALUES ('existing','profile-owner','owner','Owner',14,121,'retry')"
+			)
+			.run();
+		const before = client.prepare('SELECT * FROM incident').get();
+		for (const statement of migrations[14].sql) client.exec(statement);
+		assert.deepEqual(client.prepare('SELECT * FROM incident').get(), before);
+		assert.equal(client.prepare('SELECT count(*) AS n FROM incident_person_location').get().n, 0);
+		const insert = client.prepare(
+			'INSERT INTO incident_person_location (incident_id,latitude,longitude,accuracy,recorded_at) VALUES (?,?,?,?,?)'
+		);
+		assert.throws(() => insert.run('existing', 91, 121, 10, 1000));
+		assert.throws(() => insert.run('existing', 14, 181, 10, 1000));
+		assert.throws(() => insert.run('existing', 14, 121, -1, 1000));
+		assert.throws(() => insert.run('missing', 14, 121, 10, 1000));
+		insert.run('existing', 14, 121, 10, 1000);
+		assert.throws(() => insert.run('existing', 14, 121, 10, 1000));
+		assert.deepEqual(client.pragma('foreign_key_check'), []);
+	} finally {
+		client.close();
+	}
+});
+
 test('SOS favorites migration preserves trusted connections and defaults existing rows to unfavorited', () => {
 	const client = new Database(':memory:');
 	client.pragma('foreign_keys=ON');

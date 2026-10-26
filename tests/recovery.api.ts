@@ -287,6 +287,7 @@ for (const role of ['admin', 'dispatcher']) {
 		await page.getByLabel('Email', { exact: true }).fill(actor.email);
 		await page.getByLabel('Password', { exact: true }).fill(newPassword);
 		await page.getByRole('button', { name: 'Log In', exact: true }).click();
+		await page.getByRole('button', { name: 'I understand. Continue', exact: true }).click();
 		await expect(page).toHaveURL(`/${portal}/security`);
 	});
 }

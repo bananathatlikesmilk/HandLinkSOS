@@ -15,6 +15,7 @@ export default defineConfig({
 		'tests/accounts.api.ts',
 		'tests/staff-profile.frontend.ts',
 		'tests/incidents.api.ts',
+		'tests/incident-location.api.ts',
 		'tests/sos-consent.api.ts',
 		'tests/sos-consent.frontend.ts',
 		'tests/sharing.api.ts',

@@ -204,7 +204,11 @@
 	{:else if phase === 'locating' || phase === 'countdown'}
 		<p class="user-kicker">SOS FOR {target?.name}</p>
 		<h1 class="user-title mt-4">You can still cancel</h1>
-		<p class="user-copy mt-3">Your device location is sent with this SOS.</p>
+		<p class="user-copy mt-3">
+			{target?.id !== data.accountProfile?.id
+				? 'Their shared location is included if available. Your device location is recorded separately.'
+				: 'Your device location is sent with this SOS.'}
+		</p>
 		{#if phase === 'locating'}
 			<p class="user-copy my-10" role="status">
 				Getting your location. Allow location access to continue.

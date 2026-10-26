@@ -7,6 +7,7 @@ import { db } from './db/index.ts';
 import {
 	emergencyContact,
 	incident,
+	incidentPersonLocation,
 	incidentReference,
 	incidentEvent,
 	incidentAddendum,
@@ -22,6 +23,23 @@ import { incidentInput, incidentListInput } from './validation.ts';
 import { latestIncidentNote } from './incident-notes.ts';
 import { getAiSummaryState } from './ai-summaries.ts';
 import { incidentReferenceCode } from './incident-references.ts';
+import { sharedPointForRecipient } from './location-policy.ts';
+
+function personLocationSnapshot(incidentId: string) {
+	const row = db
+		.select()
+		.from(incidentPersonLocation)
+		.where(eq(incidentPersonLocation.incidentId, incidentId))
+		.get();
+	return row
+		? {
+				latitude: row.latitude,
+				longitude: row.longitude,
+				accuracy: row.accuracy,
+				recordedAt: row.recordedAt.toISOString()
+			}
+		: null;
+}
 
 const callerProfile = alias(profile, 'caller_profile');
 const dispatcher = alias(user, 'handling_dispatcher');
@@ -252,6 +270,13 @@ export function createIncident(event: RequestEvent, input: z.output<typeof incid
 				})
 				.returning()
 				.get();
+			if (person.profile.id !== ownProfile.id) {
+				const point = sharedPointForRecipient(tx, person.profile.id, identity.id);
+				if (point)
+					tx.insert(incidentPersonLocation)
+						.values({ incidentId: saved.id, ...point })
+						.run();
+			}
 			tx.insert(incidentEvent)
 				.values({ incidentId: saved.id, actorUserId: identity.id, type: 'created' })
 				.run();
@@ -352,6 +377,7 @@ export function getIncidentReport(event: RequestEvent, id: string | undefined): 
 			ai: getAiSummaryState(row.id),
 			cancellation: getCancellation(row.id),
 			callerRelationship: row.callerRelationship,
+			personLocation: personLocationSnapshot(row.id),
 			latitude: row.latitude,
 			longitude: row.longitude,
 			locationLabel: row.locationLabel,
@@ -419,6 +445,7 @@ export function getIncidentDetail(event: RequestEvent, id: string | undefined): 
 			now.getUTCMonth() < birth.getUTCMonth() ||
 			(now.getUTCMonth() === birth.getUTCMonth() && now.getUTCDate() < birth.getUTCDate());
 		result.personal = {
+			personLocation: personLocationSnapshot(row.id),
 			firstName: person.firstName,
 			lastName: person.lastName,
 			age: now.getUTCFullYear() - birth.getUTCFullYear() - Number(beforeBirthday),

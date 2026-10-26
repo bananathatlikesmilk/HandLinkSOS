@@ -177,6 +177,7 @@ for (const role of ['admin', 'dispatcher']) {
 		await page.getByLabel('Email', { exact: true }).fill(actor.email);
 		await page.getByLabel('Password', { exact: true }).fill(password);
 		await page.getByRole('button', { name: 'Log In', exact: true }).click();
+		await page.getByRole('button', { name: 'I understand. Continue', exact: true }).click();
 		await expect(page).toHaveURL(`/${portal}/security`);
 		await page.getByLabel('Current password', { exact: true }).fill(password);
 		await page.getByRole('button', { name: 'Start authenticator setup', exact: true }).click();
@@ -213,6 +214,7 @@ for (const role of ['admin', 'dispatcher']) {
 		await page.getByRole('button', { name: 'Use a backup code', exact: true }).click();
 		await page.getByLabel('Backup code', { exact: true }).fill(backupCode);
 		await page.getByRole('button', { name: 'Verify code', exact: true }).click();
+		await page.getByRole('button', { name: 'I understand. Continue', exact: true }).click();
 		await expect(page).toHaveURL(`/${portal}`);
 	});
 }

@@ -2,10 +2,10 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { Eye, EyeOff } from '@lucide/svelte';
+	import { Eye, EyeOff, TriangleAlert } from '@lucide/svelte';
 	import AuthFrame from './AuthFrame.svelte';
 
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	let ready = $state(false);
 	onMount(() => {
 		ready = true;
@@ -31,7 +31,11 @@
 	let twoFactor = $state(false);
 	let useBackupCode = $state(false);
 	let code = $state('');
-	const title = $derived(mode === 'recovery' ? 'Forgot password?' : 'Log In');
+	let showEmergencyMemo = $state(false);
+	let memoHeading = $state<HTMLHeadingElement>();
+	const title = $derived(
+		mode === 'recovery' ? 'Forgot password?' : showEmergencyMemo ? 'Emergency use only' : 'Log In'
+	);
 	let recoveryStage = $state<'email' | 'code' | 'password' | 'success'>('email');
 	let recoveryCode = $state('');
 	let newPassword = $state('');
@@ -149,8 +153,23 @@
 		}
 		password = '';
 		code = '';
-		// The server chooses the workspace from the current database role and session MFA proof.
-		await goto(resolve('/login'), { invalidateAll: true });
+		showEmergencyMemo = true;
+		await tick();
+		memoHeading?.focus();
+	}
+
+	async function acknowledgeEmergencyMemo() {
+		if (busy || !showEmergencyMemo) return;
+		busy = true;
+		error = '';
+		try {
+			// The server chooses the workspace from the current database role and session MFA proof.
+			await goto(resolve('/login'), { invalidateAll: true });
+		} catch {
+			error = 'Unable to open your workspace. Please try again.';
+		} finally {
+			busy = false;
+		}
 	}
 
 	async function submit(event: SubmitEvent) {
@@ -219,7 +238,31 @@
 			<p class="role-label">
 				{mode === 'login' ? 'User · Dispatcher · Admin' : 'Account recovery'}
 			</p>
-			{#if mode === 'recovery'}
+			{#if showEmergencyMemo}
+				<section class="emergency-memo" aria-labelledby="emergency-memo-heading">
+					<TriangleAlert size={32} aria-hidden="true" />
+					<h2 id="emergency-memo-heading" bind:this={memoHeading} tabindex="-1">
+						Important safety notice
+					</h2>
+					<p><strong>HandLink is for real emergencies. It is not a game.</strong></p>
+					<ul>
+						<li>Do not send prank SOS alerts, false reports, or test emergencies.</li>
+						<li>Give accurate information. Send SOS for others only when they need urgent help.</li>
+						<li>
+							False alerts waste emergency resources and can delay help for someone in danger.
+						</li>
+					</ul>
+					<p>Use HandLink responsibly. Every alert must be taken seriously.</p>
+				</section>
+				{#if error}<p class="form-error" role="alert">{error}</p>{/if}
+				<button
+					class="continue-button memo-continue"
+					type="button"
+					disabled={busy}
+					onclick={acknowledgeEmergencyMemo}
+					>{busy ? 'Opening workspace...' : 'I understand. Continue'}</button
+				>
+			{:else if mode === 'recovery'}
 				{#if !emailConfigured}
 					<p class="auth-subtitle" role="status">
 						Password recovery is unavailable because email delivery is not configured. Contact your
@@ -417,6 +460,43 @@
 </AuthFrame>
 
 <style>
+	.emergency-memo {
+		display: grid;
+		gap: 1rem;
+		padding: 1.25rem;
+		border: 2px solid #fbbf24;
+		border-radius: 14px;
+		background: #211912;
+		color: #fff2d5;
+		font-size: 16px;
+		line-height: 1.6;
+		text-shadow: none;
+	}
+	.emergency-memo h2 {
+		margin: 0;
+		font-size: 20px;
+		font-weight: 700;
+	}
+	.emergency-memo p,
+	.emergency-memo ul {
+		margin: 0;
+	}
+	.emergency-memo ul {
+		padding-left: 1.25rem;
+		list-style: disc;
+	}
+	.emergency-memo li + li {
+		margin-top: 0.75rem;
+	}
+	.memo-continue {
+		width: 100%;
+		margin-top: 1.5rem;
+	}
+	:global(:root[data-appearance='light']) .emergency-memo {
+		background: #fff7ed;
+		border-color: #b45309;
+		color: #713f12;
+	}
 	.login-fields {
 		display: contents;
 	}

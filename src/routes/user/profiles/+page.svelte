@@ -6,6 +6,7 @@
 	import { apiRequest } from '#lib/client/request.ts';
 	import type { TrustedConnection } from '#lib/trusted.ts';
 	import RelationshipSelect from '#lib/user/RelationshipSelect.svelte';
+	import { matchingRelationship } from '#lib/relationships.ts';
 	const preview = getUserPreview();
 	let revealed = $state('');
 	let removing = $state<TrustedConnection | null>(null);
@@ -75,9 +76,10 @@
 	async function changeConnection(connection: TrustedConnection, action: 'approve' | 'revoke') {
 		if (busy) return;
 		const requestMutual = action === 'approve' && Boolean(mutualRequests[connection.id]);
-		const mutualRelationship = (mutualRelationships[connection.id] ?? '').trim();
-		if (requestMutual && (!mutualRelationship || mutualRelationship.length > 100)) {
-			error = 'Enter your relationship to this person using 1 to 100 characters.';
+		const expectedRelationship = matchingRelationship(connection.relationship);
+		const mutualRelationship = (mutualRelationships[connection.id] ?? expectedRelationship).trim();
+		if (requestMutual && mutualRelationship !== expectedRelationship) {
+			error = `Your relationship must be ${expectedRelationship} to match their ${connection.relationship} relationship.`;
 			return;
 		}
 		busy = true;
@@ -216,7 +218,8 @@
 		{#each incoming as connection (connection.id)}
 			<article class="user-panel space-y-3" aria-label={`Request from ${connection.requesterName}`}>
 				<h3 class="font-semibold">{connection.requesterName}</h3>
-				<p class="user-copy">{connection.relationship}. Wants permission to send SOS for you.</p>
+				<p class="user-copy">Their relationship to you: {connection.relationship}.</p>
+				<p class="user-copy">Wants permission to send SOS for you.</p>
 				<form
 					class="space-y-3"
 					onsubmit={(event) => {
@@ -236,8 +239,11 @@
 					{#if mutualRequests[connection.id]}
 						<RelationshipSelect
 							label="Your relationship to this person"
+							options={[matchingRelationship(connection.relationship)]}
 							bind:value={
-								() => mutualRelationships[connection.id] ?? '',
+								() =>
+									mutualRelationships[connection.id] ??
+									matchingRelationship(connection.relationship),
 								(value) => (mutualRelationships[connection.id] = value)
 							}
 							disabled={busy}

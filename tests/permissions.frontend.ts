@@ -19,6 +19,7 @@ test('User login survives a browser restart, skips welcome, and logout revokes t
 	await page.getByLabel('Email', { exact: true }).fill(account.email);
 	await page.getByLabel('Password', { exact: true }).fill(password);
 	await page.getByRole('button', { name: 'Log In', exact: true }).click();
+	await page.getByRole('button', { name: 'I understand. Continue', exact: true }).click();
 	await expect(page).toHaveURL('/user/dashboard');
 	const saved = await page.context().storageState();
 	const token = saved.cookies.find((cookie) => cookie.name.endsWith('session_token'));

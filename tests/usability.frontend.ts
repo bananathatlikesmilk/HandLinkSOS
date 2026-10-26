@@ -133,9 +133,10 @@ test('light staff security uses readable inputs, messages and text', async ({ pa
 
 test('one login page routes Users and protects staff destinations with MFA', async ({ page }) => {
 	test.setTimeout(120000);
-	await page.addInitScript(() =>
-		localStorage.setItem('handlink:initial-device-permissions:v1', 'attempted')
-	);
+	await page.addInitScript(() => {
+		localStorage.setItem('handlink:initial-device-permissions:v1', 'attempted');
+		localStorage.setItem('handlink:appearance', 'light');
+	});
 	const user = await provision();
 	await page.goto('/user/login');
 	await expect(page).toHaveURL('/login');
@@ -143,7 +144,30 @@ test('one login page routes Users and protects staff destinations with MFA', asy
 	await page.getByLabel('Password', { exact: true }).fill(password);
 	await page.getByRole('button', { name: 'Show password', exact: true }).click();
 	await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('type', 'text');
+	await expect(page.getByRole('heading', { name: 'Important safety notice' })).toHaveCount(0);
 	await page.getByRole('button', { name: 'Log In', exact: true }).click();
+	const memo = page.getByRole('region', { name: 'Important safety notice' });
+	await expect(memo).toContainText('HandLink is for real emergencies. It is not a game.');
+	await expect(memo).toContainText(
+		'Do not send prank SOS alerts, false reports, or test emergencies.'
+	);
+	await expect(page.getByRole('heading', { name: 'Important safety notice' })).toBeFocused();
+	await expect(page).toHaveURL('/login');
+	await expectLightSurface(memo);
+	await page.setViewportSize({ width: 390, height: 844 });
+	for (const theme of ['light', 'dark']) {
+		if (theme === 'dark')
+			await page.getByRole('button', { name: 'Switch to dark mode', exact: true }).click();
+		expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+			true
+		);
+		await page.screenshot({
+			path: test.info().outputPath(`emergency-memo-${theme}.png`),
+			fullPage: true,
+			animations: 'disabled'
+		});
+	}
+	await page.getByRole('button', { name: 'I understand. Continue', exact: true }).click();
 	await expect(page).toHaveURL('/user/dashboard');
 	await page.request.post('/api/auth/sign-out', { headers, data: {} });
 	for (const role of ['admin', 'dispatcher']) {
@@ -171,9 +195,13 @@ test('one login page routes Users and protects staff destinations with MFA', asy
 			);
 		}
 		await expect(page.getByLabel('Authenticator code', { exact: true })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Important safety notice' })).toHaveCount(0);
 		await expect(page).toHaveURL('/login');
 		await page.getByLabel('Authenticator code', { exact: true }).fill(totp(setup!.totpURI));
 		await page.getByRole('button', { name: 'Verify code', exact: true }).click();
+		await expect(page.getByRole('heading', { name: 'Important safety notice' })).toBeVisible();
+		await expect(page).toHaveURL('/login');
+		await page.getByRole('button', { name: 'I understand. Continue', exact: true }).click();
 		await expect(page).toHaveURL(role === 'admin' ? '/admin' : '/dispatch');
 		await page.request.post('/api/auth/sign-out', { headers, data: {} });
 	}

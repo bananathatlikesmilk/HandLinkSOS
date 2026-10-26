@@ -230,6 +230,10 @@
 <div class="sharing-screen">
 	<h1 class="user-title text-center">Share location to your circle</h1>
 	<p class="user-copy mt-4 text-center">Choose recipients and a sharing timer.</p>
+	<p class="user-copy mt-3 text-center">
+		If a recipient sends SOS for you while sharing is active, your last shared location is saved in
+		the incident for authorized staff.
+	</p>
 	<div class="sharing-symbol"><MapPin size={42} strokeWidth={1.1} /></div>
 	{#if loading}<p class="user-copy mt-6" role="status">Loading location sharing…</p>
 	{:else if active}

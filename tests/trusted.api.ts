@@ -10,6 +10,121 @@ import {
 } from './incident-fixture';
 import { challenge, invitation } from './trusted-fixture';
 
+for (const [relationship, matching] of [
+	['Parent', 'Child'],
+	['Grandparent', 'Grandchild'],
+	['Friend', 'Friend'],
+	['Caregiver', 'Care recipient'],
+	['Teacher', 'Student']
+]) {
+	test(`trusted relationships must match ${relationship} with ${matching} before mutual approval`, async ({
+		request,
+		playwright
+	}) => {
+		const owner = await provision();
+		const scanner = await provision();
+		await login(request, owner);
+		const other = await playwright.request.newContext({ baseURL: origin });
+		try {
+			await login(other, scanner);
+			const qr = await invitation(request, owner.id);
+			const scan = await other.post('/api/trusted/scan', {
+				headers,
+				data: { token: qr.token, relationship }
+			});
+			expect(scan.status()).toBe(201);
+			const { connection } = await scan.json();
+			const path = `/api/trusted/${connection.id}`;
+			const approval = { action: 'approve', invitationId: qr.invitationId, requestMutual: true };
+			const mismatch = await request.patch(path, {
+				headers,
+				data: { ...approval, mutualRelationship: 'Relative' }
+			});
+			expect(mismatch.status()).toBe(422);
+			expect((await mismatch.json()).message).toContain(`must be ${matching}`);
+			const unchanged = (await (await request.get('/api/trusted')).json()).connections;
+			expect(unchanged).toHaveLength(1);
+			expect(unchanged[0].status).toBe('pending');
+			const result = await request.patch(path, {
+				headers,
+				data: { ...approval, mutualRelationship: matching }
+			});
+			expect(result.status()).toBe(200);
+			const { mutualRequest } = await result.json();
+			expect(mutualRequest).toMatchObject({ relationship: matching, status: 'pending' });
+			expect(
+				(await request.post('/api/incidents', { headers, data: sos(scanner.profileId) })).status()
+			).toBe(403);
+			expect(
+				(
+					await other.patch(`/api/trusted/${mutualRequest.id}`, {
+						headers,
+						data: { action: 'approve', invitationId: mutualRequest.invitationId }
+					})
+				).status()
+			).toBe(200);
+		} finally {
+			await other.dispose();
+		}
+	});
+}
+
+test('separate QR scans enforce matching relationships and legacy mismatches cannot be approved', async ({
+	request,
+	playwright
+}) => {
+	const owner = await provision();
+	const scanner = await provision();
+	await login(request, owner);
+	const other = await playwright.request.newContext({ baseURL: origin });
+	try {
+		await login(other, scanner);
+		const first = await invitation(request, owner.id);
+		const scan = await other.post('/api/trusted/scan', {
+			headers,
+			data: { token: first.token, relationship: 'Parent' }
+		});
+		expect(scan.status()).toBe(201);
+		const { connection } = await scan.json();
+		const second = await invitation(other, scanner.id);
+		const mismatch = await request.post('/api/trusted/scan', {
+			headers,
+			data: { token: second.token, relationship: 'Friend' }
+		});
+		expect(mismatch.status()).toBe(422);
+		expect((await mismatch.json()).message).toContain('must be Child');
+		const matching = await request.post('/api/trusted/scan', {
+			headers,
+			data: { token: second.token, relationship: 'Child' }
+		});
+		expect(matching.status()).toBe(201);
+		const reverse = (await matching.json()).connection;
+		const db = database();
+		try {
+			// Reproduce inconsistent records created before matching was enforced.
+			db.prepare('UPDATE trusted_connection SET relationship=? WHERE id=?').run(
+				'Friend',
+				reverse.id
+			);
+		} finally {
+			db.close();
+		}
+		const approval = await request.patch(`/api/trusted/${connection.id}`, {
+			headers,
+			data: { action: 'approve', invitationId: first.invitationId }
+		});
+		expect(approval.status()).toBe(409);
+		expect((await approval.json()).message).toContain('relationships do not match');
+		expect(
+			(await (await request.get('/api/trusted')).json()).connections.every(
+				(item: { status: string }) => item.status === 'pending'
+			)
+		).toBe(true);
+	} finally {
+		await other.dispose();
+	}
+});
+
 test('QR endpoints enforce roles, CSRF, strict fields, mail failure invalidation, and issuance limits', async ({
 	request,
 	playwright

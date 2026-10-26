@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import IncidentCancellationReview from './IncidentCancellationReview.svelte';
+	import IncidentLocation from './IncidentLocation.svelte';
 	import AiReportSummary from './AiReportSummary.svelte';
 	import { page as route } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -367,10 +368,6 @@
 							<td>{date(selected.incident.endedAt)}</td>
 						</tr>
 						<tr>
-							<th scope="row">Location</th>
-							<td>{selected.locationLabel || 'GPS coordinates below'}</td>
-						</tr>
-						<tr>
 							<th scope="row">Caller name</th>
 							<td>{selected.incident.callerName}</td>
 						</tr>
@@ -386,13 +383,14 @@
 							<th scope="row">Response duration</th>
 							<td>{duration(selected.incident.startedAt, selected.incident.endedAt)}</td>
 						</tr>
-						<tr>
-							<th scope="row">Latitude / longitude</th>
-							<td>{selected.latitude}, {selected.longitude}</td>
-						</tr>
 					</tbody>
 				</table>
 				{#key selected.incident.id}
+					<IncidentLocation
+						personLocation={selected.personLocation}
+						reporter={selected}
+						isForSomeoneElse={selected.incident.isForSomeoneElse}
+					/>
 					<IncidentCancellationReview
 						incidentId={selected.incident.id}
 						cancellation={selected.cancellation}

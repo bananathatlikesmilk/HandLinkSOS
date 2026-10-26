@@ -1,5 +1,12 @@
 export type IncidentStatus = 'Not assigned' | 'In progress' | 'On route' | 'Resolved';
 
+export type IncidentLocationSnapshot = {
+	latitude: number;
+	longitude: number;
+	accuracy: number;
+	recordedAt: string;
+};
+
 export type IncidentCancellation = {
 	id: string;
 	reason: string;
@@ -31,6 +38,7 @@ export type IncidentDetail = {
 	cancellation: IncidentCancellation | null;
 	incident: IncidentSummary;
 	personal: null | {
+		personLocation: IncidentLocationSnapshot | null;
 		firstName: string;
 		lastName: string;
 		age: number;
@@ -59,6 +67,7 @@ export type IncidentDetail = {
 };
 
 export type IncidentReport = {
+	personLocation: IncidentLocationSnapshot | null;
 	addenda: {
 		id: string;
 		notes: string;

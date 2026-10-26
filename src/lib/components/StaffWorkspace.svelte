@@ -2,6 +2,7 @@
 	/* eslint svelte/no-navigation-without-resolve: "off" -- beforeNavigate supplies a destination already resolved by SvelteKit. */
 	import { onMount } from 'svelte';
 	import IncidentCancellationReview from './IncidentCancellationReview.svelte';
+	import IncidentLocation from './IncidentLocation.svelte';
 	import { resolve } from '$app/paths';
 	import { beforeNavigate, goto } from '$app/navigation';
 	import { page as route, navigating as navigationState } from '$app/state';
@@ -558,13 +559,18 @@
 					{#if detail === 'Personal information'}
 						<table class="detail-table">
 							<tbody>
-								{#each [['First name', selected.personal.firstName], ['Last name', selected.personal.lastName], ['Age', selected.personal.age + ' years'], ['Sex', selected.personal.sex], ['Longitude', selected.personal.longitude.toFixed(6)], ['Latitude', selected.personal.latitude.toFixed(6)], ['Phone number', selected.personal.phone], ['Status', selected.incident.status], ['Incident reference', selected.incident.reference], ['Pinged location', selected.personal.locationLabel]] as [label, value] (label)}<tr
+								{#each [['First name', selected.personal.firstName], ['Last name', selected.personal.lastName], ['Age', selected.personal.age + ' years'], ['Sex', selected.personal.sex], ['Phone number', selected.personal.phone], ['Status', selected.incident.status], ['Incident reference', selected.incident.reference]] as [label, value] (label)}<tr
 									>
 										<th scope="row">{label}</th>
 										<td>{value || 'Not provided'}</td>
 									</tr>{/each}
 							</tbody>
 						</table>
+						<IncidentLocation
+							personLocation={selected.personal.personLocation}
+							reporter={selected.personal}
+							isForSomeoneElse={selected.incident.isForSomeoneElse}
+						/>
 					{:else if detail === 'Medical information'}
 						{#if selected.medical}<table class="detail-table">
 								<tbody>

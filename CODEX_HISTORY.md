@@ -277,3 +277,52 @@ The following entries have fuller assistant/tool evidence in the available conve
 **Investigation and explanation:** Checked available integrations, searched the plugin directory, and consulted official OpenAI documentation at https://learn.chatgpt.com/docs/projects. No available tool or discovered plugin supported replacing uploaded files in that ChatGPT Project. Local AGENTS.md already instructs future relevant sessions to maintain repository records; this does not run a background sync or grant access to ChatGPT Project storage. The IDE workspace and a ChatGPT Project are separate sources of context.
 
 **Outcome and limits:** No remote upload or automatic synchronization was configured. The practical current workflow is to replace uploaded PROJECT_CONTEXT.md and CODEX_HISTORY.md in the ChatGPT Project after meaningful updates. Additional plugins may exist in https://chatgpt.com/plugins, but this search did not establish a suitable integration. Updated these two local records only; no application changes, commit, or push occurred.
+### H029 — Python unavailable while attempting another authorship rewrite
+
+**Date:** 21 October 2026, Asia/Manila.
+
+**User report:** `python -m git_filter_repo` reached the Windows Store placeholder, `pip` was not recognized, and `winget install Python.Python` found no package.
+
+**Evidence and explanation:** Command discovery found only WindowsApps aliases for `python` and `python3`, with no `py` or `pip` on PATH. This does not rule out an installation elsewhere. Local `main` at `11d905b` already has the requested author and committer names and email throughout its history. Another rewrite is unnecessary. Consulted current git-filter-repo installation documentation through Context7, including its Windows stub warning and destructive `--force` behavior.
+
+**Outcome and limits:** Provided Python setup guidance as optional tooling work. No software was installed, no history was rewritten, and no remote state was checked. WinGet could not execute from the agent environment, so current package availability was not verified. Updated PROJECT_CONTEXT.md and this history only; application tests were unnecessary.
+
+### H030 — Require matching trusted-profile relationships
+
+**Date:** 26 October 2026, Asia/Manila.
+
+**User request and clarification:** Relationship inputs did not match when adding a trusted profile. Asked whether the issue concerned appearance, options, or direction. The user clarified that the two people could pick conflicting relationships and must choose matching ones.
+
+**Cause and decision:** The two directional trusted connections previously accepted independent strings. Selecting Parent in one direction did not prevent Friend in the reverse direction. Matching means complementary roles, not identical text in every case: Parent/Child, Grandparent/Grandchild, Teacher/Student, and Caregiver/Care recipient. Symmetric roles such as Friend and Sibling match themselves. Approval of a relationship does not automatically grant reciprocal SOS permission.
+
+**Changes:** Added shared relationship rules in `src/lib/relationships.ts`; reused them in RelationshipSelect and server trusted-profile operations. Added Student and Care recipient to complete existing directional options. The mutual-request dropdown offers the matching role by default, and incoming requests explicitly label the sender's relationship. Server-side guards reject conflicting mutual requests and separate reverse QR scans before changes are committed. Approval also rejects conflicting active reverse records, including older inconsistencies, with removal/rescan guidance. Existing records, custom strings, incident history, and separate-consent rules are preserved; no migration runs. Corrected one Windows-1252 dash in the previous history entry to its UTF-8 equivalent without changing its text.
+
+**Verification:** Type checking completed with zero errors/warnings; targeted ESLint and Prettier checks passed. The isolated trusted-profile suite passed 15 of 16 tests, including all seven added relationship API/browser checks and existing consent, revocation, rollback, and QR-image coverage. The unchanged live-camera simulation initially timed out waiting for QR decoding, then passed its focused rerun (one test). This is an intermittent test result, not a clean first full-suite pass. No Svelte MCP autofixer was available, so that tool was not run.
+
+**Scope:** Local changes only; no commit, push, deployment, APK build, real-account database changes, or physical-camera verification. Existing already-approved inconsistent records are not silently rewritten or revoked. Further approval is blocked until their mismatch is corrected by removal and a new request.
+
+### H031 — Emergency-use warning after login
+
+**Date:** 26 October 2026, Asia/Manila.
+
+**User request:** Add a strict compliance warning when logging into the app, like a memo stating that HandLink is for emergencies and must not be played with.
+
+**Approach and changes:** Reused the shared login component rather than adding separate User/staff implementations. Successful interactive login now displays an “Emergency use only” screen before role-based navigation. The warning says HandLink is not a game, prohibits prank alerts/false reports/test emergencies, requires accurate information, and explains that false alerts waste resources and delay real help. An explicit “I understand. Continue” button proceeds through the existing server-selected destination. Staff MFA still completes before the memo. The memo receives keyboard focus after rendering, supports light/dark mode, and uses readable mobile text and a large button. No extra timer is added.
+
+**Verification:** Consulted current Svelte documentation through Context7 for focusing a newly rendered element after `tick`. Svelte checking finished with zero errors/warnings; targeted ESLint and Prettier checks passed. The production build succeeded within the isolated browser-test run. Two focused browser tests passed, covering User/Admin/Dispatcher login, MFA ordering, acknowledgment before normal navigation, mobile light/dark rendering, light-theme contrast, persistent login after reopening, and logout. Inspected both mobile memo screenshots. Updated existing interactive-login tests to acknowledge the new screen; the remaining test suites were not rerun. The Svelte MCP autofixer was unavailable and was not run.
+
+**Scope and limits:** This is a client-side login notice, not a recorded legal agreement or server authorization rule. Authentication has already established the session when the memo appears; direct navigation/reload can use that session. Returning users with saved sessions are not forced through another login or acknowledgment. No automatic suspension, fines, audit record, database migration, commit, push, deployment, or APK packaging was introduced. The prior trusted-relationship edits remain intact. Updated PROJECT_CONTEXT.md and appended this history entry.
+
+### H032 — Include the represented person's shared location in SOS reports
+
+**Date:** 26 October 2026, Asia/Manila.
+
+**User request:** When sending SOS for a trusted person, include that person's location because the emergency is theirs rather than the reporter's.
+
+**Investigation and decision:** SOS previously stored only the sending device's coordinates, although voluntary recipient-controlled sharing existed separately. Reused that consent model instead of silently enabling another phone's GPS. On-behalf SOS now captures the latest shared point only when the represented person is active, the reporter is currently eligible, and an active/unexpired/uncancelled sharing session explicitly includes that reporter without revocation. The server selects the point; clients cannot submit a beneficiary snapshot. No arbitrary proximity between caller and beneficiary is assumed.
+
+**Changes:** Added the `incident_person_location` table and additive migration `0014`, storing coordinates, accuracy, and recorded time under the incident ID. The snapshot insert is inside the existing immediate incident transaction. Original reporter coordinates and idempotency comparisons remain unchanged. Added shared location-policy lookup and authorized report/detail serialization. Reused one IncidentLocation component in dispatcher details and reports to prioritize the beneficiary snapshot, display its timestamp and accuracy, warn that it is not live tracking, and label reporter coordinates separately. Missing/expired/revoked/unselected sharing does not block SOS; staff see an explicit unavailable message. Updated SOS text and the sharing screen's notice about saving location in emergency reports.
+
+**Preservation and limits:** Existing incidents are not rewritten or backfilled. Retried SOS requests return the same original snapshot even if the person moves or sharing ends. Stopping sharing prevents new snapshots but does not erase historical incident data. Current self-SOS behavior remains intact. This does not start or guarantee background tracking, retrieve location from an offline phone, or bypass OS/recipient permissions. The sender still needs device location under the existing SOS flow. The extra table can remain when rolling back to older application code; no destructive rollback or real-data migration was performed.
+
+**Verification:** The focused migration test passed: legacy incident rows remain unchanged, and invalid coordinates/accuracy, missing incident references, and duplicate snapshots are rejected. All 13 isolated API/browser tests passed, including eight new location tests and five existing incident regressions. Coverage includes active sharing, snapshot preservation after movement/stop/retry, dispatcher details/reports, missing/expired/cancelled/revoked/unselected sharing, no-point sessions, forged client snapshots, self SOS, authorization, assignment, and audit rollback. The production build completed within that test run. Type checking passed with zero errors/warnings and targeted lint/format checks passed. The Svelte MCP autofixer was unavailable and was not run. No push, deployment, APK packaging, or physical-device test occurred.

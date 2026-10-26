@@ -248,6 +248,26 @@ export const incident = sqliteTable(
 	]
 );
 
+export const incidentPersonLocation = sqliteTable(
+	'incident_person_location',
+	{
+		incidentId: text('incident_id')
+			.primaryKey()
+			.references(() => incident.id, { onDelete: 'restrict' }),
+		latitude: real('latitude').notNull(),
+		longitude: real('longitude').notNull(),
+		accuracy: real('accuracy').notNull(),
+		recordedAt: integer('recorded_at', { mode: 'timestamp_ms' }).notNull()
+	},
+	(t) => [
+		check(
+			'incident_person_coordinates',
+			sql`${t.latitude} between -90 and 90 and ${t.longitude} between -180 and 180`
+		),
+		check('incident_person_accuracy', sql`${t.accuracy} >= 0`)
+	]
+);
+
 export const incidentReference = sqliteTable(
 	'incident_reference',
 	{

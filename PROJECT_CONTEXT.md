@@ -10,6 +10,8 @@ Recovery files are stored locally under `.git/history-backups/2026-10-21T01-49-0
 
 ## How to use this file on a phone
 
+**Python troubleshooting, 21 October 2026:** A later local inspection found only Windows Store aliases for `python`/`python3`; `py` and `pip` were not on PATH. The user's `winget install Python.Python` found no matching package. No Python installation or additional history rewrite was performed. Local `main` at `11d905b` already uses the requested author and committer identity throughout; installing Python is unnecessary for the completed authorship task. This inspection did not query the remote.
+
 **ChatGPT synchronization limitation (21 October 2026):** Repository instructions require future relevant Codex sessions to maintain these local records. This is not a background synchronization service. No available connected tool or discovered plugin provides upload/replacement of files inside the user's ChatGPT Project. No automatic sync was configured. For now, replace the uploaded context/history files manually when using the phone. Official documentation distinguishes local folder access from ChatGPT Project sources: [Projects and chats](https://learn.chatgpt.com/docs/projects).
 
 **Git publishing update, 21 October 2026:** The user committed the authorship-maintenance records and explicitly authorized a force-push. Published local `main` at `3f48759` to `origin/main` using an explicit force-with-lease against the previously observed remote commit. A fresh remote query confirmed the matching full commit ID. All 44 published commits use `bananathatlikesmilk` as author and committer. This supersedes the earlier unpushed/uncommitted status above; it does not verify production deployment. The records of this publishing action remain local, uncommitted edits.
@@ -36,6 +38,8 @@ HandLink supports emergency reporting, authorized incident handling, trusted-pro
 | Admin      | Complete staff MFA; manage staff accounts and account status; view dashboard counts and authorized reports; choose the system-wide AI provider. Admin access does not automatically grant the assigned dispatcher's full personal/medical-detail view. |
 
 All roles use `/login`. Older role-specific login routes redirect into the shared flow. The server chooses the destination from the authenticated role and session, not a role chosen in the browser. Public signup cannot assign a staff role.
+
+**Emergency-use memo, 26 October 2026 (local source):** After a successful interactive login, the shared `AuthScreen.svelte` shows an emergency-only warning for Users, Dispatchers, and Admins. Staff with MFA see it after successful code verification. It prohibits prank SOS alerts, false reports, and test emergencies, asks for accurate details, and explains that misuse can delay urgent help. The user clicks “I understand. Continue” before the normal role-based navigation. Focus moves to the memo heading; light/dark styling and mobile layout are supported. Existing saved sessions continue normally without repeating the login flow. This is a client-side warning, not a server-enforced compliance gate, recorded agreement, or automatic penalty mechanism. Direct navigation or a reload after authentication can use the already established session; no acknowledgment is stored in the database.
 
 ## 2. Architecture and technologies
 
@@ -106,12 +110,14 @@ These are declared major versions and inspected architecture, not a claim that e
 
 QR invitations use random tokens with hashed server storage, expiration, and controlled approval. Scanning does not immediately grant full access. Permission is directional: the owner approves a requester to send SOS for the owner. Reciprocal access is not automatic.
 
+**Relationship matching, 26 October 2026 (local source):** Both directions of a trusted connection must use matching roles. Parent pairs with Child; Grandparent with Grandchild; Teacher with Student; Caregiver with Care recipient. Sibling, Spouse/Partner, Relative, Friend, and Other pair with the same role. The shared rules live in `src/lib/relationships.ts`. The mutual-request dropdown defaults to, and offers only, the matching role. The server checks mutual requests, separate reverse QR scans, and approvals against any active reverse connection inside the existing transactions. Mismatches return a clear error without partial approval or consuming a new QR invitation. Separate consent remains required for each SOS permission. Existing records and incident snapshots are not rewritten; inconsistent older connections must be removed and requested again before a new approval. Legacy custom relationship strings remain supported and must match exactly in the reverse direction.
+
 The dashboard searches approved SOS profiles by name, ignoring case and surrounding spaces. A separate star saves the requester's favorite on that trusted connection. Favorites sort first, then names alphabetically. Favorites persist across reloads/devices; they do not grant approval, transmit SOS, or share the preference with another account. Revoked/inactive relationships stop appearing as eligible targets.
 
 ### SOS and incident handling
 
 1. The User chooses self or an approved trusted profile.
-2. The reporting device obtains location.
+2. The reporting device obtains its location. For on-behalf SOS, the server also snapshots the represented person's latest location if that person has an active sharing session explicitly including the reporter.
 3. A five-second cancellation countdown starts; an explicit immediate-send option can bypass the remaining countdown.
 4. The client sends JSON with a retry/idempotency key.
 5. The server rechecks current identity, account/profile availability, trusted permission, input, rate/duplicate rules, and prior request state.
@@ -120,7 +126,7 @@ The dashboard searches approved SOS profiles by name, ignoring case and surround
 8. An MFA-verified Dispatcher verbally confirms and claims an unassigned case. Ownership checks control sensitive detail access and changes.
 9. Normal status progression is `Not assigned`, `In progress`, `On route`, `Resolved`.
 
-**Location limitation:** on-behalf SOS uses the location of the device sending the alert. It does not automatically request, receive, or track the represented person's live location. Separate voluntary sharing exists but is not automatically linked to that incident.
+**Location behavior updated 26 October 2026:** On-behalf SOS now saves a separate snapshot of the represented person's latest eligible shared location in `incident_person_location`, including coordinates, accuracy, and recorded time. The sharing session must be active, unexpired, uncancelled, and explicitly include the reporter as a non-revoked recipient; current sharing eligibility is checked too. No new permission or remote GPS capture is forced. If no eligible point exists, SOS still sends and staff see an explicit unavailable message. The reporter's original coordinates remain separately labeled; they are not presented as the beneficiary's location. Assigned-dispatcher details and authorized reports show the snapshot, its timestamp/accuracy, and a warning that the person may have moved. Older reports have no invented beneficiary location. A snapshot remains unchanged through retries, later movement, stopping sharing, and expiration; it is historical incident data, not live tracking. The reporting device still needs location access under the existing SOS client flow. The sharing screen explains this incident use before sharing begins. Additive migration `0014_incident_person_location` must run before the updated server is deployed; older app code can ignore the extra table without deleting it. No production migration or deployment was performed in this session.
 
 Personal, medical, and registered emergency-contact details are limited to the assigned Dispatcher after confirmation. Reports have separate authorized oversight behavior; do not assume every report viewer gets every medical field.
 
@@ -164,13 +170,15 @@ Source of truth: `src/lib/server/db/schema.ts`, `handlink.schema.ts`, and applie
 | Bootstrap and administration | `seed_history` records one-time provisioning; `account_audit` records management actions; `ai_provider_setting` stores the system-wide provider selection/revision.                                                               |
 | User information             | `user_profile` references `user`; `medical_profile` references the profile; `emergency_contact` references the profile and can hold controlled linked-account information.                                                        |
 | Trusted access               | `qr_invitation`, `trusted_connection`, `verification_request`: invitations, directional approval/revocation, relationships, and verification workflows. `trusted_connection.requester_favorite` stores personal SOS favorites.    |
-| Incidents                    | `incident`, `incident_reference`, `incident_event`, `incident_addendum`, `incident_cancellation`: caller/beneficiary, coordinates, status, human-readable reference, timeline, note history, addenda, and cancellation decisions. |
+| Incidents                    | `incident`, `incident_reference`, `incident_event`, `incident_addendum`, `incident_cancellation`, `incident_person_location`: caller/beneficiary, reporter coordinates, optional beneficiary shared-location snapshot with accuracy/time, status, reference, timeline, note history, addenda, and cancellation decisions. |
 | AI/reporting                 | `ai_summary_request` records generation/version/request state; `report` stores the resulting summary and review linkage. Incident reports also derive information from incidents/events.                                          |
 | Location                     | `location_session`, `location_recipient`, `location_point`: sharing ownership, permitted recipients, expiration/revocation, and reported points.                                                                                  |
 | Notifications                | `device`, `notification`, `push_delivery`: session-linked device registrations, User notifications, delivery attempts/leases/states. These tables contain private identifiers and must not be exported into context files.        |
 | Other schema                 | `call_session` is schema-only scaffolding for potential provider calls; `task` is an existing starter table, not a central SOS feature.                                                                                           |
 
 Migrations are committed from `0000` through **`0013_sos_favorites.sql`**, registered in `drizzle/meta/_journal.json`. Notable later changes include staff MFA, account management, cancellation, AI reports, short incident references, Android push, seed history, incident addenda, AI-provider settings, and SOS favorites.
+
+Local work on 26 October adds and registers **`0014_incident_person_location.sql`** for beneficiary location snapshots. It passed isolated migration/API tests but has not been committed or applied to the production database.
 
 `scripts/migrate.mjs` backs up existing databases into ignored `.db-backups`, applies migrations, and checks foreign keys. `scripts/seed.ts` seeds the initial Admin once using `seed_history` and an immediate transaction. The bootstrap Admin is email-verified by provisioning; staff MFA still applies. This differs from the separate interactive admin-creation path described in older docs. Never infer that a local Admin exists on the production database.
 

@@ -5,6 +5,7 @@ import { alias } from 'drizzle-orm/sqlite-core';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import type { z } from 'zod';
 import type { TrustedConnection } from '../trusted.ts';
+import { matchingRelationship } from '../relationships.ts';
 import { db } from './db/index.ts';
 import {
 	profile,
@@ -325,6 +326,22 @@ export function scanQr(event: RequestEvent, input: z.output<typeof qrScanInput>)
 				error(422, 'This QR code has expired. Ask for a new code.');
 			if (existing && existing.status !== 'revoked')
 				error(409, 'You already have a pending or approved connection with this person.');
+			const reverse = tx
+				.select()
+				.from(trustedConnection)
+				.where(
+					and(
+						eq(trustedConnection.ownerProfileId, ownProfile.id),
+						eq(trustedConnection.requesterProfileId, invitation.ownerProfileId),
+						ne(trustedConnection.status, 'revoked')
+					)
+				)
+				.get();
+			if (reverse && input.relationship !== matchingRelationship(reverse.relationship))
+				error(
+					422,
+					`Your relationship must be ${matchingRelationship(reverse.relationship)} to match their ${reverse.relationship} relationship.`
+				);
 			checkConnectionLimit(ownProfile.id);
 			checkConnectionLimit(invitation.ownerProfileId);
 			const now = new Date();
@@ -392,22 +409,37 @@ export function changeTrusted(
 					error(409, 'This request changed or was removed. Refresh before approving.');
 				if (!activeProfile(connection.requesterProfileId))
 					error(403, 'The requesting account is unavailable.');
+				const expectedRelationship = matchingRelationship(connection.relationship);
+				if (input.requestMutual && input.mutualRelationship !== expectedRelationship)
+					error(
+						422,
+						`Your relationship must be ${expectedRelationship} to match their ${connection.relationship} relationship.`
+					);
+				const reverse = tx
+					.select()
+					.from(trustedConnection)
+					.where(
+						and(
+							eq(trustedConnection.ownerProfileId, connection.requesterProfileId),
+							eq(trustedConnection.requesterProfileId, connection.ownerProfileId)
+						)
+					)
+					.get();
+				if (
+					reverse &&
+					reverse.status !== 'revoked' &&
+					reverse.relationship !== expectedRelationship
+				)
+					error(
+						409,
+						'The relationships do not match. Remove the incorrect request and scan a new QR code.'
+					);
 				if (connection.status === 'pending') {
 					tx.update(trustedConnection)
 						.set({ status: 'approved', approvedAt: new Date() })
 						.where(eq(trustedConnection.id, connection.id))
 						.run();
 					if (input.requestMutual) {
-						const reverse = tx
-							.select()
-							.from(trustedConnection)
-							.where(
-								and(
-									eq(trustedConnection.ownerProfileId, connection.requesterProfileId),
-									eq(trustedConnection.requesterProfileId, connection.ownerProfileId)
-								)
-							)
-							.get();
 						if (reverse && reverse.status !== 'revoked')
 							mutualRequest = connectionSummary(reverse.id);
 						else {
