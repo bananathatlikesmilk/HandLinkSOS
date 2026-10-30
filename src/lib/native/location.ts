@@ -1,6 +1,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
 import type { SharedLocationSession } from '../sharing.ts';
+import { assertAccessEnabled } from './permissions.ts';
 
 export type NativeSharingStatus = { active: boolean; sessionId: string | null; message: string };
 interface NativeLocationPlugin {
@@ -14,15 +15,18 @@ let nativeGeneration = 0;
 export const nativeBackgroundAvailable = () => Capacitor.getPlatform() === 'android';
 
 export async function getDeviceLocation(): Promise<GeolocationPosition> {
+	await assertAccessEnabled('location');
 	if (Capacitor.isNativePlatform()) {
 		const permission = await Geolocation.requestPermissions({ permissions: ['location'] });
 		if (permission.location !== 'granted' && permission.coarseLocation !== 'granted')
 			throw new Error('Allow location access in Android settings, then try again.');
+		await assertAccessEnabled('location');
 		const result = await Geolocation.getCurrentPosition({
 			enableHighAccuracy: permission.location === 'granted',
 			maximumAge: 0,
 			timeout: 15000
 		});
+		await assertAccessEnabled('location');
 		return {
 			timestamp: result.timestamp,
 			coords: {
@@ -40,7 +44,7 @@ export async function getDeviceLocation(): Promise<GeolocationPosition> {
 	}
 	if (!navigator.geolocation)
 		throw new Error('Location is unavailable. Use HTTPS or localhost and allow location access.');
-	return new Promise((resolve, reject) =>
+	const position = await new Promise<GeolocationPosition>((resolve, reject) =>
 		navigator.geolocation.getCurrentPosition(
 			resolve,
 			() =>
@@ -52,9 +56,12 @@ export async function getDeviceLocation(): Promise<GeolocationPosition> {
 			{ enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
 		)
 	);
+	await assertAccessEnabled('location');
+	return position;
 }
 
 export async function enableNativeSharing(session: SharedLocationSession) {
+	await assertAccessEnabled('location');
 	if (!nativeBackgroundAvailable())
 		throw new Error('Screen-off updates require the HandLink Android app.');
 	if (
@@ -65,6 +72,12 @@ export async function enableNativeSharing(session: SharedLocationSession) {
 		throw new Error('Start an active sharing session first.');
 	const generation = ++nativeGeneration;
 	await locationService.start({ sessionId: session.id, expiresAt: Date.parse(session.expiresAt) });
+	try {
+		await assertAccessEnabled('location');
+	} catch (error) {
+		await disableNativeSharing();
+		throw error;
+	}
 	if (generation !== nativeGeneration) {
 		await locationService.stop();
 		throw new Error('Screen-off update request was cancelled.');

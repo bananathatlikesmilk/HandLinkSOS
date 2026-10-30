@@ -26,6 +26,7 @@ public class HandLinkLocationPlugin extends Plugin {
 
     @PluginMethod
     public void start(PluginCall call) {
+        if (!HandLinkPermissionsPlugin.isAccessEnabled(getContext(), "location")) { call.reject("Location access is off in HandLink Settings."); return; }
         if (!granted(Manifest.permission.ACCESS_FINE_LOCATION) && !granted(Manifest.permission.ACCESS_COARSE_LOCATION)) {
             requestPermissionForAlias("location", call, "locationPermissionResult");
             return;
@@ -56,6 +57,7 @@ public class HandLinkLocationPlugin extends Plugin {
     }
 
     private void launchService(PluginCall call) {
+        if (!HandLinkPermissionsPlugin.isAccessEnabled(getContext(), "location")) { call.reject("Location access is off in HandLink Settings."); return; }
         if (!NotificationManagerCompat.from(getContext()).areNotificationsEnabled()) {
             call.reject("Allow HandLink notifications in Android settings so ongoing location sharing stays visible.");
             return;

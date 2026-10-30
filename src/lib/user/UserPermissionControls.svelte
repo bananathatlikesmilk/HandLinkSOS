@@ -4,6 +4,7 @@
 	import { Camera, MapPin, PanelsTopLeft } from '@lucide/svelte';
 	import {
 		getPermissionStatus,
+		setAccessEnabled,
 		nativePermissionsAvailable,
 		openApplicationSettings,
 		openOverlaySettings,
@@ -14,6 +15,8 @@
 		type AccessState,
 		type UserPermissionStatus
 	} from '#lib/native/permissions.ts';
+	import { apiRequest } from '#lib/client/request.ts';
+	import type { SharingState } from '#lib/sharing.ts';
 
 	let { disabled = false }: { disabled?: boolean } = $props();
 	let status = $state<UserPermissionStatus | null>(null);
@@ -24,10 +27,13 @@
 	let mounted = false;
 	let accountId: string | undefined;
 	const unavailable = $derived(disabled || working || !status);
+	const locationOn = $derived(status?.location === 'granted' && status?.locationEnabled !== false);
+	const cameraOn = $derived(status?.camera === 'granted' && status?.cameraEnabled !== false);
 	function current() {
 		return mounted && accountId === page.data.account?.id;
 	}
-	function accessLabel(access: AccessState | undefined) {
+	function accessLabel(access: AccessState | undefined, enabled = true) {
+		if (!enabled) return 'Off';
 		return access === 'granted'
 			? 'On'
 			: access === 'denied'
@@ -38,14 +44,33 @@
 	}
 	async function changeAccess(kind: 'location' | 'camera') {
 		if (!status) return;
-		if (status[kind] === 'granted') {
-			notice = native
-				? 'Change ' + kind + ' permission in Android Settings, then return here.'
-				: 'Change ' + kind + ' permission in your browser site settings, then return here.';
-			if (native) await openApplicationSettings();
-			return;
+		if (status[kind] === 'granted' && status[`${kind}Enabled`] !== false) {
+			status = await setAccessEnabled(kind, false);
+			if (kind === 'location') {
+				try {
+					const sharing = await apiRequest<SharingState>('/api/sharing');
+					if (!current()) return;
+					if (sharing.own?.status === 'active')
+						await apiRequest(`/api/sharing/${sharing.own.id}/stop`, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: '{}'
+						});
+					window.dispatchEvent(new Event('user-sharing-change'));
+				} catch {
+					throw new Error(
+						'Location use is off. Could not end existing sharing; retry Stop sharing to remove access to the last shared point.'
+					);
+				}
+			}
+			notice = `${kind === 'camera' ? 'Camera' : 'Location'} use is off in HandLink.`;
+			return status;
 		}
-		const result = await (kind === 'camera' ? requestCameraAccess() : requestLocationAccess());
+		status = await setAccessEnabled(kind, true);
+		const result =
+			status[kind] === 'granted'
+				? status
+				: await (kind === 'camera' ? requestCameraAccess() : requestLocationAccess());
 		if (!current()) return;
 		status = result;
 		if (result[kind] !== 'granted') {
@@ -111,27 +136,29 @@
 
 <section class="user-panel mt-6" aria-labelledby="permissions-heading" aria-busy={working}>
 	<h2 id="permissions-heading" class="text-base font-medium">App permissions</h2>
-	<p class="user-copy mt-2 text-sm">Manage location, camera, and the floating button.</p>
+	<p class="user-copy mt-2 text-sm">
+		Turn HandLink access on or off. Your phone still controls system permissions.
+	</p>
 	<div class="permission-row">
 		<div class="permission-details">
 			<MapPin size={20} aria-hidden="true" />
 			<div>
 				<h3>Location access</h3>
-				<p>For SOS and sharing.</p>
+				<p>For SOS and sharing. Off ends active sharing.</p>
 			</div>
 		</div>
 		<div class="permission-control">
-			<span class="permission-state" class:on={status?.location === 'granted'}
-				>{accessLabel(status?.location)}</span
+			<span class="permission-state" class:on={locationOn}
+				>{accessLabel(status?.location, status?.locationEnabled !== false)}</span
 			><input
 				type="checkbox"
 				role="switch"
 				aria-label="Location access"
-				checked={status?.location === 'granted'}
+				checked={locationOn}
 				class="permission-switch"
 				disabled={unavailable}
 				onchange={(event) => {
-					event.currentTarget.checked = status?.location === 'granted';
+					event.currentTarget.checked = locationOn;
 					void run(() => changeAccess('location'));
 				}}
 			/>
@@ -146,17 +173,17 @@
 			</div>
 		</div>
 		<div class="permission-control">
-			<span class="permission-state" class:on={status?.camera === 'granted'}
-				>{accessLabel(status?.camera)}</span
+			<span class="permission-state" class:on={cameraOn}
+				>{accessLabel(status?.camera, status?.cameraEnabled !== false)}</span
 			><input
 				type="checkbox"
 				role="switch"
 				aria-label="Camera access"
-				checked={status?.camera === 'granted'}
+				checked={cameraOn}
 				class="permission-switch"
 				disabled={unavailable}
 				onchange={(event) => {
-					event.currentTarget.checked = status?.camera === 'granted';
+					event.currentTarget.checked = cameraOn;
 					void run(() => changeAccess('camera'));
 				}}
 			/>

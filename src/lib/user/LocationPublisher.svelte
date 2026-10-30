@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { apiRequest, ApiRequestError } from '#lib/client/request.ts';
 	import type { SharingState } from '#lib/sharing.ts';
+	import { assertAccessEnabled } from '#lib/native/permissions.ts';
 	import {
 		getDeviceLocation,
 		getNativeSharingStatus,
@@ -30,6 +31,13 @@
 				!document.hidden &&
 				accountId === initialAccount;
 			try {
+				try {
+					await assertAccessEnabled('location');
+				} catch {
+					await disableNativeSharing();
+					error = '';
+					return;
+				}
 				const state = await apiRequest<SharingState>('/api/sharing', { signal: controller.signal });
 				if (!current()) return;
 				const session = state.own;
@@ -95,6 +103,11 @@
 		void publish();
 		const sharingChanged = () => refresh();
 		window.addEventListener('user-sharing-change', sharingChanged);
+		window.addEventListener('handlink-access-change', sharingChanged);
+		const accessStorageChanged = (event: StorageEvent) => {
+			if (event.key === null || event.key === 'handlink:access:location') refresh();
+		};
+		window.addEventListener('storage', accessStorageChanged);
 		const interval = setInterval(publish, 15000);
 		return () => {
 			stopped = true;
@@ -104,6 +117,8 @@
 			request?.abort();
 			clearInterval(interval);
 			window.removeEventListener('user-sharing-change', sharingChanged);
+			window.removeEventListener('handlink-access-change', sharingChanged);
+			window.removeEventListener('storage', accessStorageChanged);
 			refresh = () => {};
 		};
 	});

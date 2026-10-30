@@ -121,7 +121,7 @@ public class LocationSharingService extends Service implements LocationListener 
     }
 
     private boolean hasLocationPermission() {
-        return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        return HandLinkPermissionsPlugin.isAccessEnabled(this, "location") && (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED);
     }
 
     private Notification notification(String message, boolean ongoing) {
@@ -145,7 +145,7 @@ public class LocationSharingService extends Service implements LocationListener 
     }
 
     @Override public void onLocationChanged(Location location) {
-        if (closed || System.currentTimeMillis() >= expiresAt) return;
+        if (closed || !HandLinkPermissionsPlugin.isAccessEnabled(this, "location") || System.currentTimeMillis() >= expiresAt) return;
         latest = new Location(location);
         synchronize();
     }
@@ -198,7 +198,7 @@ public class LocationSharingService extends Service implements LocationListener 
     }
 
     private JSONObject request(String method, String path, JSONObject body) throws Exception {
-        if (closed) return null;
+        if (closed || !HandLinkPermissionsPlugin.isAccessEnabled(this, "location")) return null;
         String cookies = CookieManager.getInstance().getCookie(origin);
         if (cookies == null || cookies.isEmpty()) { main.post(() -> end("Sign in again. Screen-off updates stopped.", false)); return null; }
         HttpURLConnection http = (HttpURLConnection) new URL(origin + path).openConnection();

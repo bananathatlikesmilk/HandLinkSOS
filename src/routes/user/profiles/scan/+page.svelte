@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { onDestroy } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
+	import { assertAccessEnabled } from '#lib/native/permissions.ts';
 	import { Camera, ImagePlus, ScanLine, UserPlus } from '@lucide/svelte';
 	import { BrowserQRCodeReader, type IScannerControls } from '@zxing/browser';
 	import { apiRequest } from '#lib/client/request.ts';
@@ -58,6 +59,8 @@
 		error = '';
 		stagedToken = '';
 		try {
+			await assertAccessEnabled('camera');
+			if (!alive || request !== generation) return;
 			const nextControls = await new BrowserQRCodeReader().decodeFromVideoDevice(
 				undefined,
 				video,
@@ -80,11 +83,13 @@
 			controls = nextControls;
 			starting = false;
 			scanning = true;
-		} catch {
+		} catch (cause) {
 			if (!alive || request !== generation) return;
 			stopCamera();
 			error =
-				'Camera unavailable or permission denied. Allow camera access, or upload a QR image instead.';
+				cause instanceof Error && cause.message.includes('off in HandLink')
+					? cause.message
+					: 'Camera unavailable or permission denied. Allow camera access, or upload a QR image instead.';
 		}
 	}
 	async function readImage(event: Event) {
@@ -136,6 +141,21 @@
 			if (alive) submitting = false;
 		}
 	}
+	onMount(() => {
+		const accessChanged = (event: Event) => {
+			const { kind, enabled } = (event as CustomEvent<{ kind: string; enabled: boolean }>).detail;
+			if (kind === 'camera' && !enabled) stopCamera();
+		};
+		window.addEventListener('handlink-access-change', accessChanged);
+		const storageChanged = (event: StorageEvent) => {
+			if (event.key === null || event.key === 'handlink:access:camera') stopCamera();
+		};
+		window.addEventListener('storage', storageChanged);
+		return () => {
+			window.removeEventListener('handlink-access-change', accessChanged);
+			window.removeEventListener('storage', storageChanged);
+		};
+	});
 	onDestroy(() => {
 		alive = false;
 		stopCamera();

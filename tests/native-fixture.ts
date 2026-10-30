@@ -22,8 +22,10 @@ export async function installNativeBridge(
 			appSettingsOpens: 0,
 			locationRequests: 0,
 			permissionDeny: options.denyInitialPermissions ?? false,
-			cameraPermission: 'prompt',
-			locationPermission: 'prompt',
+			cameraPermission: localStorage.getItem('fixture:camera-permission') ?? 'prompt',
+			locationPermission: localStorage.getItem('fixture:location-permission') ?? 'prompt',
+			locationEnabled: localStorage.getItem('fixture:access:location') !== 'off',
+			cameraEnabled: localStorage.getItem('fixture:access:camera') !== 'off',
 			overlayAllowed: false,
 			overlayActive: false,
 			overlayStarts: 0,
@@ -47,6 +49,7 @@ export async function installNativeBridge(
 						name: 'HandLinkPermissions',
 						methods: [
 							'status',
+							'setAccessEnabled',
 							'requestInitial',
 							'requestCamera',
 							'requestLocation',
@@ -98,8 +101,24 @@ export async function installNativeBridge(
 						pushListeners[options.eventName] = callback;
 					return 'fixture-listener';
 				},
-				async nativePromise(plugin: string, method: string, options?: { sessionId: string }) {
+				async nativePromise(
+					plugin: string,
+					method: string,
+					options?: { sessionId?: string; kind?: 'location' | 'camera'; enabled?: boolean }
+				) {
 					if (plugin === 'HandLinkPermissions') {
+						if (method === 'setAccessEnabled' && options?.kind) {
+							state[`${options.kind}Enabled`] = options.enabled === true;
+							localStorage.setItem(
+								`fixture:access:${options.kind}`,
+								options.enabled ? 'on' : 'off'
+							);
+							if (options.kind === 'location' && !options.enabled) {
+								state.active = false;
+								state.sessionId = null;
+								state.stops++;
+							}
+						}
 						const initialKey = 'fixture:initial-permissions';
 						if (method === 'requestInitial' && !localStorage.getItem(initialKey)) {
 							state.initialRequests++;
@@ -131,9 +150,14 @@ export async function installNativeBridge(
 							state.overlayStops++;
 							state.overlayActive = false;
 						}
+						// Android grants survive WebView navigation; keep the simulation consistent.
+						localStorage.setItem('fixture:camera-permission', state.cameraPermission);
+						localStorage.setItem('fixture:location-permission', state.locationPermission);
 						return {
 							location: state.locationPermission,
 							camera: state.cameraPermission,
+							cameraEnabled: state.cameraEnabled,
+							locationEnabled: state.locationEnabled,
 							overlayAllowed: state.overlayAllowed,
 							overlayActive: state.overlayActive,
 							initialRequested: Boolean(localStorage.getItem(initialKey)),
@@ -198,7 +222,7 @@ export async function installNativeBridge(
 								state.finishStart = resolve;
 							});
 						state.active = true;
-						state.sessionId = options!.sessionId;
+						state.sessionId = options!.sessionId!;
 						state.message = 'Screen-off updates active.';
 					}
 				}
@@ -208,6 +232,8 @@ export async function installNativeBridge(
 }
 
 export type NativeTestState = {
+	locationEnabled: boolean;
+	cameraEnabled: boolean;
 	appSettingsOpens: number;
 	initialRequests: number;
 	cameraRequests: number;

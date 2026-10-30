@@ -1,6 +1,103 @@
 import { expect, test, type Page } from '@playwright/test';
 import { login, password, provision } from './incident-fixture';
 import { installNativeBridge, type NativeTestState } from './native-fixture';
+import { approveSharingTrust, sharingInput } from './sharing-fixture';
+
+test('location Off persists, ends sharing and blocks SOS GPS until enabled again', async ({
+	page
+}) => {
+	await installNativeBridge(page);
+	const account = await provision();
+	const recipient = await provision();
+	approveSharingTrust(account.profileId, recipient.profileId);
+	await login(page.request, account);
+	const sharing = sharingInput(recipient.id);
+	expect(
+		(
+			await page.request.post('/api/sharing', {
+				headers: { Origin: 'http://127.0.0.1:4174' },
+				data: sharing
+			})
+		).status()
+	).toBe(200);
+	await page.goto('/user/settings');
+	const location = page.getByRole('switch', { name: 'Location access', exact: true });
+	await expect(location).toBeChecked();
+	await page.evaluate((id) => {
+		const device = (globalThis as unknown as { __handlinkNativeTest: NativeTestState })
+			.__handlinkNativeTest;
+		device.active = true;
+		device.sessionId = id;
+	}, sharing.id);
+	await location.click();
+	await expect(location).not.toBeChecked();
+	await expect
+		.poll(async () => (await (await page.request.get('/api/sharing')).json()).own.status)
+		.toBe('cancelled');
+	expect((await state(page)).active).toBe(false);
+	expect((await state(page)).locationPermission).toBe('granted');
+	expect((await state(page)).appSettingsOpens).toBe(0);
+	await page.reload();
+	await expect(location).not.toBeChecked();
+	await page.goto(`/user/sos?profile=${account.profileId}`);
+	await expect(page.getByRole('alert')).toContainText(
+		'Location access is off in HandLink Settings.'
+	);
+	expect((await state(page)).gpsChecks).toBe(0);
+	await page.goto('/user/settings');
+	await location.click();
+	await expect(location).toBeChecked();
+	expect((await (await page.request.get('/api/sharing')).json()).own.status).toBe('cancelled');
+});
+
+test('web camera Off stops an active QR stream in another tab and stays off after reload', async ({
+	page
+}) => {
+	await page.addInitScript(() =>
+		localStorage.setItem('handlink:initial-device-permissions:v1', 'attempted')
+	);
+	await page.context().grantPermissions(['camera']);
+	await login(page.request, await provision());
+	await page.addInitScript(() => {
+		Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+			value: async () => {
+				const canvas = document.createElement('canvas');
+				canvas.getContext('2d')!.fillRect(0, 0, canvas.width, canvas.height);
+				const stream = canvas.captureStream(10);
+				Object.assign(globalThis, { __permissionTracks: stream.getTracks() });
+				return stream;
+			}
+		});
+	});
+	await page.goto('/user/profiles/scan');
+	await page.getByRole('button', { name: 'Start camera', exact: true }).click();
+	await expect(page.getByRole('button', { name: 'Stop camera', exact: true })).toBeVisible();
+	const settings = await page.context().newPage();
+	try {
+		await settings.goto('/user/settings');
+		const camera = settings.getByRole('switch', { name: 'Camera access', exact: true });
+		await expect(camera).toBeChecked();
+		await camera.click();
+		await expect(camera).not.toBeChecked();
+		await expect
+			.poll(() =>
+				page.evaluate(() =>
+					(
+						globalThis as unknown as { __permissionTracks: MediaStreamTrack[] }
+					).__permissionTracks.every((track) => track.readyState === 'ended')
+				)
+			)
+			.toBe(true);
+		await settings.reload();
+		await expect(camera).not.toBeChecked();
+		await page.getByRole('button', { name: 'Start camera', exact: true }).click();
+		await expect(page.getByRole('alert')).toContainText(
+			'Camera access is off in HandLink Settings.'
+		);
+	} finally {
+		await settings.close();
+	}
+});
 
 const state = (page: Page) =>
 	page.evaluate(
@@ -201,7 +298,7 @@ test('camera permission check releases all browser camera tracks immediately', a
 	).toEqual({ video: true, audio: false });
 });
 
-test('permission switches show actual state and open settings when blocked or disabling', async ({
+test('permission switches disable app use directly and open system settings only when blocked', async ({
 	page
 }) => {
 	await installNativeBridge(page, { denyInitialPermissions: true });
@@ -228,7 +325,16 @@ test('permission switches show actual state and open settings when blocked or di
 	});
 	await expect(camera).toBeChecked();
 	await camera.click();
-	await expect.poll(async () => (await state(page)).appSettingsOpens).toBe(2);
+	await expect(camera).not.toBeChecked();
+	expect((await state(page)).appSettingsOpens).toBe(1);
+	expect((await state(page)).cameraPermission).toBe('granted');
+	expect((await state(page)).cameraEnabled).toBe(false);
+	await page.goto('/user/profiles/scan');
+	await page.getByRole('button', { name: 'Start camera', exact: true }).click();
+	await expect(page.getByRole('alert')).toContainText('Camera access is off in HandLink Settings.');
+	await page.goto('/user/settings');
+	await expect(camera).not.toBeChecked();
+	await camera.click();
 	await expect(camera).toBeChecked();
 	await page.evaluate(() => {
 		const device = (globalThis as unknown as { __handlinkNativeTest: NativeTestState })

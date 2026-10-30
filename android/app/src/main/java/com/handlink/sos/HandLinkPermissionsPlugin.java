@@ -2,6 +2,7 @@ package com.handlink.sos;
 
 import android.Manifest;
 import android.content.Intent;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
@@ -29,6 +30,24 @@ import com.getcapacitor.annotation.PermissionCallback;
     @Permission(alias = "notifications", strings = {Manifest.permission.POST_NOTIFICATIONS})
 })
 public class HandLinkPermissionsPlugin extends Plugin {
+    public static boolean isAccessEnabled(Context context, String kind) {
+        return context.getSharedPreferences("handlink_permissions", 0).getBoolean(kind + "_enabled", true);
+    }
+
+    @PluginMethod
+    public void setAccessEnabled(PluginCall call) {
+        String kind = call.getString("kind", "");
+        Boolean enabled = call.getBoolean("enabled");
+        if ((!"location".equals(kind) && !"camera".equals(kind)) || enabled == null) {
+            call.reject("Choose location or camera and an on/off value.");
+            return;
+        }
+        getActivity().runOnUiThread(() -> {
+            getContext().getSharedPreferences("handlink_permissions", 0).edit().putBoolean(kind + "_enabled", enabled).apply();
+            if (!enabled && "location".equals(kind)) getContext().stopService(new Intent(getContext(), LocationSharingService.class));
+            call.resolve(snapshot());
+        });
+    }
     private boolean permissionPending;
     private int overlayGeneration;
     private int initialGeneration;
@@ -54,6 +73,8 @@ public class HandLinkPermissionsPlugin extends Plugin {
         JSObject result = new JSObject();
         result.put("location", access("location", locationGranted()));
         result.put("camera", access("camera", granted(Manifest.permission.CAMERA)));
+        result.put("locationEnabled", isAccessEnabled(getContext(), "location"));
+        result.put("cameraEnabled", isAccessEnabled(getContext(), "camera"));
         result.put("overlayAllowed", overlayAllowed);
         result.put("overlayActive", overlayAllowed && HandLinkOverlayService.isActive());
         result.put("initialRequested", getContext().getSharedPreferences("handlink_permissions", 0).getBoolean("initial_requested", false));
@@ -76,7 +97,7 @@ public class HandLinkPermissionsPlugin extends Plugin {
             getContext().getSharedPreferences("handlink_permissions", 0).edit().putBoolean("initial_requested", true).apply();
             permissionPending = true;
             call.getData().put("initialGeneration", ++initialGeneration);
-            if (!locationGranted()) requestPermissionForAlias("location", call, "locationResult");
+            if (isAccessEnabled(getContext(), "location") && !locationGranted()) requestPermissionForAlias("location", call, "locationResult");
             else requestCameraNext(call);
         });
     }
@@ -84,6 +105,7 @@ public class HandLinkPermissionsPlugin extends Plugin {
     @PluginMethod
     public void requestLocation(PluginCall call) {
         getActivity().runOnUiThread(() -> {
+            if (!isAccessEnabled(getContext(), "location")) { call.reject("Location access is off in HandLink Settings."); return; }
             if (permissionPending) { call.reject("Another permission request is open."); return; }
             if (locationGranted()) { call.resolve(snapshot()); return; }
             permissionPending = true;
@@ -102,13 +124,14 @@ public class HandLinkPermissionsPlugin extends Plugin {
             finishPermissions(call);
             return;
         }
-        if (granted(Manifest.permission.CAMERA)) finishPermissions(call);
+        if (!isAccessEnabled(getContext(), "camera") || granted(Manifest.permission.CAMERA)) finishPermissions(call);
         else requestPermissionForAlias("camera", call, "cameraResult");
     }
 
     @PluginMethod
     public void requestCamera(PluginCall call) {
         getActivity().runOnUiThread(() -> {
+            if (!isAccessEnabled(getContext(), "camera")) { call.reject("Camera access is off in HandLink Settings."); return; }
             if (permissionPending) { call.reject("Another permission request is open."); return; }
             permissionPending = true;
             requestCameraNext(call);
