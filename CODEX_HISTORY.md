@@ -463,3 +463,13 @@ The following entries have fuller assistant/tool evidence in the available conve
 **Final diagnostics:** `pnpm check` finished with zero errors and zero warnings. Documentation formatting and `git diff --check` passed.
 
 **Records and deployment:** Updated PROJECT_CONTEXT.md and docs/android.md. Baseline `000ad29` already contains the preceding native Location changes. This new correction needs hosted web deployment; it does not require another APK rebuild when using the previously refreshed native app. No commit, push, deployment, APK packaging, physical-device actions, production-data access, or secret access occurred.
+
+### H042 — Camera switch still reports that the installed APK lacks native controls
+
+**Date:** 1 November 2026, Asia/Manila.
+
+**User report and explanation:** Pressing Camera access shows the new APK-update instruction. That instruction is emitted when the installed native bridge reports `setAccessEnabled` as unimplemented. The server can update hosted UI but cannot add a Java method to an already installed APK. No evidence established that the user installed the verified new artifact; the running phone binary itself remains inaccessible.
+
+**Verification and concrete next step:** Rechecked the existing local debug APK: 6,529,310 bytes and SHA-256 `BCC85DC9AB41B1BF018BB223A0A802D1FA9729D17F8E0C8B20AF808F90B828B7`, matching H040's signature/DEX-verified build. Created and hash-checked an identical copy named `android/app/build/outputs/apk/debug/handlink-permissions-2026-11-01.apk` so the user can distinguish it from older downloads. This is a renamed copy, not a new build or code change. Instruct the user to install this file over the existing app, then close and reopen HandLink. ADB returned no connected devices, so the agent could not install it or verify the installed package.
+
+**Scope and records:** Camera behavior remains unchanged. Updated PROJECT_CONTEXT.md and appended this entry. Baseline `894f314` now contains the preceding Location-toggle fix. No application tests were rerun because application code did not change. No new APK compilation, commit, push, deployment, physical-device installation, secret access, or production-record access occurred.
