@@ -25,6 +25,7 @@ export async function installNativeBridge(
 			cameraPermission: localStorage.getItem('fixture:camera-permission') ?? 'prompt',
 			locationPermission: localStorage.getItem('fixture:location-permission') ?? 'prompt',
 			locationEnabled: localStorage.getItem('fixture:access:location') !== 'off',
+			locationServicesEnabled: localStorage.getItem('fixture:location-services') !== 'off',
 			cameraEnabled: localStorage.getItem('fixture:access:camera') !== 'off',
 			overlayAllowed: false,
 			overlayActive: false,
@@ -79,6 +80,7 @@ export async function installNativeBridge(
 						name: 'Geolocation',
 						methods: [
 							{ name: 'requestPermissions', rtype: 'promise' },
+							{ name: 'checkPermissions', rtype: 'promise' },
 							{ name: 'getCurrentPosition', rtype: 'promise' }
 						]
 					},
@@ -186,6 +188,19 @@ export async function installNativeBridge(
 						return;
 					}
 					if (plugin === 'Geolocation') {
+						localStorage.setItem(
+							'fixture:location-services',
+							state.locationServicesEnabled ? 'on' : 'off'
+						);
+						if (!state.locationServicesEnabled)
+							throw Object.assign(new Error('Location services are not enabled.'), {
+								code: 'OS-PLUG-GLOC-0007'
+							});
+						if (method === 'checkPermissions')
+							return {
+								location: state.locationPermission,
+								coarseLocation: state.locationPermission
+							};
 						if (method === 'requestPermissions')
 							return { location: 'granted', coarseLocation: 'granted' };
 						state.gpsChecks++;
@@ -232,6 +247,7 @@ export async function installNativeBridge(
 }
 
 export type NativeTestState = {
+	locationServicesEnabled: boolean;
 	locationEnabled: boolean;
 	cameraEnabled: boolean;
 	appSettingsOpens: number;

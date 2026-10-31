@@ -1,10 +1,12 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Geolocation } from '@capacitor/geolocation';
 
 export type AccessState = 'granted' | 'denied' | 'prompt' | 'unknown';
 export type UserPermissionStatus = {
 	location: AccessState;
 	camera: AccessState;
 	locationEnabled?: boolean;
+	locationServicesEnabled?: boolean | null;
 	cameraEnabled?: boolean;
 	overlayAllowed: boolean;
 	overlayActive: boolean;
@@ -32,6 +34,27 @@ let webAttempted = false;
 let overlayGeneration = 0;
 let initialGeneration = 0;
 export const nativePermissionsAvailable = () => Capacitor.getPlatform() === 'android';
+
+export const locationServicesOffMessage =
+	'Phone Location is off. Turn on Location in Quick Settings or phone Settings, then tap Retry location.';
+export function locationServicesDisabled(cause: unknown) {
+	return (
+		!!cause &&
+		typeof cause === 'object' &&
+		'code' in cause &&
+		['OS-PLUG-GLOC-0007', 'OS-PLUG-GLOC-0017'].includes(String(cause.code))
+	);
+}
+export async function getLocationServicesEnabled(): Promise<boolean | null> {
+	if (!Capacitor.isNativePlatform()) return null;
+	try {
+		// Read-only: no coordinate capture, grant request, or system-setting change.
+		await Geolocation.checkPermissions();
+		return true;
+	} catch (cause) {
+		return locationServicesDisabled(cause) ? false : null;
+	}
+}
 
 type AccessKind = 'location' | 'camera';
 const webAccess = { location: true, camera: true };
@@ -77,13 +100,20 @@ async function browserState(name: PermissionName): Promise<AccessState> {
 	}
 }
 export async function getPermissionStatus(): Promise<UserPermissionStatus> {
-	if (nativePermissionsAvailable()) return permissions.status();
+	if (nativePermissionsAvailable()) {
+		const [status, locationServicesEnabled] = await Promise.all([
+			permissions.status(),
+			getLocationServicesEnabled()
+		]);
+		return { ...status, locationServicesEnabled };
+	}
 	const [location, camera] = await Promise.all([
 		browserState('geolocation'),
 		browserState('camera' as PermissionName)
 	]);
 	return {
 		location,
+		locationServicesEnabled: null,
 		camera,
 		locationEnabled: webAccessEnabled('location'),
 		cameraEnabled: webAccessEnabled('camera'),

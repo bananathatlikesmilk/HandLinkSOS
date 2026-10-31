@@ -1,7 +1,12 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
 import type { SharedLocationSession } from '../sharing.ts';
-import { assertAccessEnabled } from './permissions.ts';
+import {
+	assertAccessEnabled,
+	getLocationServicesEnabled,
+	locationServicesDisabled,
+	locationServicesOffMessage
+} from './permissions.ts';
 
 export type NativeSharingStatus = { active: boolean; sessionId: string | null; message: string };
 interface NativeLocationPlugin {
@@ -17,30 +22,37 @@ export const nativeBackgroundAvailable = () => Capacitor.getPlatform() === 'andr
 export async function getDeviceLocation(): Promise<GeolocationPosition> {
 	await assertAccessEnabled('location');
 	if (Capacitor.isNativePlatform()) {
-		const permission = await Geolocation.requestPermissions({ permissions: ['location'] });
-		if (permission.location !== 'granted' && permission.coarseLocation !== 'granted')
-			throw new Error('Allow location access in Android settings, then try again.');
-		await assertAccessEnabled('location');
-		const result = await Geolocation.getCurrentPosition({
-			enableHighAccuracy: permission.location === 'granted',
-			maximumAge: 0,
-			timeout: 15000
-		});
-		await assertAccessEnabled('location');
-		return {
-			timestamp: result.timestamp,
-			coords: {
-				latitude: result.coords.latitude,
-				longitude: result.coords.longitude,
-				accuracy: result.coords.accuracy,
-				altitude: result.coords.altitude,
-				altitudeAccuracy: result.coords.altitudeAccuracy ?? null,
-				heading: result.coords.heading,
-				speed: result.coords.speed,
-				toJSON: () => ({ ...result.coords })
-			},
-			toJSON: () => ({ ...result })
-		};
+		if ((await getLocationServicesEnabled()) === false) throw new Error(locationServicesOffMessage);
+		try {
+			const permission = await Geolocation.requestPermissions({ permissions: ['location'] });
+			if (permission.location !== 'granted' && permission.coarseLocation !== 'granted')
+				throw new Error('Allow location access in Android settings, then try again.');
+			await assertAccessEnabled('location');
+			const result = await Geolocation.getCurrentPosition({
+				enableHighAccuracy: permission.location === 'granted',
+				maximumAge: 0,
+				timeout: 15000
+			});
+			await assertAccessEnabled('location');
+			return {
+				timestamp: result.timestamp,
+				coords: {
+					latitude: result.coords.latitude,
+					longitude: result.coords.longitude,
+					accuracy: result.coords.accuracy,
+					altitude: result.coords.altitude,
+					altitudeAccuracy: result.coords.altitudeAccuracy ?? null,
+					heading: result.coords.heading,
+					speed: result.coords.speed,
+					toJSON: () => ({ ...result.coords })
+				},
+				toJSON: () => ({ ...result })
+			};
+		} catch (cause) {
+			// Services can also be switched off after the preflight, while GPS is resolving.
+			if (locationServicesDisabled(cause)) throw new Error(locationServicesOffMessage, { cause });
+			throw cause;
+		}
 	}
 	if (!navigator.geolocation)
 		throw new Error('Location is unavailable. Use HTTPS or localhost and allow location access.');

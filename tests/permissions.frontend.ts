@@ -50,6 +50,49 @@ test('location Off persists, ends sharing and blocks SOS GPS until enabled again
 	expect((await (await page.request.get('/api/sharing')).json()).own.status).toBe('cancelled');
 });
 
+test('phone Location off is shown separately and SOS recovers after enabling it', async ({
+	page
+}) => {
+	await installNativeBridge(page);
+	const account = await provision();
+	await login(page.request, account);
+	await page.goto('/user/settings');
+	const toggle = page.getByRole('switch', { name: 'Location access', exact: true });
+	await expect(toggle).toBeChecked();
+	await page.evaluate(() => {
+		(
+			globalThis as unknown as { __handlinkNativeTest: NativeTestState }
+		).__handlinkNativeTest.locationServicesEnabled = false;
+	});
+	// No focus event: visible settings must notice Quick Settings changes by polling too.
+	await expect(page.getByText('Phone Location off', { exact: true })).toBeVisible();
+	await expect(toggle).toBeChecked();
+	await toggle.click();
+	await expect(toggle).not.toBeChecked();
+	await toggle.click();
+	await expect(toggle).toBeChecked();
+	await expect(page.getByText('Phone Location off', { exact: true })).toBeVisible();
+	let submissions = 0;
+	page.on('request', (request) => {
+		if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/incidents')
+			submissions++;
+	});
+	await page.goto(`/user/sos?profile=${account.profileId}`);
+	await expect(page.getByRole('alert')).toContainText('Phone Location is off. Turn on Location');
+	expect((await state(page)).gpsChecks).toBe(0);
+	expect(submissions).toBe(0);
+	await page.evaluate(() => {
+		(
+			globalThis as unknown as { __handlinkNativeTest: NativeTestState }
+		).__handlinkNativeTest.locationServicesEnabled = true;
+	});
+	await page.getByRole('button', { name: 'Retry location', exact: true }).click();
+	await expect(page.getByRole('timer')).toBeVisible();
+	await page.getByRole('button', { name: 'Cancel SOS', exact: true }).click();
+	expect(submissions).toBe(0);
+	expect((await state(page)).dialerAttempts).toBe(0);
+});
+
 test('saved access can be switched off after phone permissions are revoked', async ({ page }) => {
 	await installNativeBridge(page);
 	await login(page.request, await provision());

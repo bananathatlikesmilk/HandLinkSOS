@@ -26,6 +26,7 @@
 	let notice = $state('');
 	let mounted = false;
 	let accountId: string | undefined;
+	let actionGeneration = 0;
 	const unavailable = $derived(disabled || working || !status);
 	// The switch owns saved app use; OS grants and hardware activity are separate states.
 	const locationOn = $derived(!!status && status.locationEnabled !== false);
@@ -46,7 +47,7 @@
 	async function changeAccess(kind: 'location' | 'camera', enabled: boolean) {
 		if (!status) return;
 		if (!enabled) {
-			status = await setAccessEnabled(kind, false);
+			status = { ...status, ...(await setAccessEnabled(kind, false)) };
 			if (kind === 'location') {
 				try {
 					const sharing = await apiRequest<SharingState>('/api/sharing');
@@ -67,13 +68,13 @@
 			notice = `${kind === 'camera' ? 'Camera' : 'Location'} use is off in HandLink.`;
 			return status;
 		}
-		status = await setAccessEnabled(kind, true);
+		status = { ...status, ...(await setAccessEnabled(kind, true)) };
 		const result =
 			status[kind] === 'granted'
 				? status
 				: await (kind === 'camera' ? requestCameraAccess() : requestLocationAccess());
 		if (!current()) return;
-		status = result;
+		status = { ...status, ...result };
 		if (result[kind] !== 'granted') {
 			notice = native
 				? 'HandLink use is on. Allow ' + kind + ' in Android Settings.'
@@ -99,13 +100,14 @@
 	async function run(action: () => Promise<UserPermissionStatus | void>) {
 		if (!current() || disabled || working) return;
 		working = true;
+		actionGeneration++;
 		error = '';
 		notice = '';
 		try {
 			const result = await action();
 			if (!current()) return;
 			const latest = result ?? (await getPermissionStatus());
-			if (current()) status = latest;
+			if (current()) status = { ...status, ...latest };
 		} catch (cause) {
 			if (current())
 				error = cause instanceof Error ? cause.message : 'Could not check permissions. Try again.';
@@ -121,14 +123,28 @@
 		mounted = true;
 		accountId = page.data.account?.id;
 		native = nativePermissionsAvailable();
-		const refresh = () => {
-			if (!document.hidden) void run(getPermissionStatus);
+		let refreshing = false;
+		const refresh = async () => {
+			if (!current() || document.hidden || working || disabled || refreshing) return;
+			refreshing = true;
+			const generation = actionGeneration;
+			try {
+				const latest = await getPermissionStatus();
+				if (current() && !working && generation === actionGeneration) status = latest;
+			} catch (cause) {
+				if (current() && !status)
+					error = cause instanceof Error ? cause.message : 'Could not check permissions.';
+			} finally {
+				refreshing = false;
+			}
 		};
-		refresh();
+		void refresh();
+		const timer = window.setInterval(() => void refresh(), 3000);
 		window.addEventListener('focus', refresh);
 		document.addEventListener('visibilitychange', refresh);
 		return () => {
 			mounted = false;
+			window.clearInterval(timer);
 			window.removeEventListener('focus', refresh);
 			document.removeEventListener('visibilitychange', refresh);
 		};
@@ -147,11 +163,27 @@
 			<div>
 				<h3>Location access</h3>
 				<p>For SOS and sharing. Off ends active sharing.</p>
+				{#if status?.locationServicesEnabled === false}<p class="user-error">
+						Phone Location is off. Turn it on in Quick Settings or phone Settings.
+					</p>
+				{:else if status && status.locationServicesEnabled == null}<p>
+						Phone Location cannot be checked here. Make sure it is on before SOS.
+					</p>{/if}
 			</div>
 		</div>
 		<div class="permission-control">
-			<span class="permission-state" class:on={locationOn}
-				>{accessLabel(status?.location, status?.locationEnabled !== false)}</span
+			<span
+				class="permission-state"
+				class:on={locationOn &&
+					status?.locationServicesEnabled === true &&
+					status?.location === 'granted'}
+				>{!locationOn
+					? 'Off'
+					: status?.locationServicesEnabled === false
+						? 'Phone Location off'
+						: status?.locationServicesEnabled == null
+							? 'Phone Location not checked'
+							: accessLabel(status?.location, true)}</span
 			><input
 				type="checkbox"
 				role="switch"

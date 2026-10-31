@@ -101,6 +101,8 @@ The button stays visible when HandLink is minimized or swiped away from Recent a
 
 The manifest declares `CAMERA`, `SYSTEM_ALERT_WINDOW`, and the `specialUse` foreground-service type with its required permission and subtype explanation. A future Google Play release must declare and justify this foreground-service use for review. Rebuild/install the APK and deploy the web code together; the native bridge is not present in older APKs. Verify initial grant/denial, permanent denial and settings recovery, QR scanning, approximate GPS, special-access return, drag/tap/hide, notification hide, background display, logout, and permission revocation on a physical phone. Automated bridge simulations do not prove these OS behaviors.
 
+The Settings page also checks the phone's master Location service through the installed Geolocation plugin. When disabled, it shows **Phone Location off** even if HandLink's saved access switch remains enabled. It refreshes every three seconds while visible and when returning to the app. This is a read-only check, not a GPS capture or permission request. SOS checks this state before requesting coordinates and gives instructions to enable phone Location and tap **Retry location**. If the user enables Location, Retry resumes normal acquisition and countdown. Browsers cannot reliably read the master phone switch; they show it as not checked. This shared web-code update does not require a new native bridge method or Java change, but must be deployed to the hosted server.
+
 ## Physical-phone checks
 
 - Confirm login, logout, QR camera access, SOS countdown/cancellation, and sharing start/stop work in the installed app.
