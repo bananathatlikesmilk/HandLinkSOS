@@ -114,7 +114,11 @@ test('filtered reports export every matching page without crossing staff or LGU 
 	const loadingTask = getDocument({ data: new Uint8Array(bytes), useSystemFonts: false });
 	const parsed = await loadingTask.promise;
 	const firstPage = await (await parsed.getPage(1)).getTextContent();
-	const firstPageText = firstPage.items.map((item) => ('str' in item ? item.str : '')).join(' ');
+	const firstPageText = firstPage.items
+		.map((item) => ('str' in item ? item.str : ''))
+		.join(' ')
+		.replace(/\s+/g, ' ')
+		.trim();
 	expect(firstPageText).toContain(references[0]);
 	expect(firstPageText).toContain('Person in distress: Peña Reyes');
 	expect(firstPageText).toContain('SYNTHETIC-NOTES');
@@ -132,7 +136,15 @@ test('filtered reports export every matching page without crossing staff or LGU 
 	for (let i = 1; i <= parsed.numPages; i++) {
 		const page = await parsed.getPage(i);
 		const text = await page.getTextContent();
-		content += text.items.map((item) => ('str' in item ? item.str : '')).join(' ') + '\n';
+		const pageText = text.items
+			.map((item) => ('str' in item ? item.str : ''))
+			.join(' ')
+			.replace(/\s+/g, ' ')
+			.trim();
+		expect(pageText).toContain(`Page ${i} of ${parsed.numPages}`);
+		expect(pageText).toContain('HANDLINK');
+		expect(pageText).toContain('INCIDENT REPORTS | HL-');
+		content += pageText + '\n';
 	}
 	expect(parsed.numPages).toBeGreaterThanOrEqual(22);
 	for (const reference of references) expect(content).toContain(reference);

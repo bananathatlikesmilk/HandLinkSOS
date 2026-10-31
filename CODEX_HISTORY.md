@@ -509,3 +509,17 @@ The following entries have fuller assistant/tool evidence in the available conve
 **Final diagnostics:** `pnpm check` reported zero errors and zero warnings. Source/document formatting and `git diff --check` passed.
 
 **Records and limits:** Updated PROJECT_CONTEXT.md and this history. Local baseline `994ef42` already contains Select all sharing. No schema, native bridge, APK, permission, or deployment change was made. No commit, push, production-data read, or credential access occurred. Deploy the server/web correction and generate a new PDF; previously downloaded files do not update automatically.
+
+### H046 — Make exported PDF reports easier to read and more polished
+
+**Date:** 1 November 2026, Asia/Manila.
+
+**User objective:** Improve how PDF reports look. Preserved the preceding requirement that actual incident data begins on page one, along with full notes/addenda and exact timestamps/durations.
+
+**Changes:** Reworked only PDF presentation using the existing PDFKit renderer. Added a teal HandLink wordmark/header, compact shaded filter metadata, larger case references, aligned two-column labeled detail cells, and clear section bars. AI summaries have a distinct amber section while retaining saved review/staleness information. Every page carries the incident reference, confidentiality text, and Page X of Y. Long table values are measured and wrapped; table rows stay together, headings reserve room for following text, and long notes/addenda flow onto continuation pages. Existing Noto Sans regular/bold fonts are embedded from the installed font package; no new dependencies or external services were added. Query filters, exported field scope, and authorization behavior are unchanged.
+
+**Verification and fixes:** Consulted current PDFKit documentation through Context7 for buffered pages, page counts, and text measurements. The initial check exposed a formatting-sensitive text assertion, which now normalizes PDF whitespace while preserving field/value checks. Also corrected footer positioning so drawing a page number outside the body margin cannot generate an extra page. The final isolated export/browser test passed, including every filtered incident, notes/addenda, accented names, exact time/duration, page-one case data, access restrictions, export limit, and mobile download. Extended that test to assert the header, incident identification, and correct page count on every page. Visually inspected the first detail page and its notes/addenda/AI continuation; the synthetic 22-case fixture produced 44 populated report pages with clear footers. Production build, targeted ESLint, and source formatting passed. Final local type diagnostics are recorded below.
+
+**Final diagnostics:** `pnpm check` reported zero errors and zero warnings. Source/document formatting and `git diff --check` passed.
+
+**Records and limits:** Updated PROJECT_CONTEXT.md and this history. Baseline `3135381` contains the previous PDF correction; the new styling remains local. No schema, UI permission, native/APK, role, data-access, or deployed-server change was made. No commit, push, deployment, real-data read, or credential access occurred. Deploy the updated server renderer and download a new PDF to see the design; existing downloaded files remain unchanged.
