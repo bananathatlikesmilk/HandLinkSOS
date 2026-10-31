@@ -27,8 +27,9 @@
 	let mounted = false;
 	let accountId: string | undefined;
 	const unavailable = $derived(disabled || working || !status);
-	const locationOn = $derived(status?.location === 'granted' && status?.locationEnabled !== false);
-	const cameraOn = $derived(status?.camera === 'granted' && status?.cameraEnabled !== false);
+	// The switch owns saved app use; OS grants and hardware activity are separate states.
+	const locationOn = $derived(!!status && status.locationEnabled !== false);
+	const cameraOn = $derived(!!status && status.cameraEnabled !== false);
 	function current() {
 		return mounted && accountId === page.data.account?.id;
 	}
@@ -37,14 +38,14 @@
 		return access === 'granted'
 			? 'On'
 			: access === 'denied'
-				? 'Off (blocked)'
+				? 'On · permission blocked'
 				: access === 'prompt'
-					? 'Off'
-					: 'Not checked';
+					? 'On · permission needed'
+					: 'On · permission not checked';
 	}
-	async function changeAccess(kind: 'location' | 'camera') {
+	async function changeAccess(kind: 'location' | 'camera', enabled: boolean) {
 		if (!status) return;
-		if (status[kind] === 'granted' && status[`${kind}Enabled`] !== false) {
+		if (!enabled) {
 			status = await setAccessEnabled(kind, false);
 			if (kind === 'location') {
 				try {
@@ -75,8 +76,8 @@
 		status = result;
 		if (result[kind] !== 'granted') {
 			notice = native
-				? 'Access is still off. Allow ' + kind + ' in Android Settings.'
-				: 'Access is still off. Allow ' + kind + ' in your browser site settings.';
+				? 'HandLink use is on. Allow ' + kind + ' in Android Settings.'
+				: 'HandLink use is on. Allow ' + kind + ' in your browser site settings.';
 			if (native) await openApplicationSettings();
 		}
 		return result;
@@ -137,7 +138,8 @@
 <section class="user-panel mt-6" aria-labelledby="permissions-heading" aria-busy={working}>
 	<h2 id="permissions-heading" class="text-base font-medium">App permissions</h2>
 	<p class="user-copy mt-2 text-sm">
-		Turn HandLink access on or off. Your phone still controls system permissions.
+		Switches save HandLink access, not whether GPS or camera is currently running. Phone permissions
+		apply separately.
 	</p>
 	<div class="permission-row">
 		<div class="permission-details">
@@ -158,8 +160,9 @@
 				class="permission-switch"
 				disabled={unavailable}
 				onchange={(event) => {
+					const enabled = event.currentTarget.checked;
 					event.currentTarget.checked = locationOn;
-					void run(() => changeAccess('location'));
+					void run(() => changeAccess('location', enabled));
 				}}
 			/>
 		</div>
@@ -183,8 +186,9 @@
 				class="permission-switch"
 				disabled={unavailable}
 				onchange={(event) => {
+					const enabled = event.currentTarget.checked;
 					event.currentTarget.checked = cameraOn;
-					void run(() => changeAccess('camera'));
+					void run(() => changeAccess('camera', enabled));
 				}}
 			/>
 		</div>

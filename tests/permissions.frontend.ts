@@ -50,6 +50,40 @@ test('location Off persists, ends sharing and blocks SOS GPS until enabled again
 	expect((await (await page.request.get('/api/sharing')).json()).own.status).toBe('cancelled');
 });
 
+test('saved access can be switched off after phone permissions are revoked', async ({ page }) => {
+	await installNativeBridge(page);
+	await login(page.request, await provision());
+	await page.goto('/user/settings');
+	const camera = page.getByRole('switch', { name: 'Camera access', exact: true });
+	const location = page.getByRole('switch', { name: 'Location access', exact: true });
+	await expect(camera).toBeChecked();
+	await expect(location).toBeChecked();
+	const before = await state(page);
+	await page.evaluate(() => {
+		const device = (globalThis as unknown as { __handlinkNativeTest: NativeTestState })
+			.__handlinkNativeTest;
+		device.cameraPermission = 'denied';
+		device.locationPermission = 'denied';
+		window.dispatchEvent(new Event('focus'));
+	});
+	await expect(page.getByText('On · permission blocked', { exact: true })).toHaveCount(2);
+	await expect(camera).toBeChecked();
+	await expect(location).toBeChecked();
+	await camera.click();
+	await expect(camera).not.toBeChecked();
+	await location.click();
+	await expect(location).not.toBeChecked();
+	const after = await state(page);
+	expect(after.cameraEnabled).toBe(false);
+	expect(after.locationEnabled).toBe(false);
+	expect(after.cameraRequests).toBe(before.cameraRequests);
+	expect(after.locationRequests).toBe(before.locationRequests);
+	expect(after.appSettingsOpens).toBe(before.appSettingsOpens);
+	await page.reload();
+	await expect(camera).not.toBeChecked();
+	await expect(location).not.toBeChecked();
+});
+
 test('web camera Off stops an active QR stream in another tab and stays off after reload', async ({
 	page
 }) => {
@@ -108,6 +142,7 @@ test('User login survives a browser restart, skips welcome, and logout revokes t
 	page,
 	browser
 }) => {
+	test.setTimeout(90000);
 	const account = await provision();
 	await page.addInitScript(() =>
 		localStorage.setItem('handlink:initial-device-permissions:v1', 'attempted')
@@ -115,7 +150,19 @@ test('User login survives a browser restart, skips welcome, and logout revokes t
 	await page.goto('/user/login');
 	await page.getByLabel('Email', { exact: true }).fill(account.email);
 	await page.getByLabel('Password', { exact: true }).fill(password);
-	await page.getByRole('button', { name: 'Log In', exact: true }).click();
+	// Preview shares one IP bucket across accounts; honor the real limiter as other login fixtures do.
+	for (let attempt = 0; ; attempt++) {
+		const responsePromise = page.waitForResponse((response) =>
+			response.url().endsWith('/api/auth/sign-in/email')
+		);
+		await page.getByRole('button', { name: 'Log In', exact: true }).click();
+		const response = await responsePromise;
+		if (response.status() !== 429 || attempt >= 2) break;
+		const seconds = Number(response.headers()['retry-after']);
+		await new Promise((resolve) =>
+			setTimeout(resolve, (Number.isFinite(seconds) && seconds > 0 ? seconds : 10) * 1000 + 100)
+		);
+	}
 	await page.getByRole('button', { name: 'I understand. Continue', exact: true }).click();
 	await expect(page).toHaveURL('/user/dashboard');
 	const saved = await page.context().storageState();
@@ -179,7 +226,10 @@ test('denied initial access leaves dashboard usable and camera can be retried in
 			globalThis as unknown as { __handlinkNativeTest: NativeTestState }
 		).__handlinkNativeTest.permissionDeny = false;
 	});
-	await page.getByRole('switch', { name: 'Camera access', exact: true }).click();
+	const camera = page.getByRole('switch', { name: 'Camera access', exact: true });
+	await camera.click();
+	await expect(camera).not.toBeChecked();
+	await camera.click();
 	await expect.poll(async () => (await state(page)).cameraPermission).toBe('granted');
 	expect((await state(page)).cameraRequests).toBe(1);
 });
@@ -268,6 +318,7 @@ test('browser Settings includes camera and explains that overlays need Android',
 test('camera permission check releases all browser camera tracks immediately', async ({ page }) => {
 	await page.addInitScript(() => {
 		localStorage.setItem('handlink:initial-device-permissions:v1', 'attempted');
+		localStorage.setItem('handlink:access:camera', 'off');
 		const camera = { stopped: 0, options: null as unknown };
 		Object.assign(globalThis, { __permissionCameraTest: camera });
 		Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
@@ -310,12 +361,14 @@ test('permission switches disable app use directly and open system settings only
 		'type',
 		'checkbox'
 	);
+	await expect(camera).toBeChecked();
+	await camera.click();
 	await expect(camera).not.toBeChecked();
 	await camera.click();
 	await expect.poll(async () => (await state(page)).appSettingsOpens).toBe(1);
-	await expect(camera).not.toBeChecked();
+	await expect(camera).toBeChecked();
 	await expect(
-		page.getByText('Access is still off. Allow camera in Android Settings.', { exact: true })
+		page.getByText('HandLink use is on. Allow camera in Android Settings.', { exact: true })
 	).toBeVisible();
 	await page.evaluate(() => {
 		const device = (globalThis as unknown as { __handlinkNativeTest: NativeTestState })
@@ -342,5 +395,8 @@ test('permission switches disable app use directly and open system settings only
 		device.cameraPermission = 'denied';
 		window.dispatchEvent(new Event('focus'));
 	});
+	await expect(page.getByText('On · permission blocked', { exact: true })).toHaveCount(2);
+	await expect(camera).toBeChecked();
+	await camera.click();
 	await expect(camera).not.toBeChecked();
 });

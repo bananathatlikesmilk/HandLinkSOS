@@ -1,6 +1,6 @@
 # HandLink-SOS project context
 
-Last inspected: **1 November 2026, Asia/Manila**. Local branch: `main`; inspected baseline HEAD: `df1ea72` (`central admin fix`). Multi-LGU sources are present in this baseline; filtered-PDF report changes are new local work. Earlier inspections used the commits recorded in the historical notes below. No new GitHub synchronization or production deployment was verified.
+Last inspected: **1 November 2026, Asia/Manila**. Local branch: `main`; inspected baseline HEAD: `fa9475c` (`pdf reports`). Multi-LGU and filtered-PDF report sources are present in this baseline; the permission-switch correction below is new local work. Earlier inspections used the commits recorded in the historical notes below. No new GitHub synchronization or production deployment was verified.
 
 ### Local Git authorship maintenance
 
@@ -179,6 +179,8 @@ Settings provide location/camera/overlay controls. Android may require opening s
 **In-app access switches, 30 October 2026 (local source):** Location and camera switches now control saved HandLink-use preferences separately from system permission grants. Off blocks SOS GPS/live QR camera use and stops foreground/background location publishing; location Off also attempts to stop active server sharing, with an explicit warning if the network/server cannot confirm that step. Android stores flags in private device preferences; web uses origin-local storage with an in-memory fallback. Re-enabling reuses a still-granted system permission or requests it when needed. Blocked system grants and initial overlay special access still require OS/browser approval. Camera upload scanning remains available without camera use. Preferences persist across reloads and do not restart sharing automatically. Native changes require a rebuilt APK; the current compilation attempt was blocked by Gradle's missing Java 21 toolchain. No deployment or phone verification was performed.
 
 User sessions use persistent HttpOnly cookies; continued validity still depends on expiry, logout, password reset, revocation, account state, and device storage. Closing the app is not itself a request to log out. Android APKs are not iOS installation packages; a schema enum mentioning iOS does not establish a completed iOS client.
+
+**Permission-switch correction, 1 November 2026 (local source):** The camera/location switches now represent saved HandLink-use preferences independently of the system grant. Previously the checked state combined both values, and the action inferred enable/disable from that combination; revoking a phone permission made an enabled app preference look Off and the next click requested access again. The handler now uses the user's explicit checked target. Off saves the disabled preference even when system permission is denied, without requesting permission or opening system settings. Labels distinguish On, On with permission blocked/needed/unknown, and saved Off. On does not mean GPS/camera hardware is running or that a missing system permission has been granted. Existing sharing shutdown, camera-track release, persistence, and OS grant rules remain. This correction changes shared web UI only; no Java bridge change or APK build occurred.
 
 ## 4. Database structure
 
