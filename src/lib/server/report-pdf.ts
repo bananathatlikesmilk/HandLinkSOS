@@ -2,6 +2,7 @@ import PDFDocument from 'pdfkit';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import type { filteredIncidentReports } from './incidents.ts';
+import { incidentDuration } from '../incidents.ts';
 
 const require = createRequire(import.meta.url);
 const font = readFileSync(
@@ -12,7 +13,7 @@ const formatTime = (value: string | null) =>
 		? new Date(value).toLocaleString('en-PH', {
 				timeZone: 'Asia/Manila',
 				dateStyle: 'medium',
-				timeStyle: 'short'
+				timeStyle: 'medium'
 			})
 		: 'Not recorded';
 
@@ -39,7 +40,7 @@ export function reportPdf(data: ReturnType<typeof filteredIncidentReports>): Pro
 		text(`Generated: ${formatTime(new Date().toISOString())} (Philippine time)`);
 		text(`Access scope: ${data.scope} | Matching reports: ${data.reports.length}`);
 		text(
-			`Started dates (Philippine time, inclusive): ${data.input.from ?? 'Any'} to ${data.input.to ?? 'Any'}`
+			`Incident start date range (Philippine time, both dates included): ${data.input.from ?? 'Any'} to ${data.input.to ?? 'Any'}`
 		);
 		text(
 			`Status: ${data.input.status} | SOS type: ${data.input.sosType} | Search: ${data.input.search || 'Any'}`
@@ -54,8 +55,8 @@ export function reportPdf(data: ReturnType<typeof filteredIncidentReports>): Pro
 		text(
 			'Includes all matches across archive pages, up to 100 reports. Saved report snapshot; later changes are not included.'
 		);
-		for (const report of data.reports) {
-			doc.addPage();
+		for (const [index, report] of data.reports.entries()) {
+			if (index > 0) doc.addPage();
 			const row = report.incident;
 			heading(row.reference);
 			text(`LGU: ${row.lguName ?? 'Central review'} | Status: ${row.status}`);
@@ -68,10 +69,7 @@ export function reportPdf(data: ReturnType<typeof filteredIncidentReports>): Pro
 			text(
 				`Started: ${formatTime(row.startedAt)} | Confirmed: ${formatTime(row.confirmedAt)} | Ended: ${formatTime(row.endedAt)}`
 			);
-			if (row.endedAt)
-				text(
-					`Duration: ${Math.max(0, Math.floor((Date.parse(row.endedAt) - Date.parse(row.startedAt)) / 60000))} minutes`
-				);
+			text(`Response duration: ${incidentDuration(row.startedAt, row.endedAt)}`);
 			text(
 				`Reporter GPS: ${report.latitude}, ${report.longitude}${report.locationLabel ? ` | ${report.locationLabel}` : ''}`
 			);

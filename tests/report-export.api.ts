@@ -52,7 +52,7 @@ test('filtered reports export every matching page without crossing staff or LGU 
 				crypto.randomUUID(),
 				time,
 				time,
-				time + 60000
+				time + 99000
 			);
 			const ref = (
 				db.prepare('SELECT number FROM incident_reference WHERE incident_id=?').get(id) as {
@@ -113,6 +113,11 @@ test('filtered reports export every matching page without crossing staff or LGU 
 	expect(bytes.subarray(0, 5).toString()).toBe('%PDF-');
 	const loadingTask = getDocument({ data: new Uint8Array(bytes), useSystemFonts: false });
 	const parsed = await loadingTask.promise;
+	const firstPage = await (await parsed.getPage(1)).getTextContent();
+	const firstPageText = firstPage.items.map((item) => ('str' in item ? item.str : '')).join(' ');
+	expect(firstPageText).toContain(references[0]);
+	expect(firstPageText).toContain('Person in distress: Peña Reyes');
+	expect(firstPageText).toContain('SYNTHETIC-NOTES');
 	const canvasFactory = parsed.canvasFactory as {
 		create(
 			width: number,
@@ -129,11 +134,14 @@ test('filtered reports export every matching page without crossing staff or LGU 
 		const text = await page.getTextContent();
 		content += text.items.map((item) => ('str' in item ? item.str : '')).join(' ') + '\n';
 	}
-	expect(parsed.numPages).toBeGreaterThan(22);
+	expect(parsed.numPages).toBeGreaterThanOrEqual(22);
 	for (const reference of references) expect(content).toContain(reference);
 	expect(content).toContain('Peña');
 	expect(content).toContain('SYNTHETIC-NOTES');
 	expect(content).toContain('SYNTHETIC-ADDENDUM');
+	expect(content).toContain('Response duration: 0h 1m 39s');
+	expect(content).toContain('11:59:59');
+	expect(content).toContain('Incident start date range');
 	expect(content).not.toContain('PRIVATE-INCIDENT-ALLERGY');
 	// Render representative pages through PDF.js for visual inspection without a system PDF tool.
 	for (const number of [1, 2, 3]) {
@@ -163,8 +171,8 @@ test('filtered reports export every matching page without crossing staff or LGU 
 	}
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/admin/reports');
-	await page.getByLabel('Started from (Philippine time)').fill('2026-10-31');
-	await page.getByLabel('Started through').fill('2026-10-31');
+	await page.getByLabel('From date', { exact: true }).fill('2026-10-31');
+	await page.getByLabel('To date', { exact: true }).fill('2026-10-31');
 	await page.getByLabel('LGU', { exact: true }).selectOption(lgu);
 	await page.getByLabel('Dispatcher', { exact: true }).selectOption(handler.id);
 	await page.getByLabel('SOS type', { exact: true }).selectOption('self');

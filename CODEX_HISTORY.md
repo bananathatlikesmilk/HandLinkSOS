@@ -487,3 +487,25 @@ The following entries have fuller assistant/tool evidence in the available conve
 **Final diagnostics:** `pnpm check` reported zero errors and zero warnings. Documentation/source formatting and `git diff --check` passed.
 
 **Records and limits:** Updated PROJECT_CONTEXT.md and this history. Baseline `7240fde` was inspected. No backend schema, native code, permission, camera, or APK changes were made. No commit, push, deployment, physical-device verification, secret access, or production-data access occurred. This is local web UI work and requires deployment before it appears on the hosted site/app.
+
+### H044 — Recommended trusted-profile maximum
+
+**Date:** 1 November 2026, Asia/Manila.
+
+**Question and explanation:** The user asked for an ideal trusted-profile maximum. Recommended 20 per account as a product starting point: enough for close family/caregivers, a manageable emergency selection list, and alignment with the existing 20-recipient sharing cap. Recommended favorites at the top and continued individual approval. This was advice, not evidence that a trusted-profile cap is enforced. No cap was inspected or changed in that discussion; the location-sharing limit and a trusted-profile relationship limit are separate rules.
+
+### H045 — Put actual incident data on PDF page one and clarify date labels
+
+**Date:** 1 November 2026, Asia/Manila.
+
+**User objective and clarification:** Asked to fix PDF reports and replace Started through with clearer wording. Selected missing/incorrect information as the problem, then clarified that the PDF showed no data about the reports themselves. Asked which field was affected while independently checking the export; no real personal or medical data was requested or read.
+
+**Evidence and correction:** Source inspection and generated test PDFs showed a metadata-only first page, with actual cases on later pages. Existing parsing tests confirmed report records were exported but did not require incident data on page one. Removed the standalone cover: filter metadata is now followed immediately by the first case's actual details/notes. Later cases still begin new pages; content can flow across pages without truncation. This explains a verified presentation problem rather than claiming inspection of the user's deployed PDF. Also found that PDF times omitted seconds and durations rounded down to whole minutes. Added one shared incident-duration formatter for the report screen and PDF, and preserved timestamp seconds in Philippine time. No unauthorized medical/profile fields were added.
+
+**Labels:** Renamed Started from and Started through to From date and To date. Added an explicit note that these are incident start dates in Philippine time and both days are included. Updated the PDF filter description to match; query semantics are unchanged.
+
+**Verification:** Final isolated export/browser integration test passed after the PDF correction. PDF.js now asserts that page one contains the incident reference, person in distress, and saved response notes; it also verifies all 22 matched references, notes/addenda, accented names, a 99-second duration printed as 0h 1m 39s, and timestamp seconds. Existing access/MFA/LGU/dispatcher/filter/limit and mobile download checks within that test passed. The production build succeeded. Rendered and visually inspected the corrected first PDF page. Targeted ESLint passed. Svelte MCP/autofixer was unavailable; local checks were used. Final diagnostics are recorded below.
+
+**Final diagnostics:** `pnpm check` reported zero errors and zero warnings. Source/document formatting and `git diff --check` passed.
+
+**Records and limits:** Updated PROJECT_CONTEXT.md and this history. Local baseline `994ef42` already contains Select all sharing. No schema, native bridge, APK, permission, or deployment change was made. No commit, push, production-data read, or credential access occurred. Deploy the server/web correction and generate a new PDF; previously downloaded files do not update automatically.

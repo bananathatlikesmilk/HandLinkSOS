@@ -1,5 +1,11 @@
 export type IncidentStatus = 'Not assigned' | 'In progress' | 'On route' | 'Resolved';
 
+export function incidentDuration(start: string, end: string | null) {
+	if (!end) return 'Ongoing';
+	const seconds = Math.max(0, Math.floor((Date.parse(end) - Date.parse(start)) / 1000));
+	return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m ${seconds % 60}s`;
+}
+
 export type IncidentLocationSnapshot = {
 	latitude: number;
 	longitude: number;

@@ -9,7 +9,7 @@
 	import { resolve } from '$app/paths';
 	import { beforeNavigate } from '$app/navigation';
 	import { Archive, Check, Download, FileText, RefreshCw, Search } from '@lucide/svelte';
-	import type { IncidentReport, IncidentSummary } from '#lib/incidents.ts';
+	import { incidentDuration, type IncidentReport, type IncidentSummary } from '#lib/incidents.ts';
 	let incidents = $state<IncidentSummary[]>([]);
 	let selected = $state<IncidentReport | null>(null);
 	let selectedId = $state('');
@@ -52,14 +52,6 @@
 	);
 	function date(value: string | null) {
 		return value ? new Date(value).toLocaleString() : 'Not yet';
-	}
-	function duration(start: string, end: string | null) {
-		if (!end) return 'Ongoing';
-		const seconds = Math.max(
-			0,
-			Math.floor((new Date(end).getTime() - new Date(start).getTime()) / 1000)
-		);
-		return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m ${seconds % 60}s`;
 	}
 	async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
 		const response = await fetch(url, { cache: 'no-store', ...options });
@@ -344,7 +336,7 @@
 					></label
 				>
 				<label class="field-label"
-					>Started from (Philippine time)<input
+					>From date<input
 						class="input w-full"
 						type="date"
 						bind:value={from}
@@ -353,7 +345,7 @@
 					/></label
 				>
 				<label class="field-label"
-					>Started through<input
+					>To date<input
 						class="input w-full"
 						type="date"
 						bind:value={to}
@@ -361,6 +353,9 @@
 						disabled={busy}
 					/></label
 				>
+				<p class="muted text-xs">
+					Incident start dates in Philippine time. Both dates are included.
+				</p>
 				<label class="field-label"
 					>Dispatcher<select
 						aria-label="Dispatcher"
@@ -495,7 +490,7 @@
 						</tr>
 						<tr>
 							<th scope="row">Response duration</th>
-							<td>{duration(selected.incident.startedAt, selected.incident.endedAt)}</td>
+							<td>{incidentDuration(selected.incident.startedAt, selected.incident.endedAt)}</td>
 						</tr>
 					</tbody>
 				</table>
