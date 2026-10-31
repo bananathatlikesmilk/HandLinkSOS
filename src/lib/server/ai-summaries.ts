@@ -13,6 +13,7 @@ import {
 	user
 } from './db/schema.ts';
 import { requireStaff } from './api.ts';
+import { assertIncidentLgu } from './lgu-scope.ts';
 import { latestIncidentNote } from './incident-notes.ts';
 import { selectedAiProvider } from './ai-settings.ts';
 import { requestSummary } from './summary-providers.ts';
@@ -33,6 +34,7 @@ function owned(event: RequestEvent, id: string | undefined) {
 	if (actor.role !== 'dispatcher')
 		error(403, 'Only the assigned dispatcher can generate or approve summaries.');
 	const row = target(id);
+	assertIncidentLgu(actor, row.id);
 	if (row.dispatcherUserId !== actor.id) error(404, 'Report not found.');
 	return { actor, row };
 }

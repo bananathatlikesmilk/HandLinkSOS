@@ -4,6 +4,7 @@ import { resolve } from '$app/paths';
 import { db } from './db/index.ts';
 import { user } from './db/schema.ts';
 import { hasStaffMfa } from './staff-mfa.ts';
+import { staffScope } from './lgu-scope.ts';
 
 export function portalAccount(
 	event: RequestEvent,
@@ -32,5 +33,16 @@ export function portalAccount(
 	if (protectedPage && role !== 'user' && !hasStaffMfa(identity.id, event.locals.session!.id)) {
 		redirect(303, resolve(role === 'admin' ? '/admin/security' : '/dispatch/security'));
 	}
-	return { id: identity.id, name: identity.name, email: identity.email, role };
+	const scope = role === 'user' ? null : staffScope(identity);
+	if (protectedPage && scope && !scope.lguActive)
+		error(403, 'Your LGU is inactive. Contact the central administrator.');
+	return {
+		id: identity.id,
+		name: identity.name,
+		email: identity.email,
+		role,
+		centralAdmin: scope?.centralAdmin ?? false,
+		lguId: scope?.lguId ?? null,
+		lguName: scope?.lguName ?? null
+	};
 }

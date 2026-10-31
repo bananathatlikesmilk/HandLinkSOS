@@ -39,6 +39,41 @@ function seed(client) {
 			.run(id, owner, 'First', 'Last', '2000-01-01', 'Female', '+639171234567', Date.now());
 }
 
+test('multi-LGU migration preserves identities and incidents and scopes legacy dispatchers', () => {
+	const client = new Database(':memory:');
+	client.pragma('foreign_keys=ON');
+	try {
+		const migrations = readMigrationFiles({ migrationsFolder: './drizzle' });
+		for (const migration of migrations.slice(0, 15))
+			for (const statement of migration.sql) client.exec(statement);
+		seed(client);
+		client.prepare("UPDATE user SET role='admin' WHERE id='owner'").run();
+		client.prepare("UPDATE user SET role='dispatcher' WHERE id='dispatcher'").run();
+		client
+			.prepare(
+				"INSERT INTO incident (id,person_profile_id,caller_user_id,caller_name,latitude,longitude,idempotency_key) VALUES ('existing','profile-owner','owner','Owner',14,121,'retry')"
+			)
+			.run();
+		const accounts = client.prepare('SELECT * FROM user ORDER BY id').all();
+		const incidents = client.prepare('SELECT * FROM incident').all();
+		for (const statement of migrations[15].sql) client.exec(statement);
+		assert.deepEqual(client.prepare('SELECT * FROM user ORDER BY id').all(), accounts);
+		assert.deepEqual(client.prepare('SELECT * FROM incident').all(), incidents);
+		assert.deepEqual(client.prepare('SELECT * FROM staff_lgu').all(), [
+			{ user_id: 'dispatcher', lgu_id: 'legacy' }
+		]);
+		assert.deepEqual(client.prepare('SELECT * FROM incident_lgu').all(), [
+			{ incident_id: 'existing', lgu_id: 'legacy', reason: 'legacy' }
+		]);
+		assert.throws(() =>
+			client.prepare("INSERT INTO staff_lgu (user_id,lgu_id) VALUES ('owner','missing')").run()
+		);
+		assert.deepEqual(client.pragma('foreign_key_check'), []);
+	} finally {
+		client.close();
+	}
+});
+
 test('beneficiary location migration preserves incidents and rejects invalid snapshots', () => {
 	const client = new Database(':memory:');
 	client.pragma('foreign_keys=ON');

@@ -7,6 +7,8 @@ import { db } from './db/index.ts';
 import {
 	emergencyContact,
 	incident,
+	incidentLgu,
+	lgu,
 	incidentPersonLocation,
 	incidentReference,
 	incidentEvent,
@@ -24,6 +26,8 @@ import { latestIncidentNote } from './incident-notes.ts';
 import { getAiSummaryState } from './ai-summaries.ts';
 import { incidentReferenceCode } from './incident-references.ts';
 import { sharedPointForRecipient } from './location-policy.ts';
+import { assertIncidentLgu, routingLguId } from './lgu-scope.ts';
+import { routeEmergencyLocation } from './lgus.ts';
 
 function personLocationSnapshot(incidentId: string) {
 	const row = db
@@ -44,6 +48,9 @@ function personLocationSnapshot(incidentId: string) {
 const callerProfile = alias(profile, 'caller_profile');
 const dispatcher = alias(user, 'handling_dispatcher');
 const summaryColumns = {
+	lguId: routingLguId,
+	lguName: lgu.name,
+	routingReason: sql<string>`coalesce(${incidentLgu.reason}, 'legacy')`,
 	id: incident.id,
 	reference: incidentReferenceCode,
 	personName: sql<string>`${profile.firstName} || ' ' || ${profile.lastName}`,
@@ -69,6 +76,8 @@ function summaries() {
 		.innerJoin(incidentReference, eq(incidentReference.incidentId, incident.id))
 		.innerJoin(profile, eq(profile.id, incident.personProfileId))
 		.innerJoin(callerProfile, eq(callerProfile.userId, incident.callerUserId))
+		.leftJoin(incidentLgu, eq(incidentLgu.incidentId, incident.id))
+		.leftJoin(lgu, eq(lgu.id, routingLguId))
 		.leftJoin(dispatcher, eq(dispatcher.id, incident.dispatcherUserId));
 }
 function serialize(
@@ -260,6 +269,17 @@ export function createIncident(event: RequestEvent, input: z.output<typeof incid
 				)
 				.get()!.n;
 			if (recent >= 10) error(429, 'Too many SOS requests. Wait a minute before trying again.');
+			const personPoint =
+				person.profile.id !== ownProfile.id
+					? sharedPointForRecipient(tx, person.profile.id, identity.id)
+					: undefined;
+			const routing = routeEmergencyLocation(
+				person.profile.id === ownProfile.id
+					? input
+					: personPoint && Date.now() - personPoint.recordedAt.getTime() <= 300000
+						? personPoint
+						: null
+			);
 			const saved = tx
 				.insert(incident)
 				.values({
@@ -270,12 +290,13 @@ export function createIncident(event: RequestEvent, input: z.output<typeof incid
 				})
 				.returning()
 				.get();
-			if (person.profile.id !== ownProfile.id) {
-				const point = sharedPointForRecipient(tx, person.profile.id, identity.id);
-				if (point)
-					tx.insert(incidentPersonLocation)
-						.values({ incidentId: saved.id, ...point })
-						.run();
+			tx.insert(incidentLgu)
+				.values({ incidentId: saved.id, ...routing })
+				.run();
+			if (personPoint) {
+				tx.insert(incidentPersonLocation)
+					.values({ incidentId: saved.id, ...personPoint })
+					.run();
 			}
 			tx.insert(incidentEvent)
 				.values({ incidentId: saved.id, actorUserId: identity.id, type: 'created' })
@@ -300,7 +321,15 @@ export function listStaffIncidents(event: RequestEvent) {
 	const parsed = incidentListInput.safeParse(Object.fromEntries(event.url.searchParams));
 	if (!parsed.success) error(422, 'Invalid incident search, filter, or page.');
 	const input = parsed.data;
+	if (input.lguId && !actor.centralAdmin && input.lguId !== actor.lguId)
+		error(403, 'Choose your assigned LGU.');
 	const condition = and(
+		actor.centralAdmin ? undefined : eq(routingLguId, actor.lguId!),
+		input.lguId === 'unrouted'
+			? isNull(routingLguId)
+			: input.lguId
+				? eq(routingLguId, input.lguId)
+				: undefined,
 		actor.role === 'dispatcher'
 			? input.view === 'reports'
 				? eq(incident.dispatcherUserId, actor.id)
@@ -321,6 +350,7 @@ export function listStaffIncidents(event: RequestEvent) {
 		.from(incident)
 		.innerJoin(incidentReference, eq(incidentReference.incidentId, incident.id))
 		.innerJoin(profile, eq(profile.id, incident.personProfileId))
+		.leftJoin(incidentLgu, eq(incidentLgu.incidentId, incident.id))
 		.where(condition)
 		.get()!.n;
 	const pageSize = 20;
@@ -343,6 +373,7 @@ export function listStaffIncidents(event: RequestEvent) {
 function accessibleIncident(event: RequestEvent, id: string | undefined, assignedOnly = false) {
 	const actor = requireStaff(event);
 	const row = target(id);
+	assertIncidentLgu(actor, row.id);
 	if (
 		(assignedOnly && !row.dispatcherUserId) ||
 		(actor.role === 'dispatcher' && row.dispatcherUserId && row.dispatcherUserId !== actor.id)
@@ -511,6 +542,7 @@ export function changeIncident(
 			const actor = requireStaff(event);
 			if (actor.role !== 'dispatcher') error(403, 'Only dispatchers can handle incidents.');
 			const row = target(id);
+			assertIncidentLgu(actor, row.id);
 			if (action === 'confirm') {
 				if (row.status !== 'Not assigned' || row.dispatcherUserId)
 					error(409, 'This incident has already been assigned.');
@@ -621,6 +653,7 @@ export function reviewCancellation(
 		(tx) => {
 			const actor = requireStaff(event);
 			const row = target(id);
+			assertIncidentLgu(actor, row.id);
 			if (actor.role !== 'dispatcher' || row.dispatcherUserId !== actor.id)
 				error(403, 'Only the assigned dispatcher can review cancellation.');
 			const pending = getCancellation(row.id);

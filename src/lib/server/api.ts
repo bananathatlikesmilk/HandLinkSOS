@@ -5,6 +5,7 @@ import { db } from './db/index.ts';
 import { profile, session, user } from './db/schema.ts';
 import { hasStaffMfa } from './staff-mfa.ts';
 import { inputProblems, inputProblemMessage } from './input-errors.ts';
+import { staffScope } from './lgu-scope.ts';
 
 function currentAccount(event: RequestEvent) {
 	if (!event.locals.user || !event.locals.session) error(401, 'Sign in first.');
@@ -32,7 +33,15 @@ export function requireAdmin(event: RequestEvent) {
 	if (identity.role !== 'admin') error(403, 'Administrator access is required.');
 	if (!hasStaffMfa(identity.id, activeSession.id))
 		error(403, 'Complete staff MFA setup and verification first.');
-	return identity;
+	const scoped = staffScope(identity);
+	if (!scoped.lguActive) error(403, 'Your LGU is inactive. Contact the central administrator.');
+	return scoped;
+}
+
+export function requireCentralAdmin(event: RequestEvent) {
+	const actor = requireAdmin(event);
+	if (!actor.centralAdmin) error(403, 'Central administrator access is required.');
+	return actor;
 }
 
 export function requireStaff(event: RequestEvent) {
@@ -41,7 +50,9 @@ export function requireStaff(event: RequestEvent) {
 		error(403, 'Staff access is required.');
 	if (!hasStaffMfa(identity.id, activeSession.id))
 		error(403, 'Complete staff MFA setup and verification first.');
-	return identity;
+	const scoped = staffScope(identity);
+	if (!scoped.lguActive) error(403, 'Your LGU is inactive. Contact the central administrator.');
+	return scoped;
 }
 
 export function requireUser(event: RequestEvent) {
@@ -54,14 +65,14 @@ export function requireUser(event: RequestEvent) {
 
 export async function readInput<T extends z.ZodType>(
 	event: RequestEvent,
-	schema: T
+	schema: T,
+	limit = 32768
 ): Promise<z.output<T>> {
 	// Cookie-authenticated writes require a same-origin browser request.
 	if (event.request.headers.get('origin') !== event.url.origin)
 		error(403, 'Request origin is not allowed.');
 	if (event.request.headers.get('content-type')?.split(';')[0].trim() !== 'application/json')
 		error(415, 'Send application/json.');
-	const limit = 32768;
 	const length = Number(event.request.headers.get('content-length'));
 	if (Number.isFinite(length) && length > limit) error(413, 'Request is too large.');
 	// Bound reads even when Content-Length is absent or dishonest.

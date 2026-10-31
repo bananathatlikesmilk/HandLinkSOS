@@ -9,7 +9,7 @@ export const POST: RequestHandler = async (event) => {
 	requireAdmin(event);
 	await readInput(event, z.strictObject({}));
 	requireAdmin(event);
-	const target = accountTarget(event.params.id);
+	const target = accountTarget(event.params.id, event);
 	if (target.banned || target.emailVerified)
 		error(409, 'This account does not need a verification email.');
 	if (!emailConfigured) error(503, 'Email delivery is not configured. The account remains saved.');

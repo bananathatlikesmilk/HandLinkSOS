@@ -277,6 +277,7 @@ The following entries have fuller assistant/tool evidence in the available conve
 **Investigation and explanation:** Checked available integrations, searched the plugin directory, and consulted official OpenAI documentation at https://learn.chatgpt.com/docs/projects. No available tool or discovered plugin supported replacing uploaded files in that ChatGPT Project. Local AGENTS.md already instructs future relevant sessions to maintain repository records; this does not run a background sync or grant access to ChatGPT Project storage. The IDE workspace and a ChatGPT Project are separate sources of context.
 
 **Outcome and limits:** No remote upload or automatic synchronization was configured. The practical current workflow is to replace uploaded PROJECT_CONTEXT.md and CODEX_HISTORY.md in the ChatGPT Project after meaningful updates. Additional plugins may exist in https://chatgpt.com/plugins, but this search did not establish a suitable integration. Updated these two local records only; no application changes, commit, or push occurred.
+
 ### H029 — Python unavailable while attempting another authorship rewrite
 
 **Date:** 21 October 2026, Asia/Manila.
@@ -342,3 +343,45 @@ The following entries have fuller assistant/tool evidence in the available conve
 **Native build limitation:** Attempted Gradle `:app:compileDebugJavaWithJavac` using the installed Android Studio runtime and SDK. Gradle failed before Java compilation because it could not find the required Java 21 toolchain; the installed runtime did not satisfy the requirement. No Java toolchain was installed and no build requirement was weakened. The new native bridge needs an APK rebuild once that toolchain is available. Browser/bridge simulations do not prove physical Android permission/service behavior.
 
 **Records and scope:** Updated PROJECT_CONTEXT.md and docs/android.md. No database schema change, production data access, commit, push, deployment, generated APK, or physical-device verification was performed. Existing recorded incident locations are not erased by switching access Off.
+
+### H034 — Request support for multiple LGUs; routing and administrative boundaries pending
+
+**Date:** 31 October 2026, Asia/Manila.
+
+**User request:** Make the system work for more than one local government unit.
+
+**Inspection:** Read current project records/instructions and traced account creation/status management, authentication/role guards, staff portal access, incident list/detail/mutation paths, AI ownership/settings, dashboard aggregates, registration/profile saving, and bootstrap seeding. No existing LGU/tenant implementation was found. The current installation has shared dispatch/account/report administration; an LGU dropdown without server ownership checks would not isolate data.
+
+**Clarifications requested:** Ask whether SOS routes through a profile-selected LGU or GPS boundaries, and whether a central administrator manages separately scoped LGU staff or all administrators retain global access. Recommended explicit profile selection and central administration with LGU isolation, but neither recommendation has been confirmed. These choices change emergency routing and access to personal/medical/report data, so dependent implementation is pending the user's answer.
+
+**Proposed invariants:** Preserve old records in a default LGU; snapshot incident LGU at creation; scope every staff list and direct-ID operation; preserve MFA and assigned-dispatcher detail restrictions; prevent LGU administrators from managing other LGUs or escalating to central access; cover account verification/status and dashboard/AI/report paths as well as queues. GPS routing additionally needs authoritative boundaries and fallback rules. Cross-LGU trusted SOS requires a defined beneficiary-routing policy rather than assuming the caller's LGU is always the destination.
+
+**Outcome:** Updated PROJECT_CONTEXT.md with verified current limitations and clearly marked proposed work. No application/schema changes, migrations, tests, commit, push, deployment, or APK build occurred during this initial investigation. Implementation remains outstanding while routing and administrative-boundary choices are pending.
+
+### H035 — GPS routing selected; recommend central oversight with isolated LGU staff
+
+**Date:** 31 October 2026, Asia/Manila.
+
+**User response:** Selected automatic routing using GPS boundaries. Asked which administrative model is better rather than selecting one.
+
+**Explanation and recommendation:** Recommended a central administrator for LGU setup, staff assignment, and oversight, with LGU administrators and dispatchers restricted to their own LGU. Giving every local administrator global access is easier to configure but weakens separation of queues and sensitive reports. Existing assigned-dispatcher medical/detail rules must remain; central administration must not silently remove them.
+
+**Missing information requested:** Municipality/city and province for the first supported LGUs, plus confirmation of the preferred administrative model. Actual jurisdiction boundaries are necessary for GPS routing; no boundary polygons or municipal coverage have been invented. Proposed an explicit unrouted/central-review fallback instead of guessing when boundaries do not resolve a location. For trusted-person SOS, routing must distinguish the beneficiary's eligible location from the caller's coordinates; this is a required design consideration, not an implemented behavior.
+
+**State:** Updated PROJECT_CONTEXT.md to mark GPS routing as selected and administration/coverage as pending. No application code, schema, deployment, or routing behavior changed. Multi-LGU implementation remains outstanding pending these material routing/security inputs.
+
+### H036 — Add configurable LGUs with GPS routing and isolated staff
+
+**Date:** 31 October 2026, Asia/Manila.
+
+**User decisions:** No initial municipalities are known yet; allow adding LGUs later. Confirmed the recommended model: central Admin oversight with separately scoped LGU administrators and dispatchers. Automatic routing uses GPS jurisdiction boundaries.
+
+**Implementation:** Added central LGU management, inactive drafts, GeoJSON upload/paste, activation, staff assignments, and a refreshing central routing queue. Added `lgu`, `staff_lgu`, `incident_lgu`, and `lgu_routing_audit` through additive migration `0015_multi_lgu.sql`. The migration maps old incidents and dispatchers to Existing LGU without rewriting original records. Existing Admins retain central authority; newly created staff always receive a scoped LGU. Added server restrictions to staff queues, direct-ID incident access/mutations, reports, AI operations, account management/verification, and dashboard counts. Global AI settings remain central-only. MFA, sharing consent, and assigned-dispatcher medical privacy remain enforced.
+
+**Routing decisions:** Before the first boundary activation, inactive drafts preserve the existing service. After activation, self-SOS uses reported coordinates; trusted-person SOS uses only an eligible beneficiary shared point no older than five minutes. Missing/stale beneficiary points never substitute caller GPS. Report snapshots may preserve older eligible points separately. Outside points, overlaps, and missing eligible beneficiary GPS go to central review. Incident routing is saved at creation and preserved on retries. Only central Admins may reroute unassigned cases, with an audit entry. An explicit null destination means central review, while a missing legacy mapping remains legacy-compatible. No geographic coverage was invented.
+
+**Safeguards refined during tests:** Retained first activation time so disabling boundaries cannot silently restore legacy routing. Inactive boundary drafts do not trigger activation. Staff can be prepared in inactive LGUs without gaining operational access. Staff moves invalidate sessions and block unresolved assigned incidents; an Admin cannot remove their own central access. LGU deactivation blocks unresolved incidents. Fixed mobile overflow and queue refresh ordering; polling cancels obsolete requests and cleans up on navigation. Local dashboard people counts describe incident beneficiaries rather than claiming a resident registry.
+
+**Actual verification:** Two geometry unit tests and the focused migration preservation test passed. A targeted account/incident/LGU integration run passed all 16 tests. After later safeguards/mobile changes, all four LGU integration tests passed. The final two-test rerun passed draft/activation/staff-preparation behavior and actual central-page GeoJSON upload/mobile layout after the last staging and refresh changes. Production builds succeeded during browser runs. Final `pnpm check` reported zero errors and warnings; targeted ESLint and LGU-source formatting checks passed. Mobile screenshots were inspected. Svelte MCP/autofixer was unavailable and was not run; local Svelte checks provided diagnostics. Tests used isolated synthetic data, not production records. A test-server Better Auth warning about unresolved client IP indicates deployment proxy/IP configuration still needs operator attention; this work did not change that setting.
+
+**Records and remaining operation:** Added [docs/multi-lgu.md](docs/multi-lgu.md), updated PROJECT_CONTEXT.md, and appended this entry. Corrected the current migration inventory: `0014` is committed in inspected baseline `36d44ad`; `0015` is new local work. Operators still need verified official boundaries, staffed central review, and a consistent updated-server deployment with migration. Do not mix old/new server versions after LGU isolation becomes active; older code lacks these guards. No commit, push, production migration, deployment, APK packaging, or physical-device verification occurred for this feature. Existing 911 dialer handoff was unchanged; routing selects a server queue, not a phone number.

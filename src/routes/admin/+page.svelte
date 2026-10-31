@@ -21,7 +21,12 @@
 	let controller: AbortController | undefined;
 	const summary = $derived(latest ?? data.summary);
 	const cards = $derived([
-		{ label: 'Users', count: summary.users, icon: Users, note: 'User accounts' },
+		{
+			label: summary.centralAdmin ? 'Users' : 'People in LGU incidents',
+			count: summary.users,
+			icon: Users,
+			note: summary.centralAdmin ? 'User accounts' : 'Distinct beneficiaries in this LGU'
+		},
 		{
 			label: 'Dispatchers',
 			count: summary.dispatchers,
@@ -103,6 +108,7 @@
 		<div>
 			<p class="eyebrow">ADMINISTRATION</p>
 			<h1 class="page-heading">Dashboard</h1>
+			<p class="muted mt-2">Scope: {summary.scopeName}</p>
 			<p class="muted">Accounts and SOS activity at a glance.</p>
 		</div>
 		<button type="button" class="btn btn-outline" disabled={busy} onclick={refreshDashboard}

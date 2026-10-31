@@ -23,7 +23,13 @@
 		children
 	}: {
 		role?: 'dispatch' | 'admin';
-		account?: { name: string; email: string; role: 'user' | 'dispatcher' | 'admin' } | null;
+		account?: {
+			name: string;
+			email: string;
+			role: 'user' | 'dispatcher' | 'admin';
+			centralAdmin?: boolean;
+			lguName?: string | null;
+		} | null;
 		children: Snippet;
 	} = $props();
 	let logoutError = $state('');
@@ -46,7 +52,12 @@
 		...(role === 'admin'
 			? [
 					{ href: '/admin/accounts' as const, label: 'Manage accounts', icon: Users },
-					{ href: '/admin/ai' as const, label: 'AI settings', icon: Sparkles }
+					...(account?.centralAdmin
+						? [
+								{ href: '/admin/lgus' as const, label: 'LGUs and routing', icon: Users },
+								{ href: '/admin/ai' as const, label: 'AI settings', icon: Sparkles }
+							]
+						: [])
 				]
 			: []),
 		{
@@ -108,6 +119,11 @@
 		<section class="signed-in-account" aria-label="Signed-in account">
 			<span class="account-label">Signed in as</span><strong>{account.name}</strong>
 			<span class="account-email">{account.email}</span>
+			<span class="account-label"
+				>{account.centralAdmin
+					? 'Central administration ? All LGUs'
+					: (account.lguName ?? '')}</span
+			>
 			<span class="account-role"
 				>{account.role === 'admin'
 					? 'Administrator'

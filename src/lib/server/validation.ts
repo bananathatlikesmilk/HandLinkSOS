@@ -22,7 +22,8 @@ export const staffAccountInput = z.strictObject({
 	name,
 	email: z.string().trim().toLowerCase().max(254).pipe(z.email()),
 	password: z.string().min(12).max(128),
-	role: z.enum(['dispatcher', 'admin']).default('dispatcher')
+	role: z.enum(['dispatcher', 'admin']).default('dispatcher'),
+	lguId: z.string().min(1).max(100).optional()
 });
 export const accountStatusInput = z.strictObject({ active: z.boolean() });
 export const accountListInput = z.strictObject({
@@ -99,6 +100,7 @@ export const addendumInput = z.strictObject({
 	notes: z.string().trim().min(1).max(2000)
 });
 export const incidentListInput = z.strictObject({
+	lguId: z.string().min(1).max(100).optional(),
 	view: z.enum(['alerts', 'reports']).default('alerts'),
 	search: z.string().trim().max(100).default(''),
 	status: z

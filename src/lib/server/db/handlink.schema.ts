@@ -9,6 +9,7 @@ import {
 	uniqueIndex
 } from 'drizzle-orm/sqlite-core';
 import { user, session } from './schema.ts';
+import type { LguBoundary } from '../../lgu.ts';
 
 const id = () =>
 	text('id')
@@ -22,6 +23,21 @@ const accountReference = (name: string) =>
 	text(name)
 		.notNull()
 		.references(() => user.id, { onDelete: 'restrict' });
+
+export const lgu = sqliteTable('lgu', {
+	id: id(),
+	name: text('name').notNull().unique(),
+	boundary: text('boundary', { mode: 'json' }).$type<LguBoundary>(),
+	active: integer('active', { mode: 'boolean' }).notNull().default(false),
+	activatedAt: integer('activated_at', { mode: 'timestamp_ms' }),
+	createdAt: created()
+});
+export const staffLgu = sqliteTable('staff_lgu', {
+	userId: accountReference('user_id').primaryKey(),
+	lguId: text('lgu_id')
+		.notNull()
+		.references(() => lgu.id, { onDelete: 'restrict' })
+});
 
 export const aiProviderSetting = sqliteTable(
 	'ai_provider_setting',
@@ -247,6 +263,26 @@ export const incident = sqliteTable(
 		)
 	]
 );
+
+export const incidentLgu = sqliteTable('incident_lgu', {
+	incidentId: text('incident_id')
+		.primaryKey()
+		.references(() => incident.id, { onDelete: 'restrict' }),
+	lguId: text('lgu_id').references(() => lgu.id, { onDelete: 'restrict' }),
+	reason: text('reason').notNull()
+});
+export const lguRoutingAudit = sqliteTable('lgu_routing_audit', {
+	id: id(),
+	incidentId: text('incident_id')
+		.notNull()
+		.references(() => incident.id, { onDelete: 'restrict' }),
+	fromLguId: text('from_lgu_id').references(() => lgu.id, { onDelete: 'restrict' }),
+	toLguId: text('to_lgu_id')
+		.notNull()
+		.references(() => lgu.id, { onDelete: 'restrict' }),
+	actorUserId: accountReference('actor_user_id'),
+	createdAt: created()
+});
 
 export const incidentPersonLocation = sqliteTable(
 	'incident_person_location',

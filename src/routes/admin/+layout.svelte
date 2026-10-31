@@ -13,9 +13,11 @@
 		account={data.account && {
 			name: data.account.name,
 			email: data.account.email,
-			role: data.account.role
+			role: data.account.role,
+			centralAdmin: data.account.centralAdmin,
+			lguName: data.account.lguName
 		}}
-		>{#if page.url.pathname === '/admin' || page.url.pathname === '/admin/ai' || page.url.pathname === '/admin/alerts' || page.url.pathname === '/admin/accounts' || page.url.pathname === '/admin/security' || page.url.pathname === '/admin/reports' || page.url.pathname === '/admin/profile'}
+		>{#if page.url.pathname === '/admin' || page.url.pathname === '/admin/lgus' || page.url.pathname === '/admin/ai' || page.url.pathname === '/admin/alerts' || page.url.pathname === '/admin/accounts' || page.url.pathname === '/admin/security' || page.url.pathname === '/admin/reports' || page.url.pathname === '/admin/profile'}
 			{@render children()}
 		{:else}<section class="panel">
 				<h1 class="page-heading">Admin workspace</h1>

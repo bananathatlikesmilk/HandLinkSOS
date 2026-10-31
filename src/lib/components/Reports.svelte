@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import IncidentCancellationReview from './IncidentCancellationReview.svelte';
 	import IncidentLocation from './IncidentLocation.svelte';
+	import { routingDescription } from '#lib/lgu.ts';
 	import AiReportSummary from './AiReportSummary.svelte';
 	import { page as route } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -385,6 +386,11 @@
 						</tr>
 					</tbody>
 				</table>
+				<p class="muted">
+					LGU: {selected.incident.lguName ?? 'Unrouted — central review'} · Routing: {routingDescription(
+						selected.incident.routingReason
+					)}
+				</p>
 				{#key selected.incident.id}
 					<IncidentLocation
 						personLocation={selected.personLocation}

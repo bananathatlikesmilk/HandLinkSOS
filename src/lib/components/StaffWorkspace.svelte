@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import IncidentCancellationReview from './IncidentCancellationReview.svelte';
 	import IncidentLocation from './IncidentLocation.svelte';
+	import { routingDescription } from '#lib/lgu.ts';
 	import { resolve } from '$app/paths';
 	import { beforeNavigate, goto } from '$app/navigation';
 	import { page as route, navigating as navigationState } from '$app/state';
@@ -486,7 +487,11 @@
 									: ' (self)'}</td
 							></tr
 						>
-						<tr><th scope="row">Caller name</th><td>{selected.incident.callerName}</td></tr>
+						<tr
+							><th scope="row">LGU</th><td
+								>{selected.incident.lguName ?? 'Unrouted ? central review'}</td
+							></tr
+						><tr><th scope="row">Caller name</th><td>{selected.incident.callerName}</td></tr>
 						<tr><th scope="row">Caller phone number</th><td>{selected.incident.callerPhone}</td></tr
 						>
 						{#if selected.incident.isForSomeoneElse}<tr
@@ -547,6 +552,11 @@
 							>{/if}
 					</div>
 				{:else}
+					<p class="muted">
+						LGU: {selected.incident.lguName ?? 'Unrouted — central review'} · Routing: {routingDescription(
+							selected.incident.routingReason
+						)}
+					</p>
 					<div class="detail-tabs" aria-label="Incident detail sections">
 						{#each ['Personal information', 'Medical information', 'Emergency contacts', 'Additional information'] as tab (tab)}<button
 								class:active={detail === tab}

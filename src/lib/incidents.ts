@@ -17,6 +17,9 @@ export type IncidentCancellation = {
 };
 
 export type IncidentSummary = {
+	lguId: string | null;
+	lguName: string | null;
+	routingReason: string;
 	id: string;
 	reference: string;
 	personName: string;

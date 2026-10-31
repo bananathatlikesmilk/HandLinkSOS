@@ -15,6 +15,24 @@
 	let email = $state('');
 	let password = $state('');
 	let role = $state<'dispatcher' | 'admin'>('dispatcher');
+	let selectedLgu = $state('legacy');
+	let assignments = $state<Record<string, string>>({});
+	async function moveStaff(account: Account) {
+		if (busy || !assignments[account.id]) return;
+		busy = true;
+		error = '';
+		try {
+			await request(`/api/admin/accounts/${encodeURIComponent(account.id)}/lgu`, 'PUT', {
+				lguId: assignments[account.id]
+			});
+			await refreshSavedAccounts();
+			notice = 'Staff LGU updated. Their existing sessions were signed out.';
+		} catch (reason) {
+			error = reason instanceof Error ? reason.message : 'Could not assign LGU.';
+		} finally {
+			busy = false;
+		}
+	}
 	let busy = $state(false);
 	let error = $state('');
 	let formError = $state('');
@@ -31,7 +49,7 @@
 		});
 		return `/admin/accounts?${query}` as const;
 	}
-	async function request(url: string, method: 'POST' | 'PATCH', body: object) {
+	async function request(url: string, method: 'POST' | 'PATCH' | 'PUT', body: object) {
 		let response: Response;
 		try {
 			response = await fetch(url, {
@@ -62,6 +80,7 @@
 		email = '';
 		password = '';
 		role = 'dispatcher';
+		selectedLgu = data.lgus.length === 1 ? data.lgus[0].id : '';
 		createDialog().showModal();
 	}
 	async function createAccount(event: SubmitEvent) {
@@ -75,7 +94,8 @@
 				name: name.trim(),
 				email: email.trim(),
 				password,
-				role
+				role,
+				lguId: selectedLgu
 			});
 			password = '';
 			createdAccount = result.account;
@@ -197,7 +217,30 @@
 										<span class="muted">(You)</span>{/if}</strong
 								><span class="text-sm text-slate-400">{account.email}</span></td
 							>
-							<td class="capitalize">{account.role}</td>
+							<td class="capitalize"
+								>{account.role}<span class="muted block normal-case"
+									>{account.centralAdmin
+										? 'Central administrator'
+										: (account.lguName ?? 'Global user account')}</span
+								>
+								{#if data.centralAdmin && account.id !== data.currentUserId && ['admin', 'dispatcher'].includes(account.role)}
+									<label class="block text-sm"
+										>Assign LGU<select
+											class="select"
+											bind:value={assignments[account.id]}
+											disabled={busy}
+											><option value="">Choose LGU</option
+											>{#each data.lgus as item (item.id)}<option value={item.id}
+													>{item.name}{item.active ? '' : ' (inactive)'}</option
+												>{/each}</select
+										></label
+									><button
+										class="btn mt-2 btn-outline btn-sm"
+										disabled={busy || !assignments[account.id]}
+										onclick={() => moveStaff(account)}>Save LGU for {account.name}</button
+									>
+								{/if}</td
+							>
 							<td
 								><span class="badge badge-ghost">{account.active ? 'Active' : 'Inactive'}</span></td
 							>
@@ -343,6 +386,14 @@
 						/></label
 					>
 					<p id="password-help" class="muted text-sm">Use 12–128 characters.</p>
+					<label class="field-label"
+						>LGU *<select class="select w-full" bind:value={selectedLgu} required
+							><option value="" disabled>Choose LGU</option
+							>{#each data.lgus as item (item.id)}<option value={item.id}
+									>{item.name}{item.active ? '' : ' (inactive)'}</option
+								>{/each}</select
+						></label
+					>
 					{#if formError}<p class="error-message" role="alert">{formError}</p>{/if}
 					<div class="flex justify-end gap-3 pt-3">
 						<button class="btn btn-ghost" type="button" onclick={() => createDialog().close()}

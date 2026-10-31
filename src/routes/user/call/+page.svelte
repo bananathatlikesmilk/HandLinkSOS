@@ -68,6 +68,7 @@
 		<p class="user-copy mt-4">SOS for {data.incident.personName} was saved for dispatchers.</p>
 		<p class="user-copy mt-3">Incident reference: {data.incident.reference}</p>
 		<p class="user-copy mt-3">Status: {data.incident.status}</p>
+		<p class="user-copy mt-3">LGU: {data.incident.lguName ?? 'Awaiting central routing review'}</p>
 	{:else}
 		<h1 class="user-title">Call through your phone</h1>
 	{/if}

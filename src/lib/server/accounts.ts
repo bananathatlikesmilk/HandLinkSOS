@@ -8,15 +8,21 @@ import {
 	locationRecipient,
 	locationSession,
 	profile,
+	staffLgu,
+	lgu,
 	session,
 	user
 } from './db/schema.ts';
 import { requireAdmin } from './api.ts';
+import { staffScope } from './lgu-scope.ts';
+import { requireLgu } from './lgus.ts';
 import { accountListInput, staffAccountInput } from './validation.ts';
 import { emailConfigured } from './email.ts';
 import type { z } from 'zod';
 
 const summaryColumns = {
+	lguId: staffLgu.lguId,
+	lguName: lgu.name,
 	id: user.id,
 	name: user.name,
 	email: user.email,
@@ -36,8 +42,13 @@ function summary(record: {
 	emailVerified: boolean;
 	createdAt: Date;
 	deactivatedAt?: Date | null;
+	lguId?: string | null;
+	lguName?: string | null;
 }) {
 	return {
+		lguId: record.lguId ?? (record.role === 'dispatcher' ? 'legacy' : null),
+		lguName: record.lguName ?? (record.role === 'dispatcher' ? 'Existing LGU' : null),
+		centralAdmin: record.role === 'admin' && !record.lguId,
 		id: record.id,
 		name: record.name,
 		email: record.email,
@@ -55,6 +66,7 @@ export function listAccounts(event: RequestEvent) {
 	const input = parsed.data;
 	// instr treats %, _ and quotes as literal search text. All values stay parameterized.
 	const condition = and(
+		actor.centralAdmin ? undefined : eq(staffLgu.lguId, actor.lguId!),
 		input.search
 			? sql`instr(lower(${user.name} || ' ' || ${user.email}), ${input.search.toLowerCase()}) > 0`
 			: undefined,
@@ -64,13 +76,20 @@ export function listAccounts(event: RequestEvent) {
 				? or(eq(user.role, 'user'), isNull(user.role))
 				: eq(user.role, input.role)
 	);
-	const total = db.select({ value: count() }).from(user).where(condition).get()!.value;
+	const total = db
+		.select({ value: count() })
+		.from(user)
+		.leftJoin(staffLgu, eq(staffLgu.userId, user.id))
+		.where(condition)
+		.get()!.value;
 	const pageSize = 20;
 	const page = Math.min(input.page, Math.max(1, Math.ceil(total / pageSize)));
 	const accounts = db
 		.select(summaryColumns)
 		.from(user)
 		.leftJoin(profile, eq(profile.userId, user.id))
+		.leftJoin(staffLgu, eq(staffLgu.userId, user.id))
+		.leftJoin(lgu, eq(lgu.id, staffLgu.lguId))
 		.where(condition)
 		.orderBy(desc(user.createdAt), user.id)
 		.limit(pageSize)
@@ -85,6 +104,13 @@ export function listAccounts(event: RequestEvent) {
 		search: input.search,
 		role: input.role,
 		currentUserId: actor.id,
+		centralAdmin: actor.centralAdmin,
+		lgus: db
+			.select({ id: lgu.id, name: lgu.name, active: lgu.active })
+			.from(lgu)
+			.where(actor.centralAdmin ? undefined : eq(lgu.id, actor.lguId!))
+			.orderBy(lgu.name)
+			.all(),
 		emailConfigured
 	};
 }
@@ -113,6 +139,10 @@ export async function createStaffAccount(
 	return db.transaction(
 		(tx) => {
 			const actor = requireAdmin(event);
+			const selectedLguId = input.lguId ?? actor.lguId ?? 'legacy';
+			if (!actor.centralAdmin && selectedLguId !== actor.lguId)
+				error(403, 'You can create staff only for your LGU.');
+			const selectedLgu = requireLgu(selectedLguId);
 			checkCreationLimit(actor.id);
 			if (
 				tx
@@ -138,6 +168,7 @@ export async function createStaffAccount(
 				})
 				.returning()
 				.get();
+			tx.insert(staffLgu).values({ userId: id, lguId: selectedLguId }).run();
 			tx.insert(account)
 				.values({
 					id: crypto.randomUUID(),
@@ -156,16 +187,27 @@ export async function createStaffAccount(
 					action: input.role === 'admin' ? 'admin_created' : 'dispatcher_created'
 				})
 				.run();
-			return summary(created);
+			return summary({ ...created, lguId: selectedLguId, lguName: selectedLgu.name });
 		},
 		{ behavior: 'immediate' }
 	);
 }
 
-export function accountTarget(id: string | undefined) {
+export function accountTarget(id: string | undefined, event?: RequestEvent) {
 	if (!id || id.length > 128) error(400, 'Invalid account ID.');
 	const target = db.select().from(user).where(eq(user.id, id)).get();
 	if (!target) error(404, 'Account not found.');
+	if (event) {
+		const actor = requireAdmin(event);
+		const targetScope = staffScope(target);
+		if (
+			!actor.centralAdmin &&
+			(!['admin', 'dispatcher'].includes(target.role ?? '') ||
+				targetScope.centralAdmin ||
+				targetScope.lguId !== actor.lguId)
+		)
+			error(404, 'Account not found.');
+	}
 	return target;
 }
 
@@ -173,13 +215,21 @@ export function setAccountActive(event: RequestEvent, id: string | undefined, ac
 	return db.transaction(
 		(tx) => {
 			const actor = requireAdmin(event);
-			const target = accountTarget(id);
-			if (!active && target.role === 'admin' && target.emailVerified && !target.banned) {
+			const target = accountTarget(id, event);
+			if (
+				!active &&
+				target.role === 'admin' &&
+				target.emailVerified &&
+				!target.banned &&
+				staffScope(target).centralAdmin
+			) {
 				const admins = tx
 					.select({ value: count() })
 					.from(user)
+					.leftJoin(staffLgu, eq(staffLgu.userId, user.id))
 					.where(
 						and(
+							isNull(staffLgu.userId),
 							eq(user.role, 'admin'),
 							eq(user.emailVerified, true),
 							or(eq(user.banned, false), isNull(user.banned))

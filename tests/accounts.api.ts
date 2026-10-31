@@ -166,10 +166,13 @@ test('dispatcher creation validates fields, rejects concurrent duplicates, and r
 	expect(created).toMatchObject({ email, role: 'dispatcher', emailVerified: false, active: true });
 	expect(Object.keys(created).sort()).toEqual([
 		'active',
+		'centralAdmin',
 		'createdAt',
 		'email',
 		'emailVerified',
 		'id',
+		'lguId',
+		'lguName',
 		'name',
 		'role'
 	]);
