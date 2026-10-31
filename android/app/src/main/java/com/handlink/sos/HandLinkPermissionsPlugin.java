@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -14,6 +15,7 @@ import android.provider.Settings;
 import androidx.activity.result.ActivityResult;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.location.LocationManagerCompat;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
@@ -74,6 +76,8 @@ public class HandLinkPermissionsPlugin extends Plugin {
         result.put("location", access("location", locationGranted()));
         result.put("camera", access("camera", granted(Manifest.permission.CAMERA)));
         result.put("locationEnabled", isAccessEnabled(getContext(), "location"));
+        LocationManager locations = (LocationManager) getContext().getSystemService(Context.LOCATION_SERVICE);
+        result.put("locationServicesEnabled", locations != null && LocationManagerCompat.isLocationEnabled(locations));
         result.put("cameraEnabled", isAccessEnabled(getContext(), "camera"));
         result.put("overlayAllowed", overlayAllowed);
         result.put("overlayActive", overlayAllowed && HandLinkOverlayService.isActive());
@@ -107,16 +111,38 @@ public class HandLinkPermissionsPlugin extends Plugin {
         getActivity().runOnUiThread(() -> {
             if (!isAccessEnabled(getContext(), "location")) { call.reject("Location access is off in HandLink Settings."); return; }
             if (permissionPending) { call.reject("Another permission request is open."); return; }
-            if (locationGranted()) { call.resolve(snapshot()); return; }
             permissionPending = true;
-            requestPermissionForAlias("location", call, "locationResult");
+            if (locationGranted()) finishLocationEnable(call);
+            else requestPermissionForAlias("location", call, "locationResult");
         });
     }
 
     @PermissionCallback
     private void locationResult(PluginCall call) {
         if ("requestInitial".equals(call.getMethodName())) requestCameraNext(call);
-        else finishPermissions(call);
+        else finishLocationEnable(call);
+    }
+
+    private void finishLocationEnable(PluginCall call) {
+        LocationManager locations = (LocationManager) getContext().getSystemService(Context.LOCATION_SERVICE);
+        if (!locationGranted() || !isAccessEnabled(getContext(), "location") ||
+            (locations != null && LocationManagerCompat.isLocationEnabled(locations))) {
+            finishPermissions(call);
+            return;
+        }
+        try {
+            // Only explicit Location On opens this screen; startup and status checks never do.
+            startActivityForResult(call, new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS), "locationSettingsResult");
+        } catch (RuntimeException exception) {
+            permissionPending = false;
+            call.reject("Turn on Location in phone Settings, then try again.");
+        }
+    }
+
+    @ActivityCallback
+    private void locationSettingsResult(PluginCall call, ActivityResult result) {
+        if (call != null) finishPermissions(call);
+        else permissionPending = false;
     }
 
     private void requestCameraNext(PluginCall call) {

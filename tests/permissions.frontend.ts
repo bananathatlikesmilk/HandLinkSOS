@@ -50,6 +50,46 @@ test('location Off persists, ends sharing and blocks SOS GPS until enabled again
 	expect((await (await page.request.get('/api/sharing')).json()).own.status).toBe('cancelled');
 });
 
+test('Location On requests permission and opens phone Location settings; old APKs get an update instruction', async ({
+	page
+}) => {
+	await installNativeBridge(page);
+	await login(page.request, await provision());
+	await page.goto('/user/settings');
+	const toggle = page.getByRole('switch', { name: 'Location access', exact: true });
+	await expect(toggle).toBeChecked();
+	await page.evaluate(() => {
+		(
+			globalThis as unknown as { __handlinkNativeTest: NativeTestState }
+		).__handlinkNativeTest.accessUnsupported = true;
+	});
+	await toggle.click();
+	await expect(page.getByRole('alert')).toContainText('Update the HandLink APK');
+	await expect(toggle).toBeChecked();
+	await page.evaluate(() => {
+		const device = (globalThis as unknown as { __handlinkNativeTest: NativeTestState })
+			.__handlinkNativeTest;
+		device.accessUnsupported = false;
+		device.locationServicesEnabled = false;
+		device.locationPermission = 'denied';
+		device.locationSettingsEnableOnReturn = true;
+	});
+	await toggle.click();
+	await expect(toggle).not.toBeChecked();
+	await toggle.click();
+	await expect(toggle).toBeChecked();
+	await expect.poll(async () => (await state(page)).locationSettingsOpens).toBe(1);
+	const enabled = await state(page);
+	expect(enabled.locationPermission).toBe('granted');
+	expect(enabled.locationServicesEnabled).toBe(true);
+	expect(enabled.locationRequests).toBe(1);
+	expect(enabled.gpsChecks).toBe(0);
+	expect(enabled.cameraRequests).toBe(0);
+	await toggle.click();
+	await expect(toggle).not.toBeChecked();
+	expect((await state(page)).locationServicesEnabled).toBe(true);
+});
+
 test('phone Location off is shown separately and SOS recovers after enabling it', async ({
 	page
 }) => {

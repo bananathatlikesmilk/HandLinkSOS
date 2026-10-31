@@ -70,11 +70,19 @@
 		}
 		status = { ...status, ...(await setAccessEnabled(kind, true)) };
 		const result =
-			status[kind] === 'granted'
-				? status
-				: await (kind === 'camera' ? requestCameraAccess() : requestLocationAccess());
+			kind === 'location' && native
+				? await requestLocationAccess()
+				: status[kind] === 'granted'
+					? status
+					: await (kind === 'camera' ? requestCameraAccess() : requestLocationAccess());
 		if (!current()) return;
 		status = { ...status, ...result };
+		if (
+			kind === 'location' &&
+			result.location === 'granted' &&
+			result.locationServicesEnabled === false
+		)
+			notice = 'Phone Location is still off. Enable it in phone Settings when ready.';
 		if (result[kind] !== 'granted') {
 			notice = native
 				? 'HandLink use is on. Allow ' + kind + ' in Android Settings.'

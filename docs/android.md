@@ -2,7 +2,9 @@
 
 ## Current online test APK
 
-The debug APK rebuilt on 18 October 2026 targets `https://thebois.fyi/user`. Its embedded server URL and APK signature were verified. This build needs internet access and the deployed backend; it does not need USB forwarding or a local development server. Install the updated APK over the previous localhost build before disconnecting USB.
+The latest debug APK was rebuilt on **1 November 2026** for `https://thebois.fyi/user`: `android/app/build/outputs/apk/debug/app-debug.apk`, 6,529,310 bytes. Signature verification passed. Its packaged DEX contains `HandLinkPermissions.setAccessEnabled` and the explicit Location settings flow. SHA-256: `BCC85DC9AB41B1BF018BB223A0A802D1FA9729D17F8E0C8B20AF808F90B828B7`. Install this rebuilt APK to replace an older binary that reports the method as unimplemented. Deploy the matching web changes too; rebuilding an APK does not deploy the hosted application. No phone was connected for installation or OS verification.
+
+The earlier debug APK rebuilt on 18 October 2026 also targeted `https://thebois.fyi/user`; its embedded URL and signature were verified at that time. The online build needs internet access and the deployed backend, without USB forwarding or a local development server. Install the updated APK over the previous localhost build before disconnecting USB.
 
 To reproduce this target, set `HANDLINK_MOBILE_SERVER_URL=https://thebois.fyi` in the terminal environment before running `pnpm android:prepare`, then build the APK. Running preparation without that variable selects localhost again. The localhost instructions below apply only to builds prepared for USB testing.
 
@@ -102,6 +104,8 @@ The button stays visible when HandLink is minimized or swiped away from Recent a
 The manifest declares `CAMERA`, `SYSTEM_ALERT_WINDOW`, and the `specialUse` foreground-service type with its required permission and subtype explanation. A future Google Play release must declare and justify this foreground-service use for review. Rebuild/install the APK and deploy the web code together; the native bridge is not present in older APKs. Verify initial grant/denial, permanent denial and settings recovery, QR scanning, approximate GPS, special-access return, drag/tap/hide, notification hide, background display, logout, and permission revocation on a physical phone. Automated bridge simulations do not prove these OS behaviors.
 
 The Settings page also checks the phone's master Location service through the installed Geolocation plugin. When disabled, it shows **Phone Location off** even if HandLink's saved access switch remains enabled. It refreshes every three seconds while visible and when returning to the app. This is a read-only check, not a GPS capture or permission request. SOS checks this state before requesting coordinates and gives instructions to enable phone Location and tap **Retry location**. If the user enables Location, Retry resumes normal acquisition and countdown. Browsers cannot reliably read the master phone switch; they show it as not checked. This shared web-code update does not require a new native bridge method or Java change, but must be deployed to the hosted server.
+
+Explicit Location On now requests the location grant and, if needed, opens Android's Location settings screen. The user must enable the phone's master switch there. Back/cancel returns the actual disabled status. Initial setup and read-only refreshes do not open this screen. Location Off stops HandLink use and its updates; it does not change the global phone Location switch or revoke the Android grant. Camera behavior is unchanged. An older APK lacking `setAccessEnabled` needs replacement; it cannot gain that Java method from a web update.
 
 ## Physical-phone checks
 

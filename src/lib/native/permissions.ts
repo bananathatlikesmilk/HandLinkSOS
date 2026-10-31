@@ -78,8 +78,18 @@ export async function assertAccessEnabled(kind: AccessKind) {
 }
 export async function setAccessEnabled(kind: AccessKind, enabled: boolean) {
 	let result: UserPermissionStatus;
-	if (nativePermissionsAvailable()) result = await permissions.setAccessEnabled({ kind, enabled });
-	else {
+	if (nativePermissionsAvailable()) {
+		try {
+			result = await permissions.setAccessEnabled({ kind, enabled });
+		} catch (cause) {
+			if (cause && typeof cause === 'object' && 'code' in cause && cause.code === 'UNIMPLEMENTED')
+				throw new Error(
+					'Update the HandLink APK to use these access switches. The installed app is missing the required native controls.',
+					{ cause }
+				);
+			throw cause;
+		}
+	} else {
 		webAccess[kind] = enabled;
 		try {
 			localStorage.setItem(`handlink:access:${kind}`, enabled ? 'on' : 'off');

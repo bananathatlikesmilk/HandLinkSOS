@@ -26,6 +26,9 @@ export async function installNativeBridge(
 			locationPermission: localStorage.getItem('fixture:location-permission') ?? 'prompt',
 			locationEnabled: localStorage.getItem('fixture:access:location') !== 'off',
 			locationServicesEnabled: localStorage.getItem('fixture:location-services') !== 'off',
+			locationSettingsOpens: 0,
+			locationSettingsEnableOnReturn: false,
+			accessUnsupported: false,
 			cameraEnabled: localStorage.getItem('fixture:access:camera') !== 'off',
 			overlayAllowed: false,
 			overlayActive: false,
@@ -110,6 +113,11 @@ export async function installNativeBridge(
 				) {
 					if (plugin === 'HandLinkPermissions') {
 						if (method === 'setAccessEnabled' && options?.kind) {
+							if (state.accessUnsupported)
+								throw Object.assign(
+									new Error('HandLinkPermissions.setAccessEnabled() is not implemented on android'),
+									{ code: 'UNIMPLEMENTED' }
+								);
 							state[`${options.kind}Enabled`] = options.enabled === true;
 							localStorage.setItem(
 								`fixture:access:${options.kind}`,
@@ -137,6 +145,10 @@ export async function installNativeBridge(
 						if (method === 'requestLocation') {
 							state.locationRequests++;
 							state.locationPermission = state.permissionDeny ? 'denied' : 'granted';
+							if (state.locationPermission === 'granted' && !state.locationServicesEnabled) {
+								state.locationSettingsOpens++;
+								if (state.locationSettingsEnableOnReturn) state.locationServicesEnabled = true;
+							}
 						}
 						if (method === 'openOverlaySettings') state.overlayAllowed = true;
 						if (method === 'startOverlay') {
@@ -160,6 +172,7 @@ export async function installNativeBridge(
 							camera: state.cameraPermission,
 							cameraEnabled: state.cameraEnabled,
 							locationEnabled: state.locationEnabled,
+							locationServicesEnabled: state.locationServicesEnabled,
 							overlayAllowed: state.overlayAllowed,
 							overlayActive: state.overlayActive,
 							initialRequested: Boolean(localStorage.getItem(initialKey)),
@@ -247,6 +260,9 @@ export async function installNativeBridge(
 }
 
 export type NativeTestState = {
+	locationSettingsOpens: number;
+	locationSettingsEnableOnReturn: boolean;
+	accessUnsupported: boolean;
 	locationServicesEnabled: boolean;
 	locationEnabled: boolean;
 	cameraEnabled: boolean;
