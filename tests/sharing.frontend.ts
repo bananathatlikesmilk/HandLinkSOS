@@ -2,6 +2,46 @@ import { expect, test } from '@playwright/test';
 import { database, headers, login, origin, provision } from './incident-fixture';
 import { approveSharingTrust, expireSharing, sharingInput } from './sharing-fixture';
 
+test('Select all sharing recipients supports partial selection and sends only eligible accounts', async ({
+	page
+}) => {
+	const owner = await provision(),
+		first = await provision(),
+		second = await provision(),
+		stranger = await provision();
+	approveSharingTrust(owner.profileId, first.profileId);
+	approveSharingTrust(owner.profileId, second.profileId);
+	await login(page.request, owner);
+	await page.addInitScript(() =>
+		localStorage.setItem('handlink:initial-device-permissions:v1', 'attempted')
+	);
+	await page.context().grantPermissions(['geolocation']);
+	await page.context().setGeolocation({ latitude: 14.5995, longitude: 120.9842 });
+	await page.goto('/user/sharing');
+	const all = page.getByRole('checkbox', { name: 'Select all recipients', exact: true });
+	const people = page.getByRole('checkbox', { name: /Casey Reyes/ });
+	await expect(people).toHaveCount(2);
+	await expect(all).not.toBeChecked();
+	await all.check();
+	for (const person of await people.all()) await expect(person).toBeChecked();
+	await people.first().uncheck();
+	await expect(all).toBeChecked({ indeterminate: true });
+	await all.click();
+	await expect(all).toBeChecked();
+	await all.uncheck();
+	for (const person of await people.all()) await expect(person).not.toBeChecked();
+	await all.check();
+	await page.getByRole('button', { name: 'Share location', exact: true }).click();
+	await expect(page.getByText('Location sharing active', { exact: true })).toBeVisible();
+	const result = await (await page.request.get('/api/sharing')).json();
+	expect(result.own.recipients.map((person: { userId: string }) => person.userId).sort()).toEqual(
+		[first.id, second.id].sort()
+	);
+	expect(result.own.recipients.map((person: { userId: string }) => person.userId)).not.toContain(
+		stranger.id
+	);
+});
+
 test('one-minute sharing warning reaches owner and trusted viewer and clears after stopping or expiry', async ({
 	page,
 	browser

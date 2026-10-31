@@ -473,3 +473,17 @@ The following entries have fuller assistant/tool evidence in the available conve
 **Verification and concrete next step:** Rechecked the existing local debug APK: 6,529,310 bytes and SHA-256 `BCC85DC9AB41B1BF018BB223A0A802D1FA9729D17F8E0C8B20AF808F90B828B7`, matching H040's signature/DEX-verified build. Created and hash-checked an identical copy named `android/app/build/outputs/apk/debug/handlink-permissions-2026-11-01.apk` so the user can distinguish it from older downloads. This is a renamed copy, not a new build or code change. Instruct the user to install this file over the existing app, then close and reopen HandLink. ADB returned no connected devices, so the agent could not install it or verify the installed package.
 
 **Scope and records:** Camera behavior remains unchanged. Updated PROJECT_CONTEXT.md and appended this entry. Baseline `894f314` now contains the preceding Location-toggle fix. No application tests were rerun because application code did not change. No new APK compilation, commit, push, deployment, physical-device installation, secret access, or production-record access occurred.
+
+### H043 — Select all eligible location-sharing recipients
+
+**Date:** 1 November 2026, Asia/Manila.
+
+**User objective:** Add an All option for Share location. Interpreted as bulk-selecting the existing eligible recipient list, not public sharing or bypassing trusted-profile approval.
+
+**Change:** Added a Select all checkbox with partial-selection state and a selected-recipient count. Checking selects all current server-listed candidates; unchecking clears them. Individual checkboxes remain available. Polling removes selected IDs that are no longer eligible, without adding new people automatically or changing the snapshot of an uncertain pending sharing request. Selecting recipients does not initiate sharing; the existing timer and Share location submission remain required. Server eligibility, ownership, revocation, and the existing 20-recipient maximum remain unchanged. The form displays that maximum; more than 20 selections require narrowing before submission and are never silently truncated.
+
+**Verification:** A focused isolated browser integration test passed: select all, individual deselection/partial state, selecting the remainder, clearing all, actual GPS-backed sharing to two eligible accounts, and exclusion of an unrelated account. The production build succeeded within that run. Targeted ESLint and source formatting passed. Consulted current Svelte checkbox/group documentation through Context7; Svelte MCP/autofixer was unavailable. Final local type diagnostics are recorded below.
+
+**Final diagnostics:** `pnpm check` reported zero errors and zero warnings. Documentation/source formatting and `git diff --check` passed.
+
+**Records and limits:** Updated PROJECT_CONTEXT.md and this history. Baseline `7240fde` was inspected. No backend schema, native code, permission, camera, or APK changes were made. No commit, push, deployment, physical-device verification, secret access, or production-data access occurred. This is local web UI work and requires deployment before it appears on the hosted site/app.

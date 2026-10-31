@@ -14,6 +14,10 @@
 	let sharing = $state<SharingState | null>(null);
 	let minutes = $state(15);
 	let selected = $state<string[]>([]);
+	const allSelected = $derived(
+		!!sharing?.recipients.length &&
+			sharing.recipients.every((person) => selected.includes(person.userId))
+	);
 	let error = $state('');
 	let busy = $state(false);
 	let loading = $state(true);
@@ -77,6 +81,10 @@
 				});
 				if (!stopped && !controller.signal.aborted && owner === page.data.account?.id) {
 					sharing = result;
+					if (!pending)
+						selected = selected.filter((id) =>
+							result.recipients.some((person) => person.userId === id)
+						);
 					loading = false;
 				}
 			} catch (cause) {
@@ -276,6 +284,26 @@
 			>
 			<fieldset disabled={busy || !!pending} class="space-y-3">
 				<legend class="mb-3 font-medium">Choose recipients</legend>
+				{#if sharing.recipients.length}
+					<label class="flex min-h-11 items-center gap-3 font-medium">
+						<input
+							type="checkbox"
+							class="checkbox checkbox-sm"
+							aria-label="Select all recipients"
+							checked={allSelected}
+							indeterminate={selected.length > 0 && !allSelected}
+							onchange={(event) => {
+								selected = event.currentTarget.checked
+									? sharing!.recipients.map((person) => person.userId)
+									: [];
+							}}
+						/>
+						Select all
+					</label>
+					<p class="user-copy text-sm">
+						{selected.length} selected · Up to 20 recipients per session.
+					</p>
+				{/if}
 				{#each sharing.recipients as recipient (recipient.userId)}<label
 						class="flex min-h-11 items-center gap-3"
 						><input
