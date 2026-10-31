@@ -100,6 +100,10 @@ export const addendumInput = z.strictObject({
 	notes: z.string().trim().min(1).max(2000)
 });
 export const incidentListInput = z.strictObject({
+	from: z.iso.date().optional(),
+	to: z.iso.date().optional(),
+	dispatcherId: z.string().min(1).max(100).optional(),
+	sosType: z.enum(['all', 'self', 'trusted']).default('all'),
 	lguId: z.string().min(1).max(100).optional(),
 	view: z.enum(['alerts', 'reports']).default('alerts'),
 	search: z.string().trim().max(100).default(''),

@@ -1,5 +1,5 @@
 import { error, type RequestEvent } from '@sveltejs/kit';
-import { and, count, desc, eq, gt, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gt, gte, lt, isNull, ne, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { z } from 'zod';
 import type { IncidentDetail, IncidentReport, IncidentSummary } from '../incidents.ts';
@@ -316,14 +316,30 @@ export function createIncident(event: RequestEvent, input: z.output<typeof incid
 	);
 }
 
-export function listStaffIncidents(event: RequestEvent) {
+function staffIncidentSearch(event: RequestEvent) {
 	const actor = requireStaff(event);
 	const parsed = incidentListInput.safeParse(Object.fromEntries(event.url.searchParams));
 	if (!parsed.success) error(422, 'Invalid incident search, filter, or page.');
 	const input = parsed.data;
+	if (input.from && input.to && input.from > input.to)
+		error(422, 'Start date must be on or before end date.');
 	if (input.lguId && !actor.centralAdmin && input.lguId !== actor.lguId)
 		error(403, 'Choose your assigned LGU.');
 	const condition = and(
+		// Calendar dates describe Philippine days, regardless of the server timezone.
+		input.from ? gte(incident.startedAt, new Date(`${input.from}T00:00:00+08:00`)) : undefined,
+		input.to
+			? lt(
+					incident.startedAt,
+					new Date(new Date(`${input.to}T00:00:00+08:00`).getTime() + 86400000)
+				)
+			: undefined,
+		input.dispatcherId ? eq(incident.dispatcherUserId, input.dispatcherId) : undefined,
+		input.sosType === 'self'
+			? eq(profile.userId, incident.callerUserId)
+			: input.sosType === 'trusted'
+				? ne(profile.userId, incident.callerUserId)
+				: undefined,
 		actor.centralAdmin ? undefined : eq(routingLguId, actor.lguId!),
 		input.lguId === 'unrouted'
 			? isNull(routingLguId)
@@ -345,6 +361,11 @@ export function listStaffIncidents(event: RequestEvent) {
 			? sql`instr(lower(${incidentReferenceCode} || ' ' || ${incident.id} || ' ' || ${incident.callerName} || ' ' || ${profile.firstName} || ' ' || ${profile.lastName}), ${input.search.toLowerCase()}) > 0`
 			: undefined
 	);
+	return { actor, input, condition };
+}
+
+export function listStaffIncidents(event: RequestEvent) {
+	const { actor, input, condition } = staffIncidentSearch(event);
 	const total = db
 		.select({ n: count() })
 		.from(incident)
@@ -354,7 +375,7 @@ export function listStaffIncidents(event: RequestEvent) {
 		.where(condition)
 		.get()!.n;
 	const pageSize = 20;
-	const page = Math.min(parsed.data.page, Math.max(1, Math.ceil(total / pageSize)));
+	const page = Math.min(input.page, Math.max(1, Math.ceil(total / pageSize)));
 	return {
 		incidents: summaries()
 			.where(condition)
@@ -367,6 +388,56 @@ export function listStaffIncidents(event: RequestEvent) {
 		page,
 		pageSize,
 		currentUserId: actor.id
+	};
+}
+
+export function filteredIncidentReports(event: RequestEvent) {
+	// Reuse exactly the queue's access checks and predicates; never trust an exported ID list.
+	const url = new URL(event.url);
+	url.searchParams.set('view', 'reports');
+	const searchEvent = { ...event, url } as RequestEvent;
+	return db.transaction(() => {
+		const { condition, input, actor } = staffIncidentSearch(searchEvent);
+		const rows = summaries()
+			.where(condition)
+			.orderBy(desc(incident.startedAt), incident.id)
+			.limit(101)
+			.all();
+		if (rows.length > 100)
+			error(422, 'More than 100 reports match. Narrow your filters before exporting.');
+		if (!rows.length) error(422, 'No reports match these filters.');
+		return {
+			input,
+			scope: actor.centralAdmin ? 'Central Admin' : (actor.lguName ?? 'Assigned LGU'),
+			reports: rows.map((row) => getIncidentReport(event, row.id))
+		};
+	});
+}
+
+export function reportFilterOptions(event: RequestEvent) {
+	const url = new URL(event.url);
+	url.search = '?view=reports&status=All';
+	const { condition } = staffIncidentSearch({ ...event, url } as RequestEvent);
+	const rows = summaries().where(condition).groupBy(incident.dispatcherUserId, routingLguId).all();
+	return {
+		dispatchers: [
+			...new Map(
+				rows
+					.filter((row) => row.dispatcherUserId)
+					.map((row) => [
+						row.dispatcherUserId!,
+						{ id: row.dispatcherUserId!, name: row.dispatcherName ?? 'Unavailable' }
+					])
+			).values()
+		],
+		lgus: [
+			...new Map(
+				rows.map((row) => [
+					row.lguId ?? 'unrouted',
+					{ id: row.lguId ?? 'unrouted', name: row.lguName ?? 'Central review' }
+				])
+			).values()
+		]
 	};
 }
 

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import IncidentCancellationReview from './IncidentCancellationReview.svelte';
 	import IncidentLocation from './IncidentLocation.svelte';
 	import { routingDescription } from '#lib/lgu.ts';
@@ -7,14 +8,24 @@
 	import { page as route } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { beforeNavigate } from '$app/navigation';
-	import { Archive, Check, FileText, RefreshCw, Search } from '@lucide/svelte';
+	import { Archive, Check, Download, FileText, RefreshCw, Search } from '@lucide/svelte';
 	import type { IncidentReport, IncidentSummary } from '#lib/incidents.ts';
 	let incidents = $state<IncidentSummary[]>([]);
 	let selected = $state<IncidentReport | null>(null);
 	let selectedId = $state('');
 	let currentUserId = $state('');
 	let search = $state('');
-	let appliedSearch = '';
+	let appliedQuery = $state('');
+	let from = $state('');
+	let to = $state('');
+	let dispatcherId = $state('');
+	let lguId = $state('');
+	let sosType = $state('all');
+	let exporting = $state(false);
+	let options = $state<{
+		dispatchers: { id: string; name: string }[];
+		lgus: { id: string; name: string }[];
+	}>({ dispatchers: [], lgus: [] });
 	let filter = $state('All');
 	let page = $state(1);
 	let total = $state(0);
@@ -112,12 +123,20 @@
 			addendumRetry = undefined;
 		}
 		try {
-			const query = new URLSearchParams({
-				view: 'reports',
-				search: poll ? appliedSearch : (appliedSearch = search.trim()),
-				status: filter,
-				page: String(nextPage)
-			});
+			const query =
+				poll && appliedQuery
+					? new SvelteURLSearchParams(appliedQuery)
+					: new SvelteURLSearchParams({
+							view: 'reports',
+							search: search.trim(),
+							status: filter,
+							sosType
+						});
+			if (!poll)
+				for (const [key, value] of Object.entries({ from, to, dispatcherId, lguId })) {
+					if (value) query.set(key, value);
+				}
+			query.set('page', String(nextPage));
 			const result = await request<{
 				incidents: IncidentSummary[];
 				total: number;
@@ -126,6 +145,7 @@
 				currentUserId: string;
 			}>(`${endpoint}?${query}`, { signal: controller.signal });
 			if (disposed || controller.signal.aborted) return;
+			appliedQuery = query.toString();
 			incidents = result.incidents;
 			total = result.total;
 			page = result.page;
@@ -144,6 +164,32 @@
 				queueController = undefined;
 				if (!disposed) loading = false;
 			}
+		}
+	}
+	async function exportPdf() {
+		if (exporting || !appliedQuery || loading || queueError) return;
+		exporting = true;
+		actionError = '';
+		try {
+			const response = await fetch(`${resolve('/api/staff/reports/export')}?${appliedQuery}`, {
+				cache: 'no-store'
+			});
+			if (!response.ok) {
+				const result = await response.json().catch(() => null);
+				throw new Error(result?.message ?? 'PDF export failed. Refresh and retry.');
+			}
+			const blob = await response.blob();
+			if (disposed) return;
+			const url = URL.createObjectURL(blob);
+			const link = document.createElement('a');
+			link.href = url;
+			link.download = 'handlink-filtered-reports.pdf';
+			link.click();
+			setTimeout(() => URL.revokeObjectURL(url), 60000);
+		} catch (cause) {
+			if (!disposed) actionError = cause instanceof Error ? cause.message : 'PDF export failed.';
+		} finally {
+			if (!disposed) exporting = false;
 		}
 	}
 	async function changeStatus(status: 'On route' | 'Resolved') {
@@ -219,6 +265,13 @@
 	});
 	onMount(() => {
 		void loadQueue();
+		void request<typeof options>(resolve('/api/staff/reports/filters'))
+			.then((result) => {
+				if (!disposed) options = result;
+			})
+			.catch(() => {
+				if (!disposed) actionError = 'Could not load LGU and dispatcher filters. Refresh to retry.';
+			});
 		const refresh = () => {
 			if (document.visibilityState === 'visible') void loadQueue(page, true, true);
 		};
@@ -279,6 +332,7 @@
 					>Status<select
 						class="select w-full"
 						bind:value={filter}
+						aria-label="Status"
 						disabled={busy}
 						onchange={(event) => {
 							filter = event.currentTarget.value;
@@ -289,8 +343,67 @@
 						></select
 					></label
 				>
-				<button class="btn w-full btn-outline" disabled={busy || loading}>Search reports</button>
+				<label class="field-label"
+					>Started from (Philippine time)<input
+						class="input w-full"
+						type="date"
+						bind:value={from}
+						max={to || undefined}
+						disabled={busy}
+					/></label
+				>
+				<label class="field-label"
+					>Started through<input
+						class="input w-full"
+						type="date"
+						bind:value={to}
+						min={from || undefined}
+						disabled={busy}
+					/></label
+				>
+				<label class="field-label"
+					>Dispatcher<select
+						aria-label="Dispatcher"
+						class="select w-full"
+						bind:value={dispatcherId}
+						disabled={busy}
+						><option value="">All permitted dispatchers</option
+						>{#each options.dispatchers as staff (staff.id)}<option value={staff.id}
+								>{staff.name}</option
+							>{/each}</select
+					></label
+				>
+				<label class="field-label"
+					>LGU<select aria-label="LGU" class="select w-full" bind:value={lguId} disabled={busy}
+						><option value="">All permitted LGUs</option>{#each options.lgus as lgu (lgu.id)}<option
+								value={lgu.id}>{lgu.name}</option
+							>{/each}</select
+					></label
+				>
+				<label class="field-label"
+					>SOS type<select
+						aria-label="SOS type"
+						class="select w-full"
+						bind:value={sosType}
+						disabled={busy}
+						><option value="all">All SOS types</option><option value="self">For self</option><option
+							value="trusted">For a trusted person</option
+						></select
+					></label
+				>
+				<button class="btn w-full btn-outline" disabled={busy || loading}>Apply filters</button>
 			</form>
+			<button
+				type="button"
+				class="btn mt-3 w-full btn-primary"
+				disabled={busy || loading || exporting || !!queueError || !total}
+				onclick={exportPdf}
+				><Download size={17} />{exporting ? 'Creating PDF…' : 'Download filtered PDF'}</button
+			>
+			<p class="muted mt-2 text-xs">
+				PDF uses applied filters across all pages. Maximum 100 reports. Apply changes before
+				downloading.
+			</p>
 			<div class="report-choices mt-5">
 				{#if queueError}<p role="alert">{queueError}</p>
 				{:else if loading}<p role="status">Loading reports…</p>

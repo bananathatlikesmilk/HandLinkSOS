@@ -1,6 +1,6 @@
 # HandLink-SOS project context
 
-Last inspected: **31 October 2026, Asia/Manila**. Local branch: `main`; inspected baseline HEAD: `36d44ad` (`permission fix`). Multi-LGU changes described below are local, uncommitted work. Earlier authorship inspections used the commits recorded in the historical notes below. No new GitHub synchronization or production deployment was verified.
+Last inspected: **1 November 2026, Asia/Manila**. Local branch: `main`; inspected baseline HEAD: `df1ea72` (`central admin fix`). Multi-LGU sources are present in this baseline; filtered-PDF report changes are new local work. Earlier inspections used the commits recorded in the historical notes below. No new GitHub synchronization or production deployment was verified.
 
 ### Local Git authorship maintenance
 
@@ -148,6 +148,14 @@ Android native code uses `Intent.ACTION_DIAL` with 911 prepared. The user must p
 
 The presence of a `call_session` table is **not evidence of implemented VoIP, telephony-provider integration, automatic call placement, audio recording, or call transcription**. Inspection found its schema declaration but not an active provider-call workflow.
 
+### Filtered PDF reports, 1 November 2026
+
+The shared Admin/Dispatcher report archive now supports name/reference search, status, inclusive started-date range in Philippine time, dispatcher, LGU, and self/trusted-person SOS filters. Click **Apply filters**, then **Download filtered PDF**. The PDF includes all matching archive pages, not just the twenty displayed rows. More than 100 matches returns an instruction to narrow the filters; zero matches returns a clear error rather than an empty or silently truncated file.
+
+The server reuses the archive query and existing staff/MFA/LGU/dispatcher ownership checks. Dropdown choices come only from reports the viewer may access. A second access/data check after asynchronous PDF generation rejects changed or revoked results. PDFs use private/no-store responses and include a filter summary, generation time, saved notes, dated addenda, separately labeled reporter/beneficiary location snapshots, cancellation information, and AI review/staleness labels. They do not add registered medical-profile or emergency-contact fields. Exported files contain personal incident information and must be shared only with authorized recipients.
+
+Sources: [Reports.svelte](src/lib/components/Reports.svelte), [incident queries](src/lib/server/incidents.ts), [PDF rendering](src/lib/server/report-pdf.ts), and [export endpoint](src/routes/api/staff/reports/export/+server.ts). PDFKit and an embedded Noto Sans Latin font provide server-side PDF generation; PDF.js is a development-only parsing/rendering test dependency. No schema migration is needed. Local implementation does not establish server deployment or Android download behavior.
+
 ### AI summaries
 
 - Admin selects Ollama or Gemini system-wide in AI settings. Keys remain server-only; dispatchers see configuration status, not credentials.
@@ -189,9 +197,9 @@ Source of truth: `src/lib/server/db/schema.ts`, `handlink.schema.ts`, and applie
 | Notifications                | `device`, `notification`, `push_delivery`: session-linked device registrations, User notifications, delivery attempts/leases/states. These tables contain private identifiers and must not be exported into context files.                                                                                                |
 | Other schema                 | `call_session` is schema-only scaffolding for potential provider calls; `task` is an existing starter table, not a central SOS feature.                                                                                                                                                                                   |
 
-Migrations are committed from `0000` through **`0014_incident_person_location.sql`** in the inspected baseline, registered in `drizzle/meta/_journal.json`. These include MFA, account management, cancellation, AI reports, short incident references, push, seed history, addenda, provider settings, favorites, and beneficiary location snapshots.
+Migrations are committed from `0000` through **`0015_multi_lgu.sql`** in inspected baseline `df1ea72`, registered in `drizzle/meta/_journal.json`. These include MFA, account management, cancellation, AI reports, short incident references, push, seed history, addenda, provider settings, favorites, beneficiary location snapshots, and LGU isolation.
 
-Correction to the earlier local status: migration `0014` is now committed in baseline `36d44ad`; its production application remains unverified. New local migration **`0015_multi_lgu.sql`** is registered but uncommitted. It adds LGU ownership without rewriting original user/incident/medical/note rows and passed an isolated preservation test. No production migration was performed.
+Correction to earlier local status: migrations `0014` and `0015` are now present in committed baseline `df1ea72`; their production application remains unverified. Migration `0015` adds LGU ownership without rewriting original user/incident/medical/note rows and previously passed an isolated preservation test. No production migration was performed during the PDF-report work.
 
 `scripts/migrate.mjs` backs up existing databases into ignored `.db-backups`, applies migrations, and checks foreign keys. `scripts/seed.ts` seeds the initial Admin once using `seed_history` and an immediate transaction. The bootstrap Admin is email-verified by provisioning; staff MFA still applies. This differs from the separate interactive admin-creation path described in older docs. Never infer that a local Admin exists on the production database.
 
