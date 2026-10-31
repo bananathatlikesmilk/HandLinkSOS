@@ -107,6 +107,8 @@ The Settings page also checks the phone's master Location service through the in
 
 Explicit Location On now requests the location grant and, if needed, opens Android's Location settings screen. The user must enable the phone's master switch there. Back/cancel returns the actual disabled status. Initial setup and read-only refreshes do not open this screen. Location Off stops HandLink use and its updates; it does not change the global phone Location switch or revoke the Android grant. Camera behavior is unchanged. An older APK lacking `setAccessEnabled` needs replacement; it cannot gain that Java method from a web update.
 
+The Location checkbox now also shows **Off** whenever the phone's Location service is known to be disabled, as requested on 1 November 2026. Turning it On still opens the grant/Location settings flow; backing out with services disabled leaves it Off. Camera is unchanged. This display follows actual service availability without erasing the saved HandLink preference. Observing phone Location Off does not automatically cancel a server sharing session; use the sharing page to end it. This correction changes hosted web UI only and does not require rebuilding the already updated APK.
+
 ## Physical-phone checks
 
 - Confirm login, logout, QR camera access, SOS countdown/cancellation, and sharing start/stop work in the installed app.

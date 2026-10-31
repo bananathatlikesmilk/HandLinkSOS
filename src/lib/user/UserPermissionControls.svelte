@@ -29,7 +29,10 @@
 	let actionGeneration = 0;
 	const unavailable = $derived(disabled || working || !status);
 	// The switch owns saved app use; OS grants and hardware activity are separate states.
-	const locationOn = $derived(!!status && status.locationEnabled !== false);
+	// A known-disabled phone Location service also makes the Location switch show Off.
+	const locationOn = $derived(
+		!!status && status.locationEnabled !== false && status.locationServicesEnabled !== false
+	);
 	const cameraOn = $derived(!!status && status.cameraEnabled !== false);
 	function current() {
 		return mounted && accountId === page.data.account?.id;
@@ -170,7 +173,7 @@
 			<MapPin size={20} aria-hidden="true" />
 			<div>
 				<h3>Location access</h3>
-				<p>For SOS and sharing. Off ends active sharing.</p>
+				<p>For SOS and sharing. Switching off here ends sharing.</p>
 				{#if status?.locationServicesEnabled === false}<p class="user-error">
 						Phone Location is off. Turn it on in Quick Settings or phone Settings.
 					</p>

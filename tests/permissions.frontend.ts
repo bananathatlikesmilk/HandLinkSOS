@@ -70,12 +70,16 @@ test('Location On requests permission and opens phone Location settings; old APK
 		const device = (globalThis as unknown as { __handlinkNativeTest: NativeTestState })
 			.__handlinkNativeTest;
 		device.accessUnsupported = false;
+	});
+	await toggle.click();
+	await expect(toggle).not.toBeChecked();
+	await page.evaluate(() => {
+		const device = (globalThis as unknown as { __handlinkNativeTest: NativeTestState })
+			.__handlinkNativeTest;
 		device.locationServicesEnabled = false;
 		device.locationPermission = 'denied';
 		device.locationSettingsEnableOnReturn = true;
 	});
-	await toggle.click();
-	await expect(toggle).not.toBeChecked();
 	await toggle.click();
 	await expect(toggle).toBeChecked();
 	await expect.poll(async () => (await state(page)).locationSettingsOpens).toBe(1);
@@ -105,13 +109,17 @@ test('phone Location off is shown separately and SOS recovers after enabling it'
 		).__handlinkNativeTest.locationServicesEnabled = false;
 	});
 	// No focus event: visible settings must notice Quick Settings changes by polling too.
-	await expect(page.getByText('Phone Location off', { exact: true })).toBeVisible();
-	await expect(toggle).toBeChecked();
-	await toggle.click();
+	await expect(
+		page.getByText('Phone Location is off. Turn it on in Quick Settings or phone Settings.', {
+			exact: true
+		})
+	).toBeVisible();
 	await expect(toggle).not.toBeChecked();
 	await toggle.click();
-	await expect(toggle).toBeChecked();
-	await expect(page.getByText('Phone Location off', { exact: true })).toBeVisible();
+	await expect.poll(async () => (await state(page)).locationSettingsOpens).toBe(1);
+	// Cancelling phone settings must leave the switch Off, even with saved app use enabled.
+	await expect(toggle).not.toBeChecked();
+	expect((await state(page)).locationEnabled).toBe(true);
 	let submissions = 0;
 	page.on('request', (request) => {
 		if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/incidents')
