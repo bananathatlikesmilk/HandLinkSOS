@@ -2,7 +2,16 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { Eye, EyeOff, TriangleAlert } from '@lucide/svelte';
+	import {
+		ArrowRight,
+		ClipboardCheck,
+		Eye,
+		EyeOff,
+		HeartHandshake,
+		ShieldCheck,
+		Siren,
+		TriangleAlert
+	} from '@lucide/svelte';
 	import AuthFrame from './AuthFrame.svelte';
 
 	import { onMount, tick } from 'svelte';
@@ -233,35 +242,73 @@
 </svelte:head>
 <AuthFrame>
 	<main class="auth-main" id="main-content">
-		<div class="auth-content">
+		<div class="auth-content" class:memo-active={showEmergencyMemo}>
 			<h1 id="auth-title">{title}</h1>
 			<p class="role-label">
-				{mode === 'login' ? 'User · Dispatcher · Admin' : 'Account recovery'}
+				{showEmergencyMemo
+					? 'Please read before you continue.'
+					: mode === 'login'
+						? 'User · Dispatcher · Admin'
+						: 'Account recovery'}
 			</p>
 			{#if showEmergencyMemo}
 				<section class="emergency-memo" aria-labelledby="emergency-memo-heading">
-					<TriangleAlert size={32} aria-hidden="true" />
-					<h2 id="emergency-memo-heading" bind:this={memoHeading} tabindex="-1">
-						Important safety notice
-					</h2>
-					<p><strong>HandLink is for real emergencies. It is not a game.</strong></p>
-					<ul>
-						<li>Do not send prank SOS alerts, false reports, or test emergencies.</li>
-						<li>Give accurate information. Send SOS for others only when they need urgent help.</li>
+					<header class="memo-heading">
+						<span class="memo-emblem"><ShieldCheck size={28} aria-hidden="true" /></span>
+						<div>
+							<p class="memo-eyebrow">USE WITH CARE</p>
+							<h2 id="emergency-memo-heading" bind:this={memoHeading} tabindex="-1">
+								Important safety notice
+							</h2>
+						</div>
+					</header>
+					<p class="memo-intro">
+						<strong>HandLink is for real emergencies. It is not a game.</strong>
+					</p>
+					<ul class="memo-rules">
 						<li>
-							False alerts waste emergency resources and can delay help for someone in danger.
+							<span class="memo-rule-icon"><Siren size={20} aria-hidden="true" /></span>
+							<div>
+								<strong>Real emergencies only</strong>
+								<p>Do not send prank SOS alerts, false reports, or test emergencies.</p>
+							</div>
+						</li>
+						<li>
+							<span class="memo-rule-icon"><ClipboardCheck size={20} aria-hidden="true" /></span>
+							<div>
+								<strong>Share accurate details</strong>
+								<p>
+									Give accurate information. Send SOS for others only when they need urgent help.
+								</p>
+							</div>
+						</li>
+						<li>
+							<span class="memo-rule-icon"><HeartHandshake size={20} aria-hidden="true" /></span>
+							<div>
+								<strong>Protect people who need help</strong>
+								<p>
+									False alerts waste emergency resources and can delay help for someone in danger.
+								</p>
+							</div>
 						</li>
 					</ul>
-					<p>Use HandLink responsibly. Every alert must be taken seriously.</p>
+					<div class="memo-reminder">
+						<TriangleAlert size={19} aria-hidden="true" />
+						<p>Use HandLink responsibly. Every alert must be taken seriously.</p>
+					</div>
+					{#if error}<p class="form-error" role="alert">{error}</p>{/if}
+					<button
+						class="memo-continue"
+						type="button"
+						disabled={busy}
+						onclick={acknowledgeEmergencyMemo}
+					>
+						<span>{busy ? 'Opening workspace...' : 'I understand. Continue'}</span><ArrowRight
+							size={19}
+							aria-hidden="true"
+						/>
+					</button>
 				</section>
-				{#if error}<p class="form-error" role="alert">{error}</p>{/if}
-				<button
-					class="continue-button memo-continue"
-					type="button"
-					disabled={busy}
-					onclick={acknowledgeEmergencyMemo}
-					>{busy ? 'Opening workspace...' : 'I understand. Continue'}</button
-				>
 			{:else if mode === 'recovery'}
 				{#if !emailConfigured}
 					<p class="auth-subtitle" role="status">
@@ -461,41 +508,164 @@
 
 <style>
 	.emergency-memo {
+		--memo-bg: #151a17;
+		--memo-text: #edf5f0;
+		--memo-muted: #b6c7bd;
+		--memo-border: #39483e;
+		--memo-accent: #9ae1c0;
+		--memo-soft: #23372c;
+		--memo-button-text: #10291d;
+		--memo-warning-bg: #352c1c;
+		--memo-warning-text: #f3d79e;
+		--memo-warning-border: #5a4525;
 		display: grid;
-		gap: 1rem;
-		padding: 1.25rem;
-		border: 2px solid #fbbf24;
-		border-radius: 14px;
-		background: #211912;
-		color: #fff2d5;
-		font-size: 16px;
-		line-height: 1.6;
+		gap: 18px;
+		padding: 24px;
+		border: 1px solid var(--memo-border);
+		border-top: 4px solid var(--memo-accent);
+		border-radius: 22px;
+		background: var(--memo-bg);
+		color: var(--memo-text);
+		box-shadow: 0 20px 60px #0005;
+		font-size: 15px;
+		line-height: 1.55;
 		text-shadow: none;
+	}
+	.auth-content.memo-active {
+		width: min(100%, 480px);
+		text-shadow: none;
+	}
+	.memo-active h1 {
+		font-size: 30px;
+		font-weight: 600;
+		letter-spacing: -0.025em;
+	}
+	.memo-active .role-label {
+		margin: 10px 0 24px;
+	}
+	.memo-heading {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
+	.memo-heading > div {
+		min-width: 0;
+	}
+	.memo-emblem {
+		display: grid;
+		place-items: center;
+		flex: 0 0 48px;
+		height: 48px;
+		border-radius: 15px;
+		background: var(--memo-soft);
+		color: var(--memo-accent);
+	}
+	.emergency-memo .memo-eyebrow {
+		margin-bottom: 3px;
+		font-size: 10px;
+		font-weight: 750;
+		letter-spacing: 0.13em;
+		color: var(--memo-accent);
 	}
 	.emergency-memo h2 {
 		margin: 0;
 		font-size: 20px;
 		font-weight: 700;
+		line-height: 1.3;
+		letter-spacing: -0.02em;
 	}
 	.emergency-memo p,
 	.emergency-memo ul {
 		margin: 0;
 	}
-	.emergency-memo ul {
-		padding-left: 1.25rem;
-		list-style: disc;
+	.memo-intro {
+		font-size: 16px;
 	}
-	.emergency-memo li + li {
-		margin-top: 0.75rem;
+	.emergency-memo .memo-rules {
+		padding: 0;
+		list-style: none;
+	}
+	.memo-rules li {
+		display: flex;
+		align-items: flex-start;
+		gap: 11px;
+		padding-block: 14px;
+		border-top: 1px solid var(--memo-border);
+	}
+	.memo-rules li:last-child {
+		padding-bottom: 0;
+	}
+	.memo-rule-icon {
+		display: grid;
+		place-items: center;
+		flex: 0 0 32px;
+		height: 32px;
+		border-radius: 10px;
+		background: var(--memo-soft);
+		color: var(--memo-accent);
+	}
+	.memo-rules strong {
+		font-size: 14px;
+		font-weight: 700;
+	}
+	.memo-rules p {
+		margin-top: 3px;
+		color: var(--memo-muted);
+	}
+	.memo-reminder {
+		display: flex;
+		align-items: flex-start;
+		gap: 10px;
+		padding: 12px;
+		border: 1px solid var(--memo-warning-border);
+		border-radius: 12px;
+		background: var(--memo-warning-bg);
+		color: var(--memo-warning-text);
+		font-size: 14px;
+	}
+	.memo-reminder :global(svg) {
+		flex-shrink: 0;
+		margin-top: 2px;
 	}
 	.memo-continue {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 12px;
 		width: 100%;
-		margin-top: 1.5rem;
+		min-height: 52px;
+		padding: 12px 16px;
+		border: 1px solid var(--memo-accent);
+		border-radius: 12px;
+		background: var(--memo-accent);
+		color: var(--memo-button-text);
+		font-size: 15px;
+		font-weight: 700;
+		cursor: pointer;
+	}
+	.memo-continue:hover:not(:disabled) {
+		filter: brightness(1.08);
+	}
+	.memo-continue:focus-visible {
+		outline: 2px solid var(--memo-accent);
+		outline-offset: 4px;
+	}
+	.memo-continue:disabled {
+		opacity: 0.65;
+		cursor: wait;
 	}
 	:global(:root[data-appearance='light']) .emergency-memo {
-		background: #fff7ed;
-		border-color: #b45309;
-		color: #713f12;
+		--memo-bg: #fff;
+		--memo-text: #18382a;
+		--memo-muted: #4c6156;
+		--memo-border: #dae6de;
+		--memo-accent: #17654f;
+		--memo-soft: #edf6f0;
+		--memo-button-text: #fff;
+		--memo-warning-bg: #fff7e7;
+		--memo-warning-text: #80500e;
+		--memo-warning-border: #f0dfb8;
+		box-shadow: 0 16px 42px #123b281f;
 	}
 	.login-fields {
 		display: contents;

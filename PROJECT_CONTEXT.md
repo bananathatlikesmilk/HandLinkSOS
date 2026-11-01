@@ -1,6 +1,6 @@
 # HandLink-SOS project context
 
-Last inspected: **1 November 2026, Asia/Manila**. Local branch: `main`; inspected baseline HEAD: `3135381` (`Printable fix`). The preceding PDF/date-label corrections are committed in this local baseline; the report styling below is new local work. Earlier inspections used the commits recorded in the historical notes below. No new GitHub synchronization or production deployment was verified.
+Last inspected: **1 November 2026, Asia/Manila**. Local branch: `main`; inspected baseline HEAD: `d2a58f4` (`pdf fix`). The preceding PDF styling is committed in this local baseline; the emergency-use notice styling below is new local work. Earlier inspections used the commits recorded in the historical notes below. No new GitHub synchronization or production deployment was verified.
 
 ### Local Git authorship maintenance
 
@@ -50,6 +50,8 @@ HandLink supports emergency reporting, authorized incident handling, trusted-pro
 All roles use `/login`. Older role-specific login routes redirect into the shared flow. The server chooses the destination from the authenticated role and session, not a role chosen in the browser. Public signup cannot assign a staff role.
 
 **Emergency-use memo, 26 October 2026 (local source):** After a successful interactive login, the shared `AuthScreen.svelte` shows an emergency-only warning for Users, Dispatchers, and Admins. Staff with MFA see it after successful code verification. It prohibits prank SOS alerts, false reports, and test emergencies, asks for accurate details, and explains that misuse can delay urgent help. The user clicks “I understand. Continue” before the normal role-based navigation. Focus moves to the memo heading; light/dark styling and mobile layout are supported. Existing saved sessions continue normally without repeating the login flow. This is a client-side warning, not a server-enforced compliance gate, recorded agreement, or automatic penalty mechanism. Direct navigation or a reload after authentication can use the already established session; no acknowledgment is stored in the database.
+
+**Emergency-use notice visual refresh, 1 November 2026:** The user requested a nicer proper-use notification. Restyled the existing shared post-login notice in `AuthScreen.svelte` as a readable card with a shield header, three icon-led rules, an amber reminder, and a large I understand. Continue button. Added distinct light/dark surfaces and a wider notice layout while keeping ordinary login/recovery layouts intact. Preserved every original warning statement, acknowledgment behavior, heading focus, role-based destination, MFA ordering, and saved-session behavior. No new push notification, legal agreement record, timer, or server compliance gate was added. Existing User/Admin/Dispatcher login and mobile light/dark screenshot checks passed; screenshots were visually reviewed. Hosted web deployment is required to show the change.
 
 ## 2. Architecture and technologies
 

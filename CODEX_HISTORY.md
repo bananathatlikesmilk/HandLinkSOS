@@ -523,3 +523,17 @@ The following entries have fuller assistant/tool evidence in the available conve
 **Final diagnostics:** `pnpm check` reported zero errors and zero warnings. Source/document formatting and `git diff --check` passed.
 
 **Records and limits:** Updated PROJECT_CONTEXT.md and this history. Baseline `3135381` contains the previous PDF correction; the new styling remains local. No schema, UI permission, native/APK, role, data-access, or deployed-server change was made. No commit, push, deployment, real-data read, or credential access occurred. Deploy the updated server renderer and download a new PDF to see the design; existing downloaded files remain unchanged.
+
+### H047 — Polish the proper-use notice shown after login
+
+**Date:** 1 November 2026, Asia/Manila.
+
+**User objective:** Make the notification for proper use nicer, then asked to continue. Context and source identify this as the existing shared emergency-use memo after interactive login, not the User push-notification system.
+
+**Changes:** Updated only the memo presentation in AuthScreen.svelte. Added a shield header and readable card, three rules with decorative icons and short section titles, an amber responsibility reminder, and a prominent 52-pixel-minimum acknowledgment button with a decorative arrow. The notice has separate light/dark colors, larger available width, clearer spacing, and a short introductory subtitle. Ordinary login and recovery layouts remain separate from the expanded notice styling. Every original warning statement and the existing acknowledgment text/action were preserved. No changes to authentication, MFA, role routing, persistent sessions, recorded consent, sanctions, or backend authorization were made.
+
+**Verification:** Consulted current Svelte documentation through Context7 for conditional/scoped styling. The existing isolated login integration/browser test passed across User, Admin, and Dispatcher flows: the warning follows successful login/MFA, focus reaches its heading, acknowledgment proceeds to the proper workspace, mobile layouts do not overflow, and the light surface passes contrast checks. Production build succeeded during that run. Visually inspected both 390-pixel mobile light/dark notice screenshots; icon rows, warning content, and the full-width button were readable. Targeted ESLint and source formatting passed. Svelte MCP/autofixer was unavailable; local diagnostics were used. Final checks are recorded below.
+
+**Final checks:** `pnpm check` reported zero errors and zero warnings. Source/document formatting and `git diff --check` passed.
+
+**Records and limits:** Updated PROJECT_CONTEXT.md and this history. Baseline `d2a58f4` already includes the PDF redesign. No new dependency, database, notification-delivery, native bridge, or APK work was required. No commit, push, deployment, physical-device verification, real-account data access, or credential read occurred. Deploy the hosted web update for users to see this notice design.
