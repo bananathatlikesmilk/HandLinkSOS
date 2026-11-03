@@ -19,6 +19,7 @@ import { requireLgu } from './lgus.ts';
 import { accountListInput, staffAccountInput } from './validation.ts';
 import { emailConfigured } from './email.ts';
 import type { z } from 'zod';
+import { PROVINCIAL_LGU_ID } from '../lgu.ts';
 
 const summaryColumns = {
 	lguId: staffLgu.lguId,
@@ -143,6 +144,14 @@ export async function createStaffAccount(
 			if (!actor.centralAdmin && selectedLguId !== actor.lguId)
 				error(403, 'You can create staff only for your LGU.');
 			const selectedLgu = requireLgu(selectedLguId);
+			if (
+				selectedLguId === PROVINCIAL_LGU_ID &&
+				(!actor.centralAdmin || input.role !== 'dispatcher')
+			)
+				error(
+					403,
+					'Only central Admins can create provincial dispatchers. Choose a municipal LGU for local staff.'
+				);
 			checkCreationLimit(actor.id);
 			if (
 				tx

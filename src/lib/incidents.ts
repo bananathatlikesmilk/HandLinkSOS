@@ -23,6 +23,11 @@ export type IncidentCancellation = {
 };
 
 export type IncidentSummary = {
+	provincialWorkflow?: boolean;
+	provincialIntake?: boolean;
+	suggestedLguId?: string | null;
+	suggestedLguName?: string | null;
+	suggestionReason?: string | null;
 	lguId: string | null;
 	lguName: string | null;
 	routingReason: string;
@@ -43,6 +48,14 @@ export type IncidentSummary = {
 };
 
 export type IncidentDetail = {
+	responseUpdates?: ResponseUpdate[];
+	coordination?: {
+		latitude: number;
+		longitude: number;
+		locationLabel: string;
+		personLocation: IncidentLocationSnapshot | null;
+		history: { id: string; destination: string; actorName: string; createdAt: string }[];
+	};
 	noteId: string | null;
 	cancellation: IncidentCancellation | null;
 	incident: IncidentSummary;
@@ -76,6 +89,7 @@ export type IncidentDetail = {
 };
 
 export type IncidentReport = {
+	responseUpdates?: ResponseUpdate[];
 	personLocation: IncidentLocationSnapshot | null;
 	addenda: {
 		id: string;
@@ -93,3 +107,20 @@ export type IncidentReport = {
 	locationLabel: string;
 	notes: string;
 };
+
+export type ResponseUpdate = {
+	id: string;
+	type: string;
+	notes: string;
+	createdAt: string;
+	actorName: string;
+};
+
+export function incidentStatusLabel(incident: IncidentSummary) {
+	if (!incident.provincialWorkflow) return incident.status;
+	return incident.status === 'Not assigned'
+		? 'Received'
+		: incident.status === 'In progress'
+			? 'Coordinating'
+			: incident.status;
+}

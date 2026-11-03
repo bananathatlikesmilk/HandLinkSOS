@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { installNativeBridge, type NativeTestState } from './native-fixture';
 import {
+	stageMunicipalIntake,
 	database,
 	headers,
 	login,
@@ -116,6 +117,7 @@ test('SOS for someone else keeps caller, beneficiary and relationship visible af
 	const created = await request.post('/api/incidents', { headers, data: sos(person.profileId) });
 	expect(created.status()).toBe(201);
 	const { id } = (await created.json()).incident;
+	stageMunicipalIntake(id);
 	await login(page.request, await provision('dispatcher'));
 	await page.goto('/dispatch');
 	const banner = page.getByLabel('SOS for someone else', { exact: true });
@@ -126,8 +128,10 @@ test('SOS for someone else keeps caller, beneficiary and relationship visible af
 	await expect(banner).toContainText('Casey Reyes sent this SOS for Casey Reyes.');
 	await expect(relationship).toContainText('Sibling');
 	await page.getByRole('checkbox', { name: /I verbally confirmed/ }).check();
-	await page.getByRole('button', { name: 'Confirm incident', exact: true }).click();
-	await expect(page.getByRole('button', { name: 'Confirm incident', exact: true })).toHaveCount(0);
+	await page.getByRole('button', { name: 'Accept and confirm incident', exact: true }).click();
+	await expect(
+		page.getByRole('button', { name: 'Accept and confirm incident', exact: true })
+	).toHaveCount(0);
 	await expect(banner).toBeVisible();
 	await expect(relationship).toContainText('Sibling');
 	await expect(page.getByRole('rowheader', { name: 'Caller name', exact: true })).toBeVisible();
@@ -157,6 +161,7 @@ test('another dispatcher sees no report while admin can read it without status c
 	await login(request, caller);
 	const response = await request.post('/api/incidents', { headers, data: sos(caller.profileId) });
 	const { id, reference } = (await response.json()).incident;
+	stageMunicipalIntake(id);
 	const owner = await provision('dispatcher');
 	const ownerContext = await playwright.request.newContext({ baseURL: origin });
 	try {
@@ -245,6 +250,7 @@ test('cancel sends nothing; a real SOS reaches dispatcher confirmation and resol
 		const own = await (await page.request.get('/api/incidents')).json();
 		expect(own.incidents).toHaveLength(1);
 		const { id, reference } = own.incidents[0];
+		stageMunicipalIntake(id);
 		await expect(page).toHaveURL(`/user/call?incident=${id}`);
 		expect(reference).toMatch(/^HL-\d{7,}$/);
 		await expect(page.getByText(reference, { exact: false }).first()).toBeVisible();
@@ -262,7 +268,7 @@ test('cancel sends nothing; a real SOS reaches dispatcher confirmation and resol
 		expect((await searched).ok()).toBe(true);
 		await expect(alert).toBeVisible();
 		await alert.click();
-		const confirm = staff.getByRole('button', { name: 'Confirm incident', exact: true });
+		const confirm = staff.getByRole('button', { name: 'Accept and confirm incident', exact: true });
 		await expect(confirm).toBeDisabled();
 		await expect(staff.getByText(privateMedical, { exact: true })).toHaveCount(0);
 		await staff.getByRole('checkbox', { name: /I verbally confirmed/ }).check();
@@ -342,6 +348,7 @@ test('dispatcher autosave preserves newer typing, rejects stale edits and flushe
 	await login(request, caller);
 	const created = await request.post('/api/incidents', { headers, data: sos(caller.profileId) });
 	const { id, reference } = (await created.json()).incident;
+	stageMunicipalIntake(id);
 	await login(page.request, await provision('dispatcher'));
 	expect(
 		(
@@ -624,6 +631,7 @@ test('call handoff loader validates IDs and hides another caller incident', asyn
 	});
 	expect(created.status()).toBe(201);
 	const { id } = (await created.json()).incident;
+	stageMunicipalIntake(id);
 	expect((await page.goto(`/user/call?incident=${id}`))?.status()).toBe(200);
 	expect((await page.goto('/user/call?incident=bad-id'))?.status()).toBe(400);
 	await login(page.request, await provision());

@@ -2,7 +2,7 @@ import PDFDocument from 'pdfkit';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import type { filteredIncidentReports } from './incidents.ts';
-import { incidentDuration } from '../incidents.ts';
+import { incidentDuration, incidentStatusLabel } from '../incidents.ts';
 
 const require = createRequire(import.meta.url);
 const loadFont = (weight: number) =>
@@ -133,7 +133,9 @@ export function reportPdf(data: ReturnType<typeof filteredIncidentReports>): Pro
 				.text(`CASE ${index + 1} OF ${data.reports.length}`, left, doc.y);
 			doc.moveDown(0.3).font('Bold').fontSize(21).fillColor(accent).text(row.reference);
 			text(
-				report.cancellation?.decision === 'approved' ? 'Cancellation approved' : row.status,
+				report.cancellation?.decision === 'approved'
+					? 'Cancellation approved'
+					: incidentStatusLabel(row),
 				muted,
 				9
 			);
@@ -146,7 +148,7 @@ export function reportPdf(data: ReturnType<typeof filteredIncidentReports>): Pro
 				['Caller relationship', report.callerRelationship || 'Self'],
 				['Dispatcher', row.dispatcherName ?? 'Unavailable'],
 				['LGU', row.lguName ?? 'Central review'],
-				['Status', row.status],
+				['Status', incidentStatusLabel(row)],
 				['Started', formatTime(row.startedAt)],
 				['Confirmed', formatTime(row.confirmedAt)],
 				['Ended', formatTime(row.endedAt)],
@@ -170,6 +172,19 @@ export function reportPdf(data: ReturnType<typeof filteredIncidentReports>): Pro
 			}
 			section('Response notes');
 			text(report.notes || 'No notes recorded.');
+			if (report.incident.provincialWorkflow) {
+				section('Confirmed response updates');
+				if (!report.responseUpdates?.length) text('No confirmed updates recorded.', muted);
+				for (const update of report.responseUpdates ?? []) {
+					room(60);
+					text(
+						`${update.type === 'on_route' ? 'On route' : update.type === 'cancellation_approved' ? 'Cancellation approved' : 'Resolved'} | Recorded: ${formatTime(update.createdAt)} | By: ${update.actorName}`,
+						muted,
+						8
+					);
+					text(update.notes);
+				}
+			}
 			section('Report addenda');
 			if (!report.addenda.length) text('No addenda recorded.', muted);
 			for (const addendum of report.addenda) {

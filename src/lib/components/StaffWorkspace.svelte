@@ -3,12 +3,16 @@
 	import { onMount } from 'svelte';
 	import IncidentCancellationReview from './IncidentCancellationReview.svelte';
 	import IncidentLocation from './IncidentLocation.svelte';
+	import IncidentCoordination from './IncidentCoordination.svelte';
+	import IncidentProgress from './IncidentProgress.svelte';
+	import { PROVINCIAL_LGU_ID } from '#lib/lgu.ts';
 	import { routingDescription } from '#lib/lgu.ts';
 	import { resolve } from '$app/paths';
 	import { beforeNavigate, goto } from '$app/navigation';
 	import { page as route, navigating as navigationState } from '$app/state';
 	import { Check, Search, Info, ShieldCheck, Siren } from '@lucide/svelte';
 	import type { IncidentDetail, IncidentSummary, IncidentStatus } from '#lib/incidents.ts';
+	import { incidentStatusLabel } from '#lib/incidents.ts';
 	let { role = 'dispatch' }: { role?: 'dispatch' | 'admin' } = $props();
 	let incidents = $state<IncidentSummary[]>([]);
 	let selected = $state<IncidentDetail | null>(null);
@@ -17,6 +21,13 @@
 	let search = $state('');
 	let appliedSearch = '';
 	let filter = $state('Active');
+	let coordinationFilter = $state('all');
+	let lgus = $state<{ id: string; name: string }[]>([]);
+	const provincial = $derived(!!route.data.account?.provincialDispatcher);
+	const coordinator = $derived(provincial || !!route.data.account?.centralAdmin);
+	const canHandleSelected = $derived(
+		role === 'dispatch' && !!selected && provincial === !!selected.incident.provincialWorkflow
+	);
 	let page = $state(1);
 	let total = $state(0);
 	let pageSize = $state(20);
@@ -43,6 +54,7 @@
 	let disposed = false;
 	const ownIncident = $derived(
 		role === 'dispatch' &&
+			canHandleSelected &&
 			!!selected &&
 			route.data.account?.id === currentUserId &&
 			selected.incident.dispatcherUserId === currentUserId
@@ -119,6 +131,7 @@
 			const query = new URLSearchParams({
 				search: appliedSearch,
 				status: filter,
+				coordination: coordinationFilter,
 				page: String(page)
 			});
 			const result = await request<{
@@ -127,9 +140,11 @@
 				page: number;
 				pageSize: number;
 				currentUserId: string;
+				lgus: { id: string; name: string }[];
 			}>(`${endpoint}?${query}`, { signal: controller.signal });
 			if (controller.signal.aborted || disposed) return;
 			incidents = result.incidents;
+			lgus = result.lgus ?? [];
 			total = result.total;
 			page = result.page;
 			pageSize = result.pageSize;
@@ -333,7 +348,13 @@
 			<span class="response-icon"><Siren size={28} aria-hidden="true" /></span>
 			<div>
 				<p class="response-cue">LIVE RESPONSE</p>
-				<h1 class="page-heading">{role === 'admin' ? 'Active incidents' : 'SOS alerts'}</h1>
+				<h1 class="page-heading">
+					{provincial
+						? 'Provincial dispatch'
+						: role === 'admin'
+							? 'Active incidents'
+							: 'SOS alerts'}
+				</h1>
 			</div>
 		</div>
 		<button
@@ -343,9 +364,11 @@
 		>
 	</header>
 	<p class="response-purpose">
-		{role === 'admin'
-			? 'Monitor active incidents, response status and dispatcher assignments.'
-			: 'New SOS alerts and active response. Confirm a caller before viewing registered details.'}
+		{provincial
+			? 'Confirm the caller, record information, and coordinate response through official phone or radio channels.'
+			: role === 'admin'
+				? 'Monitor active incidents, response status and dispatcher assignments.'
+				: 'New SOS alerts and active response. Confirm a caller before viewing registered details.'}
 	</p>
 	<p class="preview-note">
 		<Info size={17} /> Alerts refresh every 5 seconds while this page is visible. Calls use your separate
@@ -394,11 +417,27 @@
 					onchange={() => changeQuery()}
 					disabled={busy || leaving}
 				>
-					<option>Active</option><option>All</option><option>Not assigned</option><option
-						>In progress</option
-					><option>On route</option><option>Resolved</option>
+					<option>Active</option><option>All</option><option value="Not assigned"
+						>{provincial ? 'Received' : 'Not assigned'}</option
+					><option value="In progress">{provincial ? 'Coordinating' : 'In progress'}</option><option
+						>On route</option
+					><option>Resolved</option>
 				</select>
 				<button class="btn btn-outline btn-sm" disabled={busy || leaving}>Search alerts</button>
+				{#if coordinator}<label class="field-label"
+						>Coordination stage<select
+							class="select w-full"
+							bind:value={coordinationFilter}
+							onchange={() => changeQuery()}
+							disabled={busy || leaving}
+						>
+							<option value="all">All stages</option><option value="provincial"
+								>Provincial cases</option
+							><option value="municipal">Awaiting municipal acceptance</option><option
+								value="accepted">Handling dispatcher assigned</option
+							>
+						</select></label
+					>{/if}
 			</form>
 			{#if loading}<p class="empty-queue" role="status">Loading alerts...</p>{/if}
 			<div class="queue-items">
@@ -417,11 +456,16 @@
 						>
 						<span class="row-footer"
 							><span class="incident-status" class:resolved={incident.status === 'Resolved'}
-								>{incident.status}</span
+								>{incidentStatusLabel(incident)}</span
 							><span>{date(incident.startedAt)}</span>{#if incident.cancellationPending}<span
 									class="badge badge-sm badge-warning">Cancellation requested</span
 								>{/if}</span
 						>
+						{#if incident.provincialIntake}<span class="muted"
+								>{incident.lguId === PROVINCIAL_LGU_ID
+									? 'Provincial case · External response coordination'
+									: `${incident.lguName} · ${incident.dispatcherUserId ? 'Accepted' : 'Awaiting acceptance'}`}</span
+							>{/if}
 					</button>
 				{:else}
 					{#if !loading && !queueError}<div class="empty-queue">
@@ -466,7 +510,7 @@
 						<p class="muted">
 							{selected.cancellation?.decision === 'approved'
 								? 'Cancellation approved'
-								: selected.incident.status}
+								: incidentStatusLabel(selected.incident)}
 						</p>
 					</div>
 				</header>
@@ -520,11 +564,22 @@
 						}}
 					/>
 				{/key}
+				{#if coordinator}
+					{#key selected.incident.id}<IncidentCoordination
+							detail={selected}
+							{lgus}
+							disabled={busy || leaving || !!detailError}
+							onBusyChange={cancellationBusy}
+							onAssigned={async () => {
+								await loadQueue();
+							}}
+						/>{/key}
+				{/if}
 				{#if !selected.personal}
 					<div class="confirmation-panel">
 						<ShieldCheck size={27} />
 						<h3 class="section-heading">
-							{role === 'dispatch' && selected.incident.status === 'Not assigned'
+							{canHandleSelected && selected.incident.status === 'Not assigned'
 								? 'Confirm caller identity'
 								: 'Registered information restricted'}
 						</h3>
@@ -536,7 +591,7 @@
 									: 'Only the assigned dispatcher can view registered information and update this incident.'}
 						</p>
 
-						{#if role === 'dispatch' && selected.incident.status === 'Not assigned'}<label
+						{#if canHandleSelected && selected.incident.status === 'Not assigned'}<label
 								class="confirmation-check"
 								><input
 									class="checkbox"
@@ -545,13 +600,18 @@
 									disabled={busy || leaving}
 								/> I verbally confirmed the caller’s name and phone number.</label
 							>{/if}
-						{#if role === 'dispatch' && selected.incident.status === 'Not assigned'}<button
+						{#if canHandleSelected && selected.incident.status === 'Not assigned'}<button
 								class="confirm-button btn"
 								disabled={!verballyConfirmed || busy || !!detailError}
-								onclick={() => mutate('confirm')}>Confirm incident</button
+								onclick={() => mutate('confirm')}
+								>{selected.incident.provincialWorkflow
+									? 'Confirm caller and handle case'
+									: selected.incident.provincialIntake
+										? 'Accept and confirm incident'
+										: 'Confirm incident'}</button
 							>{/if}
 					</div>
-				{:else}
+				{:else if selected.personal}
 					<p class="muted">
 						LGU: {selected.incident.lguName ?? 'Unrouted — central review'} · Routing: {routingDescription(
 							selected.incident.routingReason
@@ -569,7 +629,7 @@
 					{#if detail === 'Personal information'}
 						<table class="detail-table">
 							<tbody>
-								{#each [['First name', selected.personal.firstName], ['Last name', selected.personal.lastName], ['Age', selected.personal.age + ' years'], ['Sex', selected.personal.sex], ['Phone number', selected.personal.phone], ['Status', selected.incident.status], ['Incident reference', selected.incident.reference]] as [label, value] (label)}<tr
+								{#each [['First name', selected.personal.firstName], ['Last name', selected.personal.lastName], ['Age', selected.personal.age + ' years'], ['Sex', selected.personal.sex], ['Phone number', selected.personal.phone], ['Status', incidentStatusLabel(selected.incident)], ['Incident reference', selected.incident.reference]] as [label, value] (label)}<tr
 									>
 										<th scope="row">{label}</th>
 										<td>{value || 'Not provided'}</td>
@@ -657,7 +717,20 @@
 						</form>
 					{/if}
 				{/if}
-				{#if role === 'dispatch'}
+				{#if selected.incident.provincialWorkflow}
+					{#key selected.incident.id}<IncidentProgress
+							incident={selected.incident}
+							updates={selected.responseUpdates}
+							canUpdate={ownIncident}
+							disabled={busy || leaving || !!detailError}
+							beforeSave={flushNotes}
+							onBusyChange={cancellationBusy}
+							onSaved={async () => {
+								await loadQueue();
+							}}
+						/>{/key}
+				{/if}
+				{#if role === 'dispatch' && !selected.incident.provincialWorkflow}
 					<div class="detail-actions">
 						<button
 							class="on-route-button btn"

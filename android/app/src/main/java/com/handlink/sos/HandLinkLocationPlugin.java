@@ -65,7 +65,8 @@ public class HandLinkLocationPlugin extends Plugin {
         try {
             String id = call.getString("sessionId", "");
             Long expiry = call.getLong("expiresAt");
-            if (!id.matches("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}") || expiry == null || expiry <= System.currentTimeMillis() || expiry > System.currentTimeMillis() + 14460000L) {
+            // Match the 24-hour server limit with the existing one-minute clock tolerance.
+            if (!id.matches("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}") || expiry == null || expiry <= System.currentTimeMillis() || expiry > System.currentTimeMillis() + 86460000L) {
                 call.reject("Start a valid sharing session and check the phone's automatic date and time.");
                 return;
             }

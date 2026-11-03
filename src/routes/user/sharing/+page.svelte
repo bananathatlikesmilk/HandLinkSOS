@@ -4,7 +4,11 @@
 	import { resolve } from '$app/paths';
 	import { Clock3, MapPin, Users } from '@lucide/svelte';
 	import { apiRequest, ApiRequestError } from '#lib/client/request.ts';
-	import type { SharingState, SharedLocationSession } from '#lib/sharing.ts';
+	import {
+		MAX_SHARING_MINUTES,
+		type SharingState,
+		type SharedLocationSession
+	} from '#lib/sharing.ts';
 	import {
 		getDeviceLocation,
 		disableNativeSharing,
@@ -123,11 +127,11 @@
 			!pending &&
 			(!Number.isInteger(minutes) ||
 				minutes < 1 ||
-				minutes > 240 ||
+				minutes > MAX_SHARING_MINUTES ||
 				selected.length < 1 ||
 				selected.length > 20)
 		) {
-			error = 'Choose 1 to 20 recipients and a timer between 1 and 240 minutes.';
+			error = `Choose 1 to 20 recipients and a timer between 1 and ${MAX_SHARING_MINUTES} minutes (24 hours).`;
 			return;
 		}
 		busy = true;
@@ -270,12 +274,12 @@
 		<form class="mt-7 space-y-6" onsubmit={share}>
 			<label class="user-field"
 				>Set location sharing timer <span class="text-xs text-base-content/80"
-					>Duration in minutes · 1 to 240</span
+					>Duration in minutes · 1 to {MAX_SHARING_MINUTES} (up to 24 hours)</span
 				><input
 					class="input"
 					type="number"
 					min="1"
-					max="240"
+					max={MAX_SHARING_MINUTES}
 					step="1"
 					required
 					bind:value={minutes}

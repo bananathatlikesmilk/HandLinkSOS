@@ -8,5 +8,5 @@ export const GET: RequestHandler = (event) =>
 export const PATCH: RequestHandler = async (event) => {
 	requireStaff(event);
 	const input = await readInput(event, statusInput);
-	return privateJson(changeIncident(event, event.params.id, input.status));
+	return privateJson(changeIncident(event, event.params.id, input.status, '', undefined, input));
 };

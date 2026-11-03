@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { Check, Mail, Plus, Search, X } from '@lucide/svelte';
 	import type { PageProps } from './$types';
+	import { PROVINCIAL_LGU_ID } from '#lib/lgu.ts';
 	let { data }: PageProps = $props();
 	type Account = (typeof data.accounts)[number];
 	function createDialog() {
@@ -230,8 +231,8 @@
 											bind:value={assignments[account.id]}
 											disabled={busy}
 											><option value="">Choose LGU</option
-											>{#each data.lgus as item (item.id)}<option value={item.id}
-													>{item.name}{item.active ? '' : ' (inactive)'}</option
+											>{#each data.lgus.filter((item) => account.role === 'dispatcher' || item.id !== PROVINCIAL_LGU_ID) as item (item.id)}<option
+													value={item.id}>{item.name}{item.active ? '' : ' (inactive)'}</option
 												>{/each}</select
 										></label
 									><button
@@ -389,8 +390,8 @@
 					<label class="field-label"
 						>LGU *<select class="select w-full" bind:value={selectedLgu} required
 							><option value="" disabled>Choose LGU</option
-							>{#each data.lgus as item (item.id)}<option value={item.id}
-									>{item.name}{item.active ? '' : ' (inactive)'}</option
+							>{#each data.lgus.filter((item) => role === 'dispatcher' || item.id !== PROVINCIAL_LGU_ID) as item (item.id)}<option
+									value={item.id}>{item.name}{item.active ? '' : ' (inactive)'}</option
 								>{/each}</select
 						></label
 					>

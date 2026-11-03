@@ -1,5 +1,14 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
-import { database, headers, login, origin, password, provision, sos } from './incident-fixture';
+import {
+	database,
+	headers,
+	login,
+	origin,
+	password,
+	provision,
+	sos,
+	stageMunicipalIntake
+} from './incident-fixture';
 import { approveSharingTrust, sharingInput } from './sharing-fixture';
 
 function polygon(west: number) {
@@ -34,7 +43,7 @@ async function cleanLgus(api: APIRequestContext, rows: { id: string; name: strin
 	}
 }
 
-test('draft boundaries keep legacy routing; deactivating an activated boundary never silently restores it', async ({
+test('draft boundaries suggest legacy jurisdiction; deactivating an activated boundary never silently restores that suggestion', async ({
 	page,
 	playwright
 }) => {
@@ -66,7 +75,11 @@ test('draft boundaries keep legacy routing; deactivating an activated boundary n
 		});
 		expect(before.status()).toBe(201);
 		const legacy = (await before.json()).incident;
-		expect(legacy).toMatchObject({ lguId: 'legacy', routingReason: 'unconfigured' });
+		expect(legacy).toMatchObject({
+			lguId: 'provincial-intake',
+			suggestedLguId: 'legacy',
+			suggestionReason: 'unconfigured'
+		});
 		expect(
 			(
 				await page.request.put(`/api/admin/lgus/${row.id}`, {
@@ -85,12 +98,13 @@ test('draft boundaries keep legacy routing; deactivating an activated boundary n
 			data: { ...sos(second.profileId), latitude: 14.5, longitude: 120.5 }
 		});
 		expect((await after.json()).incident).toMatchObject({
-			lguId: null,
-			routingReason: 'outside_boundaries'
+			lguId: 'provincial-intake',
+			suggestedLguId: null,
+			suggestionReason: 'outside_boundaries'
 		});
 		expect(
 			(await (await page.request.get(`/api/staff/incidents/${legacy.id}`)).json()).incident.lguId
-		).toBe('legacy');
+		).toBe('provincial-intake');
 	} finally {
 		await cleanLgus(page.request, [row]);
 		await caller.dispose();
@@ -139,7 +153,21 @@ test('GPS LGUs isolate queues, direct-ID operations, local administration and da
 		const response = await user.post('/api/incidents', { headers, data: payload });
 		expect(response.status()).toBe(201);
 		const incident = (await response.json()).incident;
-		expect(incident).toMatchObject({ lguId: b.id, routingReason: 'gps' });
+		expect(incident).toMatchObject({
+			lguId: 'provincial-intake',
+			suggestedLguId: b.id,
+			suggestionReason: 'gps'
+		});
+		// Existing municipal cases retain their original LGU-scoped workflow after the provincial change.
+		stageMunicipalIntake(incident.id);
+		expect(
+			(
+				await page.request.put(`/api/admin/incidents/${incident.id}/lgu`, {
+					headers,
+					data: { lguId: b.id }
+				})
+			).status()
+		).toBe(200);
 		expect(
 			(await (await alpha.get('/api/staff/incidents')).json()).incidents.some(
 				(row: { id: string }) => row.id === incident.id
@@ -309,7 +337,7 @@ test('GPS overlaps, outside locations and missing beneficiary GPS need central r
 			data: { ...sos(person.profileId), latitude: 14.5, longitude: 120.5 }
 		});
 		expect(trusted.status()).toBe(201);
-		expect((await trusted.json()).incident.lguId).toBe(b.id);
+		expect((await trusted.json()).incident.suggestedLguId).toBe(b.id);
 		const unknown = await sender.post('/api/incidents', {
 			headers,
 			data: { ...sos(unlocated.profileId), latitude: 14.5, longitude: 120.5 }
@@ -317,8 +345,9 @@ test('GPS overlaps, outside locations and missing beneficiary GPS need central r
 		expect(unknown.status()).toBe(201);
 		const unrouted = (await unknown.json()).incident;
 		expect(unrouted).toMatchObject({
-			lguId: null,
-			routingReason: 'beneficiary_location_unavailable'
+			lguId: 'provincial-intake',
+			suggestedLguId: null,
+			suggestionReason: 'beneficiary_location_unavailable'
 		});
 		const stalePerson = await provision();
 		approveSharingTrust(stalePerson.profileId, caller.profileId);
@@ -340,8 +369,9 @@ test('GPS overlaps, outside locations and missing beneficiary GPS need central r
 			data: { ...sos(stalePerson.profileId), latitude: 14.5, longitude: 120.5 }
 		});
 		expect((await stale.json()).incident).toMatchObject({
-			lguId: null,
-			routingReason: 'beneficiary_location_unavailable'
+			lguId: 'provincial-intake',
+			suggestedLguId: null,
+			suggestionReason: 'beneficiary_location_unavailable'
 		});
 		expect(
 			(
@@ -351,9 +381,11 @@ test('GPS overlaps, outside locations and missing beneficiary GPS need central r
 				})
 			).status()
 		).toBe(403);
-		const pending = (await (await page.request.get('/api/staff/incidents?lguId=unrouted')).json())
-			.incidents;
+		const pending = (
+			await (await page.request.get('/api/staff/incidents?lguId=provincial-intake')).json()
+		).incidents;
 		expect(pending.some((row: { id: string }) => row.id === unrouted.id)).toBe(true);
+		stageMunicipalIntake(unrouted.id);
 		expect(
 			(
 				await page.request.put(`/api/admin/incidents/${unrouted.id}/lgu`, {
@@ -402,8 +434,9 @@ test('GPS overlaps, outside locations and missing beneficiary GPS need central r
 			data: { ...sos(outsidePerson.profileId), latitude: 20, longitude: 125 }
 		});
 		expect((await outside.json()).incident).toMatchObject({
-			lguId: null,
-			routingReason: 'outside_boundaries'
+			lguId: 'provincial-intake',
+			suggestedLguId: null,
+			suggestionReason: 'outside_boundaries'
 		});
 		overlap = await addLgu(page.request, 120);
 		const third = await provision();
@@ -413,8 +446,9 @@ test('GPS overlaps, outside locations and missing beneficiary GPS need central r
 			data: { ...sos(third.profileId), latitude: 14.5, longitude: 120.5 }
 		});
 		expect((await ambiguous.json()).incident).toMatchObject({
-			lguId: null,
-			routingReason: 'ambiguous'
+			lguId: 'provincial-intake',
+			suggestedLguId: null,
+			suggestionReason: 'ambiguous'
 		});
 		await page.goto('/admin/lgus');
 		await expect(page.getByRole('region', { name: 'Central routing review' })).toContainText(

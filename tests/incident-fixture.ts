@@ -70,3 +70,17 @@ export function sos(profileId: string) {
 		idempotencyKey: crypto.randomUUID()
 	};
 }
+
+// Arrange downstream incident tests after provincial review. The real routing/acceptance
+// workflow is exercised through APIs and browser controls in provincial.api.ts.
+export function stageMunicipalIntake(id: string, lguId = 'legacy') {
+	const db = database();
+	try {
+		db.prepare("UPDATE incident_lgu SET lgu_id=?,reason='manual' WHERE incident_id=?").run(
+			lguId,
+			id
+		);
+	} finally {
+		db.close();
+	}
+}

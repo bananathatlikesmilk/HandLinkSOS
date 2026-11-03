@@ -14,6 +14,7 @@
 			name: data.account.name,
 			email: data.account.email,
 			role: data.account.role,
+			provincialDispatcher: data.account.provincialDispatcher,
 			lguName: data.account.lguName
 		}}
 		>{#if page.url.pathname === '/dispatch' || page.url.pathname === '/dispatch/security' || page.url.pathname === '/dispatch/reports' || page.url.pathname === '/dispatch/profile'}

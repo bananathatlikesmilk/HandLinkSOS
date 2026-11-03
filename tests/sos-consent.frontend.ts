@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { headers, login, origin, provision, sos } from './incident-fixture';
+import { stageMunicipalIntake, headers, login, origin, provision, sos } from './incident-fixture';
 import { invitation } from './trusted-fixture';
 
 test('mutual request stays pending until separate approval; beneficiary sees SOS and dispatcher decision', async ({
@@ -50,6 +50,7 @@ test('mutual request stays pending until separate approval; beneficiary sees SOS
 		});
 		expect(created.status()).toBe(201);
 		const { id, reference } = (await created.json()).incident;
+		stageMunicipalIntake(id);
 		await expect(page.getByRole('link', { name: 'Updates, 1 unread' })).toBeVisible({
 			timeout: 15000
 		});
@@ -144,6 +145,7 @@ test('assigned dispatcher can reject cancellation in SOS workspace', async ({
 		const { id, reference } = (
 			await (await scanner.post('/api/incidents', { headers, data: sos(person.profileId) })).json()
 		).incident;
+		stageMunicipalIntake(id);
 		expect(
 			(
 				await page.request.post(`/api/staff/incidents/${id}/confirm`, {

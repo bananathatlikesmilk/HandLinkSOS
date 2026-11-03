@@ -3,6 +3,30 @@ import { spawnSync } from 'node:child_process';
 import { database, headers, login, origin, privateMedical, provision } from './incident-fixture';
 import { approveSharingTrust, expireSharing, sharingInput } from './sharing-fixture';
 
+test('24-hour sharing is bounded, retry-safe and can be stopped early', async ({ request }) => {
+	const owner = await provision(),
+		viewer = await provision();
+	approveSharingTrust(owner.profileId, viewer.profileId);
+	await login(request, owner);
+	const input = sharingInput(viewer.id, 1440);
+	expect(
+		(
+			await request.post('/api/sharing', { headers, data: { ...input, durationMinutes: 1441 } })
+		).status()
+	).toBe(422);
+	const created = await request.post('/api/sharing', { headers, data: input });
+	expect(created.status(), await created.text()).toBe(200);
+	const { session } = await created.json();
+	expect(Date.parse(session.expiresAt) - Date.parse(session.startedAt)).toBe(86400000);
+	const retry = await request.post('/api/sharing', { headers, data: input });
+	expect(retry.status()).toBe(200);
+	expect((await retry.json()).session.expiresAt).toBe(session.expiresAt);
+	expect(
+		(await request.post(`/api/sharing/${session.id}/stop`, { headers, data: {} })).status()
+	).toBe(200);
+	expect((await (await request.get('/api/sharing')).json()).own.status).toBe('cancelled');
+});
+
 test('one-minute warning reaches owner and selected trusted profiles, survives pagination, and clears on read, stop and expiry', async ({
 	request,
 	playwright
@@ -142,7 +166,7 @@ test('sharing rejects anonymous, staff, unsafe origin, arbitrary recipients and 
 		{ ...input, recipientUserIds: [] },
 		{ ...input, recipientUserIds: [viewer.id, viewer.id] },
 		{ ...input, durationMinutes: 0 },
-		{ ...input, durationMinutes: 241 },
+		{ ...input, durationMinutes: 1441 },
 		{ ...input, ownerProfileId: owner.profileId },
 		{ ...input, point: { ...input.point, latitude: 91 } },
 		{ ...input, point: { ...input.point, accuracy: -1 } },

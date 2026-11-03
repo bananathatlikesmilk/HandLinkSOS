@@ -1,5 +1,13 @@
 import { expect, test } from '@playwright/test';
-import { database, headers, login, origin, provision, sos } from './incident-fixture';
+import {
+	stageMunicipalIntake,
+	database,
+	headers,
+	login,
+	origin,
+	provision,
+	sos
+} from './incident-fixture';
 import { approveSharingTrust, sharingInput } from './sharing-fixture';
 
 test('trusted SOS snapshots the beneficiary shared location, preserves retries and labels both locations in staff views', async ({
@@ -43,6 +51,7 @@ test('trusted SOS snapshots the beneficiary shared location, preserves retries a
 		const created = await request.post('/api/incidents', { headers, data: input });
 		expect(created.status()).toBe(201);
 		const { id, reference } = (await created.json()).incident;
+		stageMunicipalIntake(id);
 		await login(page.request, staff);
 		expect(
 			(await (await page.request.get(`/api/staff/incidents/${id}`)).json()).personal
@@ -142,6 +151,7 @@ for (const unavailable of [
 		const created = await request.post('/api/incidents', { headers, data: sos(person.profileId) });
 		expect(created.status()).toBe(201);
 		const { id } = (await created.json()).incident;
+		stageMunicipalIntake(id);
 		await login(page.request, await provision('dispatcher'));
 		expect(
 			(
@@ -180,6 +190,7 @@ test('clients cannot supply a beneficiary location snapshot and self SOS keeps i
 	const created = await request.post('/api/incidents', { headers, data: input });
 	expect(created.status()).toBe(201);
 	const { id } = (await created.json()).incident;
+	stageMunicipalIntake(id);
 	await login(page.request, await provision('dispatcher'));
 	expect(
 		(

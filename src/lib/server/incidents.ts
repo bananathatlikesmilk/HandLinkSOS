@@ -8,6 +8,8 @@ import {
 	emergencyContact,
 	incident,
 	incidentLgu,
+	incidentIntake,
+	lguRoutingAudit,
 	lgu,
 	incidentPersonLocation,
 	incidentReference,
@@ -28,6 +30,8 @@ import { incidentReferenceCode } from './incident-references.ts';
 import { sharedPointForRecipient } from './location-policy.ts';
 import { assertIncidentLgu, routingLguId } from './lgu-scope.ts';
 import { routeEmergencyLocation } from './lgus.ts';
+import { PROVINCIAL_LGU_ID } from '../lgu.ts';
+import { canHandleIncident, isProvincialIncident } from './incident-workflow.ts';
 
 function personLocationSnapshot(incidentId: string) {
 	const row = db
@@ -47,7 +51,15 @@ function personLocationSnapshot(incidentId: string) {
 
 const callerProfile = alias(profile, 'caller_profile');
 const dispatcher = alias(user, 'handling_dispatcher');
+const suggestedLgu = alias(lgu, 'suggested_lgu');
 const summaryColumns = {
+	provincialWorkflow: sql<boolean>`coalesce(${routingLguId} = ${PROVINCIAL_LGU_ID}, 0)`.mapWith(
+		Boolean
+	),
+	provincialIntake: sql<boolean>`${incidentIntake.incidentId} is not null`.mapWith(Boolean),
+	suggestedLguId: incidentIntake.suggestedLguId,
+	suggestedLguName: suggestedLgu.name,
+	suggestionReason: incidentIntake.suggestionReason,
 	lguId: routingLguId,
 	lguName: lgu.name,
 	routingReason: sql<string>`coalesce(${incidentLgu.reason}, 'legacy')`,
@@ -78,6 +90,8 @@ function summaries() {
 		.innerJoin(callerProfile, eq(callerProfile.userId, incident.callerUserId))
 		.leftJoin(incidentLgu, eq(incidentLgu.incidentId, incident.id))
 		.leftJoin(lgu, eq(lgu.id, routingLguId))
+		.leftJoin(incidentIntake, eq(incidentIntake.incidentId, incident.id))
+		.leftJoin(suggestedLgu, eq(suggestedLgu.id, incidentIntake.suggestedLguId))
 		.leftJoin(dispatcher, eq(dispatcher.id, incident.dispatcherUserId));
 }
 function serialize(
@@ -291,7 +305,14 @@ export function createIncident(event: RequestEvent, input: z.output<typeof incid
 				.returning()
 				.get();
 			tx.insert(incidentLgu)
-				.values({ incidentId: saved.id, ...routing })
+				.values({ incidentId: saved.id, lguId: PROVINCIAL_LGU_ID, reason: 'provincial_intake' })
+				.run();
+			tx.insert(incidentIntake)
+				.values({
+					incidentId: saved.id,
+					suggestedLguId: routing.lguId,
+					suggestionReason: routing.reason
+				})
 				.run();
 			if (personPoint) {
 				tx.insert(incidentPersonLocation)
@@ -323,7 +344,12 @@ function staffIncidentSearch(event: RequestEvent) {
 	const input = parsed.data;
 	if (input.from && input.to && input.from > input.to)
 		error(422, 'Start date must be on or before end date.');
-	if (input.lguId && !actor.centralAdmin && input.lguId !== actor.lguId)
+	if (
+		input.lguId &&
+		!actor.centralAdmin &&
+		!actor.provincialDispatcher &&
+		input.lguId !== actor.lguId
+	)
 		error(403, 'Choose your assigned LGU.');
 	const condition = and(
 		// Calendar dates describe Philippine days, regardless of the server timezone.
@@ -340,13 +366,18 @@ function staffIncidentSearch(event: RequestEvent) {
 			: input.sosType === 'trusted'
 				? ne(profile.userId, incident.callerUserId)
 				: undefined,
-		actor.centralAdmin ? undefined : eq(routingLguId, actor.lguId!),
+		actor.centralAdmin || actor.provincialDispatcher ? undefined : eq(routingLguId, actor.lguId!),
+		input.coordination === 'provincial' ? eq(routingLguId, PROVINCIAL_LGU_ID) : undefined,
+		input.coordination === 'municipal'
+			? and(ne(routingLguId, PROVINCIAL_LGU_ID), isNull(incident.dispatcherUserId))
+			: undefined,
+		input.coordination === 'accepted' ? sql`${incident.dispatcherUserId} is not null` : undefined,
 		input.lguId === 'unrouted'
 			? isNull(routingLguId)
 			: input.lguId
 				? eq(routingLguId, input.lguId)
 				: undefined,
-		actor.role === 'dispatcher'
+		actor.role === 'dispatcher' && !actor.provincialDispatcher
 			? input.view === 'reports'
 				? eq(incident.dispatcherUserId, actor.id)
 				: or(isNull(incident.dispatcherUserId), eq(incident.dispatcherUserId, actor.id))
@@ -387,7 +418,17 @@ export function listStaffIncidents(event: RequestEvent) {
 		total,
 		page,
 		pageSize,
-		currentUserId: actor.id
+		currentUserId: actor.id,
+		canCoordinate: actor.centralAdmin || actor.provincialDispatcher,
+		lgus:
+			actor.centralAdmin || actor.provincialDispatcher
+				? db
+						.select({ id: lgu.id, name: lgu.name })
+						.from(lgu)
+						.where(and(eq(lgu.active, true), ne(lgu.id, PROVINCIAL_LGU_ID)))
+						.orderBy(lgu.name)
+						.all()
+				: []
 	};
 }
 
@@ -408,7 +449,11 @@ export function filteredIncidentReports(event: RequestEvent) {
 		if (!rows.length) error(422, 'No reports match these filters.');
 		return {
 			input,
-			scope: actor.centralAdmin ? 'Central Admin' : (actor.lguName ?? 'Assigned LGU'),
+			scope: actor.centralAdmin
+				? 'Central Admin'
+				: actor.provincialDispatcher
+					? 'Provincial coordination'
+					: (actor.lguName ?? 'Assigned LGU'),
 			reports: rows.map((row) => getIncidentReport(event, row.id))
 		};
 	});
@@ -447,7 +492,10 @@ function accessibleIncident(event: RequestEvent, id: string | undefined, assigne
 	assertIncidentLgu(actor, row.id);
 	if (
 		(assignedOnly && !row.dispatcherUserId) ||
-		(actor.role === 'dispatcher' && row.dispatcherUserId && row.dispatcherUserId !== actor.id)
+		(actor.role === 'dispatcher' &&
+			!actor.provincialDispatcher &&
+			row.dispatcherUserId &&
+			row.dispatcherUserId !== actor.id)
 	)
 		error(404, 'Incident not found.');
 	return { actor, row };
@@ -457,11 +505,38 @@ function latestNote(id: string) {
 	return latestIncidentNote(id)?.notes ?? '';
 }
 
+function responseUpdates(id: string) {
+	return db
+		.select({
+			id: incidentEvent.id,
+			type: incidentEvent.type,
+			notes: incidentEvent.notes,
+			createdAt: incidentEvent.createdAt,
+			actorName: user.name
+		})
+		.from(incidentEvent)
+		.innerJoin(user, eq(user.id, incidentEvent.actorUserId))
+		.where(
+			and(
+				eq(incidentEvent.incidentId, id),
+				or(
+					eq(incidentEvent.type, 'on_route'),
+					eq(incidentEvent.type, 'resolved'),
+					eq(incidentEvent.type, 'cancellation_approved')
+				)
+			)
+		)
+		.orderBy(incidentEvent.createdAt, sql`${incidentEvent}.rowid`)
+		.all()
+		.map((item) => ({ ...item, createdAt: item.createdAt.toISOString() }));
+}
+
 export function getIncidentReport(event: RequestEvent, id: string | undefined): IncidentReport {
 	return db.transaction(() => {
 		const { row } = accessibleIncident(event, id, true);
 		return {
 			incident: summary(row.id),
+			responseUpdates: responseUpdates(row.id),
 			addenda: db
 				.select({
 					id: incidentAddendum.id,
@@ -496,7 +571,7 @@ export function addReportAddendum(
 	return db.transaction(
 		(tx) => {
 			const { actor, row } = accessibleIncident(event, id, true);
-			if (actor.role !== 'dispatcher' || row.dispatcherUserId !== actor.id)
+			if (!canHandleIncident(actor, row.id) || row.dispatcherUserId !== actor.id)
 				error(403, 'Only the assigned dispatcher can add a report addendum.');
 			if (row.status !== 'Resolved')
 				error(409, 'Use incident notes while handling an active incident.');
@@ -528,6 +603,7 @@ export function getIncidentDetail(event: RequestEvent, id: string | undefined): 
 	return db.transaction(() => {
 		const { actor, row } = accessibleIncident(event, id);
 		const result: IncidentDetail = {
+			responseUpdates: [],
 			noteId: null,
 			cancellation: null,
 			incident: summary(row.id),
@@ -537,8 +613,33 @@ export function getIncidentDetail(event: RequestEvent, id: string | undefined): 
 			notes: '',
 			events: []
 		};
+		if (actor.centralAdmin || actor.provincialDispatcher) {
+			result.responseUpdates = responseUpdates(row.id);
+			result.coordination = {
+				latitude: row.latitude,
+				longitude: row.longitude,
+				locationLabel: row.locationLabel,
+				personLocation: personLocationSnapshot(row.id),
+				history: db
+					.select({
+						id: lguRoutingAudit.id,
+						destination: lgu.name,
+						actorName: user.name,
+						createdAt: lguRoutingAudit.createdAt
+					})
+					.from(lguRoutingAudit)
+					.innerJoin(lgu, eq(lgu.id, lguRoutingAudit.toLguId))
+					.innerJoin(user, eq(user.id, lguRoutingAudit.actorUserId))
+					.where(eq(lguRoutingAudit.incidentId, row.id))
+					.orderBy(lguRoutingAudit.createdAt, lguRoutingAudit.id)
+					.all()
+					.map((item) => ({ ...item, createdAt: item.createdAt.toISOString() }))
+			};
+			result.notes = latestNote(row.id);
+			result.cancellation = getCancellation(row.id);
+		}
 		// Medical and registered contact details belong only to the dispatcher who confirmed this incident.
-		if (actor.role !== 'dispatcher' || row.dispatcherUserId !== actor.id) return result;
+		if (!canHandleIncident(actor, row.id) || row.dispatcherUserId !== actor.id) return result;
 		result.cancellation = getCancellation(row.id);
 		const person = db.select().from(profile).where(eq(profile.id, row.personProfileId)).get()!;
 		const birth = new Date(`${person.birthday}T00:00:00Z`);
@@ -606,7 +707,8 @@ export function changeIncident(
 	id: string | undefined,
 	action: 'confirm' | 'On route' | 'Resolved' | 'note',
 	notes = '',
-	expectedNoteId?: string | null
+	expectedNoteId?: string | null,
+	progress?: { source?: string; details?: string }
 ) {
 	return db.transaction(
 		(tx) => {
@@ -614,6 +716,8 @@ export function changeIncident(
 			if (actor.role !== 'dispatcher') error(403, 'Only dispatchers can handle incidents.');
 			const row = target(id);
 			assertIncidentLgu(actor, row.id);
+			if (!canHandleIncident(actor, row.id))
+				error(403, 'This incident belongs to a different dispatch workflow.');
 			if (action === 'confirm') {
 				if (row.status !== 'Not assigned' || row.dispatcherUserId)
 					error(409, 'This incident has already been assigned.');
@@ -635,15 +739,26 @@ export function changeIncident(
 							'Notes changed in another tab. Copy your draft, refresh, and review before saving.'
 						);
 				} else {
+					const provincial = isProvincialIncident(row.id);
+					if (provincial && (!progress?.source || !progress.details))
+						error(
+							422,
+							'Record who confirmed this update and the response details received through official channels.'
+						);
 					if (action === 'Resolved' && getCancellation(row.id)?.decision === 'pending')
 						error(409, 'Review pending cancellation first.');
 					const expected = action === 'On route' ? 'In progress' : 'On route';
-					if (row.status !== expected)
+					if (
+						row.status !== expected &&
+						!(provincial && action === 'Resolved' && row.status === 'In progress')
+					)
 						error(409, `The incident must be ${expected} before this update.`);
 					tx.update(incident)
 						.set({ status: action, endedAt: action === 'Resolved' ? new Date() : null })
 						.where(eq(incident.id, row.id))
 						.run();
+					if (provincial)
+						notes = `Confirmed by: ${progress!.source}\nConfirmed update: ${progress!.details}`;
 				}
 			}
 			tx.insert(incidentEvent)
@@ -725,7 +840,7 @@ export function reviewCancellation(
 			const actor = requireStaff(event);
 			const row = target(id);
 			assertIncidentLgu(actor, row.id);
-			if (actor.role !== 'dispatcher' || row.dispatcherUserId !== actor.id)
+			if (!canHandleIncident(actor, row.id) || row.dispatcherUserId !== actor.id)
 				error(403, 'Only the assigned dispatcher can review cancellation.');
 			const pending = getCancellation(row.id);
 			if (!pending || pending.decision !== 'pending' || row.status === 'Resolved')
@@ -748,7 +863,10 @@ export function reviewCancellation(
 				.values({
 					incidentId: row.id,
 					actorUserId: actor.id,
-					type: decision === 'approve' ? 'cancellation_approved' : 'cancellation_rejected'
+					type: decision === 'approve' ? 'cancellation_approved' : 'cancellation_rejected',
+					notes: isProvincialIncident(row.id)
+						? `Beneficiary cancellation reviewed by the handling dispatcher. Reason: ${pending.reason}`
+						: ''
 				})
 				.run();
 			tx.update(notification)

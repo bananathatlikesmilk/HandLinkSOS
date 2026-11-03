@@ -52,6 +52,7 @@ for (const role of ['dispatcher', 'admin'] as const) {
 		await dialog.getByLabel('Full name', { exact: true }).fill(`UI ${label}`);
 		await dialog.getByLabel('Email address', { exact: true }).fill(email);
 		await dialog.getByLabel('Initial password', { exact: true }).fill(password);
+		await dialog.getByLabel('LGU', { exact: false }).selectOption('legacy');
 		await dialog.getByRole('button', { name: 'Create staff account', exact: true }).click();
 		const saved = page.getByRole('dialog', { name: `${label} account saved`, exact: true });
 		await expect(saved).toBeVisible();

@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+	stageMunicipalIntake,
 	database,
 	headers,
 	login,
@@ -225,6 +226,7 @@ test('one dispatcher wins confirmation; private details and transitions stay ass
 	await login(request, caller);
 	const submitted = await request.post('/api/incidents', { headers, data: sos(caller.profileId) });
 	const { id, reference } = (await submitted.json()).incident;
+	stageMunicipalIntake(id);
 	const first = await provision('dispatcher'),
 		second = await provision('dispatcher'),
 		admin = await provision('admin');
@@ -430,6 +432,7 @@ test('failed audit writes roll back SOS creation and dispatcher assignment', asy
 		}
 		const response = await request.post('/api/incidents', { headers, data: input });
 		const id = (await response.json()).incident.id;
+		stageMunicipalIntake(id);
 		db.exec(
 			"CREATE TRIGGER fail_incident_event BEFORE INSERT ON incident_event BEGIN SELECT RAISE(ABORT,'isolated audit rollback'); END"
 		);

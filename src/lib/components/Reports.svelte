@@ -3,6 +3,8 @@
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import IncidentCancellationReview from './IncidentCancellationReview.svelte';
 	import IncidentLocation from './IncidentLocation.svelte';
+	import IncidentProgress from './IncidentProgress.svelte';
+	import { incidentStatusLabel } from '#lib/incidents.ts';
 	import { routingDescription } from '#lib/lgu.ts';
 	import AiReportSummary from './AiReportSummary.svelte';
 	import { page as route } from '$app/state';
@@ -46,6 +48,7 @@
 	const totalPages = $derived(Math.max(1, Math.ceil(total / pageSize)));
 	const ownIncident = $derived(
 		route.data.account?.role === 'dispatcher' &&
+			!!route.data.account.provincialDispatcher === !!selected?.incident.provincialWorkflow &&
 			currentUserId === route.data.account.id &&
 			!!selected &&
 			selected.incident.dispatcherUserId === currentUserId
@@ -330,9 +333,9 @@
 							filter = event.currentTarget.value;
 							void loadQueue(1);
 						}}
-						><option>All</option><option>In progress</option><option>On route</option><option
-							>Resolved</option
-						></select
+						><option>All</option><option value="In progress"
+							>{route.data.account?.provincialDispatcher ? 'Coordinating' : 'In progress'}</option
+						><option>On route</option><option>Resolved</option></select
 					></label
 				>
 				<label class="field-label"
@@ -412,7 +415,7 @@
 							onclick={() => selectReport(record.id)}
 							><span class="record-icon"><FileText size={20} aria-hidden="true" /></span><span
 								><strong>{record.reference}</strong><small>{record.personName}</small><small
-									>{record.status} | {date(record.startedAt)}</small
+									>{incidentStatusLabel(record)} | {date(record.startedAt)}</small
 								>{#if record.cancellationPending}<small>Cancellation requested</small>{/if}</span
 							></button
 						>
@@ -455,7 +458,7 @@
 					<span class="badge" class:badge-success={selected.incident.status === 'Resolved'}
 						>{selected.cancellation?.decision === 'approved'
 							? 'Cancellation approved'
-							: selected.incident.status}</span
+							: incidentStatusLabel(selected.incident)}</span
 					>
 				</div>
 				<table class="report-fields">
@@ -567,7 +570,19 @@
 						}}
 					/>
 				{/key}
-				{#if ownIncident}
+				{#if selected.incident.provincialWorkflow}
+					{#key selected.incident.id}<IncidentProgress
+							incident={selected.incident}
+							updates={selected.responseUpdates}
+							canUpdate={ownIncident}
+							disabled={busy || !!detailError}
+							onBusyChange={cancellationBusy}
+							onSaved={async () => {
+								await loadQueue(page, true, true);
+							}}
+						/>{/key}
+				{/if}
+				{#if ownIncident && !selected.incident.provincialWorkflow}
 					<div class="flex flex-wrap gap-3" aria-label="Update incident status">
 						<button
 							class="btn btn-primary"

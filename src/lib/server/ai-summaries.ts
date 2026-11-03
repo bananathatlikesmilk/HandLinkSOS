@@ -14,6 +14,7 @@ import {
 } from './db/schema.ts';
 import { requireStaff } from './api.ts';
 import { assertIncidentLgu } from './lgu-scope.ts';
+import { canHandleIncident } from './incident-workflow.ts';
 import { latestIncidentNote } from './incident-notes.ts';
 import { selectedAiProvider } from './ai-settings.ts';
 import { requestSummary } from './summary-providers.ts';
@@ -35,6 +36,8 @@ function owned(event: RequestEvent, id: string | undefined) {
 		error(403, 'Only the assigned dispatcher can generate or approve summaries.');
 	const row = target(id);
 	assertIncidentLgu(actor, row.id);
+	if (!canHandleIncident(actor, row.id))
+		error(403, 'This incident belongs to a different dispatch workflow.');
 	if (row.dispatcherUserId !== actor.id) error(404, 'Report not found.');
 	return { actor, row };
 }

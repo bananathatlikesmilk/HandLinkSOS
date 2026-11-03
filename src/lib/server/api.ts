@@ -55,6 +55,13 @@ export function requireStaff(event: RequestEvent) {
 	return scoped;
 }
 
+export function requireCoordinator(event: RequestEvent) {
+	const actor = requireStaff(event);
+	if (!actor.centralAdmin && !actor.provincialDispatcher)
+		error(403, 'Provincial dispatch or central administrator access is required.');
+	return actor;
+}
+
 export function requireUser(event: RequestEvent) {
 	const { identity } = currentAccount(event);
 	if ((identity.role ?? 'user') !== 'user') error(403, 'This API is for User accounts.');

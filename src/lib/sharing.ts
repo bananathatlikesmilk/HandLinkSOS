@@ -1,3 +1,5 @@
+export const MAX_SHARING_MINUTES = 24 * 60;
+
 export type SharingRecipient = {
 	userId: string;
 	name: string;

@@ -28,6 +28,7 @@
 			email: string;
 			role: 'user' | 'dispatcher' | 'admin';
 			centralAdmin?: boolean;
+			provincialDispatcher?: boolean;
 			lguName?: string | null;
 		} | null;
 		children: Snippet;
@@ -128,7 +129,9 @@
 				>{account.role === 'admin'
 					? 'Administrator'
 					: account.role === 'dispatcher'
-						? 'Dispatcher'
+						? account.provincialDispatcher
+							? 'Provincial dispatcher'
+							: 'Municipal dispatcher'
 						: 'User'}</span
 			>
 		</section>

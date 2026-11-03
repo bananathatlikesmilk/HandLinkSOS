@@ -39,6 +39,132 @@ function seed(client) {
 			.run(id, owner, 'First', 'Last', '2000-01-01', 'Female', '+639171234567', Date.now());
 }
 
+test('24-hour sharing migration preserves sessions and dependencies with rollback safety', () => {
+	const client = new Database(':memory:');
+	client.pragma('foreign_keys=ON');
+	try {
+		const migrations = readMigrationFiles({ migrationsFolder: './drizzle' });
+		for (const migration of migrations.slice(0, 16))
+			for (const statement of migration.sql) client.exec(statement);
+		seed(client);
+		client.exec(
+			"INSERT INTO location_session (id,owner_profile_id,created_at,expires_at,cancelled_at,expiry_notified_at) VALUES ('active','profile-owner',1000000,2800000,NULL,NULL),('ended','profile-owner',2000000,2600000,2200000,2600000)"
+		);
+		client.exec(
+			"INSERT INTO location_recipient (id,session_id,user_id,revoked_at) VALUES ('viewer','active','requester',NULL),('revoked','ended','requester',2200000)"
+		);
+		client.exec(
+			"INSERT INTO location_point (id,session_id,latitude,longitude,accuracy,recorded_at) VALUES ('point','active',14,121,12,1000010),('old-point','ended',15,122,15,2000010)"
+		);
+		client.exec(
+			"INSERT INTO notification (id,user_id,location_session_id,type,delivery_key,created_at,delivered_at,read_at) VALUES ('notice','requester','active','location_shared','duration-test',1000010,1000020,1000030)"
+		);
+		const tables = [
+			'user',
+			'location_session',
+			'location_recipient',
+			'location_point',
+			'notification'
+		];
+		const snapshot = () =>
+			tables.map((table) => client.prepare(`SELECT * FROM ${table} ORDER BY id`).all());
+		const before = snapshot();
+		const apply = () => {
+			for (const statement of migrations[16].sql) client.exec(statement);
+		};
+		assert.throws(
+			client.transaction(() => {
+				apply();
+				throw new Error('isolated rollback');
+			}),
+			/isolated rollback/
+		);
+		assert.deepEqual(snapshot(), before);
+		const insert = client.prepare(
+			'INSERT INTO location_session (id,owner_profile_id,created_at,expires_at) VALUES (?, ?, ?, ?)'
+		);
+		assert.throws(() =>
+			insert.run('too-long-before', 'profile-owner', 3000000, 3000000 + 86400000)
+		);
+		client.transaction(apply)();
+		assert.deepEqual(snapshot(), before);
+		assert.deepEqual(client.pragma('foreign_key_check'), []);
+		insert.run('full-day', 'profile-owner', 3000000, 3000000 + 86400000);
+		assert.throws(() => insert.run('over-day', 'profile-owner', 3000000, 3000000 + 86400001));
+		assert.throws(() => insert.run('under-minute', 'profile-owner', 3000000, 3000000 + 59999));
+		assert.throws(() =>
+			client.exec(
+				"INSERT INTO location_recipient (id,session_id,user_id) VALUES ('bad','missing','requester')"
+			)
+		);
+		assert.throws(() =>
+			client.exec(
+				"INSERT INTO location_recipient (id,session_id,user_id) VALUES ('duplicate','active','requester')"
+			)
+		);
+		assert.equal(client.pragma('foreign_keys', { simple: true }), 1);
+	} finally {
+		client.close();
+	}
+});
+
+test('provincial intake migration preserves existing ownership, notes and references without moving historical cases', () => {
+	const client = new Database(':memory:');
+	client.pragma('foreign_keys=ON');
+	try {
+		const migrations = readMigrationFiles({ migrationsFolder: './drizzle' });
+		for (const migration of migrations.slice(0, 17))
+			for (const statement of migration.sql) client.exec(statement);
+		seed(client);
+		client.prepare("UPDATE user SET role='dispatcher' WHERE id='dispatcher'").run();
+		client.prepare("INSERT INTO staff_lgu (user_id,lgu_id) VALUES ('dispatcher','legacy')").run();
+		client
+			.prepare(
+				"INSERT INTO incident (id,person_profile_id,caller_user_id,caller_name,latitude,longitude,idempotency_key,dispatcher_user_id,status,confirmed_at) VALUES ('historical','profile-owner','owner','Owner',14,121,'retry','dispatcher','In progress',?)"
+			)
+			.run(Date.now());
+		client
+			.prepare(
+				"INSERT INTO incident_lgu (incident_id,lgu_id,reason) VALUES ('historical','legacy','legacy')"
+			)
+			.run();
+		client
+			.prepare(
+				"INSERT INTO incident_event (id,incident_id,actor_user_id,type,notes) VALUES ('saved-note','historical','dispatcher','note','Synthetic saved note')"
+			)
+			.run();
+		const tables = [
+			'user',
+			'staff_lgu',
+			'incident',
+			'incident_lgu',
+			'incident_event',
+			'incident_reference'
+		];
+		const before = tables.map((table) => client.prepare(`SELECT * FROM ${table}`).all());
+		const apply = client.transaction(() => {
+			for (const statement of migrations[17].sql) client.exec(statement);
+		});
+		apply();
+		tables.forEach((table, index) =>
+			assert.deepEqual(client.prepare(`SELECT * FROM ${table}`).all(), before[index])
+		);
+		assert.deepEqual(client.prepare('SELECT * FROM incident_intake').all(), []);
+		assert.equal(
+			client.prepare("SELECT active FROM lgu WHERE id='provincial-intake'").get().active,
+			1
+		);
+		assert.throws(() =>
+			client
+				.prepare("INSERT INTO incident_intake VALUES ('missing',NULL,'outside_boundaries')")
+				.run()
+		);
+		assert.deepEqual(client.pragma('foreign_key_check'), []);
+	} finally {
+		client.close();
+	}
+});
+
 test('multi-LGU migration preserves identities and incidents and scopes legacy dispatchers', () => {
 	const client = new Database(':memory:');
 	client.pragma('foreign_keys=ON');
@@ -731,7 +857,7 @@ test('location durations, coordinates, and recipient duplicates are rejected', (
 		'INSERT INTO location_session (id,owner_profile_id,created_at,expires_at) VALUES (?,?,?,?)'
 	);
 	assert.throws(() => add.run('too-short', 'profile-owner', 1000, 1001));
-	assert.throws(() => add.run('too-long', 'profile-owner', 1000, 14401001));
+	assert.throws(() => add.run('too-long', 'profile-owner', 1000, 86401001));
 	add.run('share', 'profile-owner', 1000, 61000);
 	const recipient = client.prepare(
 		'INSERT INTO location_recipient (id,session_id,user_id) VALUES (?,?,?)'
@@ -797,7 +923,7 @@ test('Zod rejects privileged fields, invalid dates, oversized text, and malforme
 		false
 	);
 	assert.equal(
-		locationSessionInput.safeParse({ durationMinutes: 241, recipientUserIds: ['recipient'] })
+		locationSessionInput.safeParse({ durationMinutes: 1441, recipientUserIds: ['recipient'] })
 			.success,
 		false
 	);

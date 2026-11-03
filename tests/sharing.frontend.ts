@@ -31,9 +31,15 @@ test('Select all sharing recipients supports partial selection and sends only el
 	await all.uncheck();
 	for (const person of await people.all()) await expect(person).not.toBeChecked();
 	await all.check();
+	const timer = page.getByLabel('Set location sharing timer', { exact: false });
+	await expect(timer).toHaveAttribute('max', '1440');
+	await timer.fill('1440');
 	await page.getByRole('button', { name: 'Share location', exact: true }).click();
 	await expect(page.getByText('Location sharing active', { exact: true })).toBeVisible();
 	const result = await (await page.request.get('/api/sharing')).json();
+	expect(Date.parse(result.own.expiresAt) - Date.parse(result.own.startedAt)).toBe(
+		24 * 60 * 60 * 1000
+	);
 	expect(result.own.recipients.map((person: { userId: string }) => person.userId).sort()).toEqual(
 		[first.id, second.id].sort()
 	);

@@ -1,7 +1,8 @@
 export function routingDescription(reason: string) {
 	const labels: Record<string, string> = {
 		gps: 'GPS boundary match',
-		manual: 'Assigned by central administrator',
+		manual: 'Assigned by provincial coordination',
+		provincial_intake: 'Provincial intake and case coordination',
 		legacy: 'Existing incident',
 		unconfigured: 'GPS boundaries not configured',
 		ambiguous: 'Overlapping boundaries ? central review',
@@ -118,3 +119,4 @@ export function boundaryContains(boundary: LguBoundary, latitude: number, longit
 		return true;
 	});
 }
+export const PROVINCIAL_LGU_ID = 'provincial-intake';

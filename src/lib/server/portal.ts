@@ -42,6 +42,7 @@ export function portalAccount(
 		email: identity.email,
 		role,
 		centralAdmin: scope?.centralAdmin ?? false,
+		provincialDispatcher: scope?.provincialDispatcher ?? false,
 		lguId: scope?.lguId ?? null,
 		lguName: scope?.lguName ?? null
 	};

@@ -1,5 +1,14 @@
 import { expect, test } from '@playwright/test';
-import { database, headers, login, origin, password, provision, sos } from './incident-fixture';
+import {
+	stageMunicipalIntake,
+	database,
+	headers,
+	login,
+	origin,
+	password,
+	provision,
+	sos
+} from './incident-fixture';
 import { enrollStaffMfa } from './mfa-fixture';
 
 test('note autosave protects versions; resolved addenda preserve the report and enforce assigned ownership', async ({
@@ -17,6 +26,7 @@ test('note autosave protects versions; resolved addenda preserve the report and 
 	const created = await request.post('/api/incidents', { headers, data: sos(caller.profileId) });
 	expect(created.status()).toBe(201);
 	const { id } = (await created.json()).incident;
+	stageMunicipalIntake(id);
 	const contexts = await Promise.all(
 		[assignedAccount, otherAccount, administrator].map(() =>
 			playwright.request.newContext({ baseURL: origin })

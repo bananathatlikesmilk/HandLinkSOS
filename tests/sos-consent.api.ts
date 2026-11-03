@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 import {
+	stageMunicipalIntake,
 	database,
 	headers,
 	login,
@@ -21,6 +22,7 @@ function trust(owner: string, requester: string) {
 	}
 }
 async function confirm(request: APIRequestContext, id: string) {
+	stageMunicipalIntake(id);
 	expect(
 		(
 			await request.post(`/api/staff/incidents/${id}/confirm`, {
@@ -57,6 +59,7 @@ test('beneficiary notices stay private and unique; assigned dispatcher alone dec
 		]);
 		expect(created.map((r) => r.status()).sort()).toEqual([200, 201]);
 		const id = (await created[0].json()).incident.id;
+		stageMunicipalIntake(id);
 		const reference = (await created[0].json()).incident.reference;
 		const notices = await (await beneficiary.get('/api/notifications')).json();
 		expect(notices).toMatchObject({ total: 1, unreadCount: 1 });

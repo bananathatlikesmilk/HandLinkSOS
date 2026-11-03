@@ -284,6 +284,15 @@ export const lguRoutingAudit = sqliteTable('lgu_routing_audit', {
 	createdAt: created()
 });
 
+// Only new SOS incidents enter provincial intake. Historical ownership stays unchanged.
+export const incidentIntake = sqliteTable('incident_intake', {
+	incidentId: text('incident_id')
+		.primaryKey()
+		.references(() => incident.id, { onDelete: 'restrict' }),
+	suggestedLguId: text('suggested_lgu_id').references(() => lgu.id, { onDelete: 'restrict' }),
+	suggestionReason: text('suggestion_reason').notNull()
+});
+
 export const incidentPersonLocation = sqliteTable(
 	'incident_person_location',
 	{
@@ -500,7 +509,7 @@ export const locationSession = sqliteTable(
 	},
 	(t) => [
 		index('location_expiry_idx').on(t.expiresAt),
-		check('location_duration', sql`${t.expiresAt} - ${t.startedAt} between 60000 and 14400000`),
+		check('location_duration', sql`${t.expiresAt} - ${t.startedAt} between 60000 and 86400000`),
 		check(
 			'location_cancel_time',
 			sql`${t.cancelledAt} is null or ${t.cancelledAt} >= ${t.startedAt}`

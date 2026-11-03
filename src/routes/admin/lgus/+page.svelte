@@ -3,7 +3,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { apiRequest } from '#lib/client/request.ts';
 	import type { IncidentSummary } from '#lib/incidents.ts';
-	import { routingDescription } from '#lib/lgu.ts';
+	import { routingDescription, PROVINCIAL_LGU_ID } from '#lib/lgu.ts';
 	import type { PageProps } from './$types';
 	let { data }: PageProps = $props();
 	let editing = $state('');
@@ -15,7 +15,7 @@
 	let notice = $state('');
 	let unrouted = $state<IncidentSummary[]>([]);
 	let total = $state(0);
-	let queueLgu = $state('unrouted');
+	let queueLgu = $state(PROVINCIAL_LGU_ID);
 	let queueVersion = 0;
 	let queueController: AbortController | null = null;
 	let selections = $state<Record<string, string>>({});
@@ -135,12 +135,16 @@
 		<p class="muted mt-3">
 			Central administration. Each LGU has its own staff, queues, and reports.
 		</p>
+		<p class="muted mt-3">
+			New SOS alerts enter provincial intake first. In Manage accounts, assign dispatchers to
+			Provincial coordination (system) to staff that queue. Assign municipal staff to their own LGU.
+		</p>
 	</header>
 	{#if error}<p class="alert alert-error" role="alert">{error}</p>{/if}
 	{#if notice}<p class="alert" role="status">{notice}</p>{/if}
 	<section class="panel space-y-4" aria-label="Configured LGUs">
 		<h2 class="section-heading">Configured LGUs</h2>
-		{#each data.lgus as row (row.id)}<div
+		{#each data.lgus.filter((item) => item.id !== PROVINCIAL_LGU_ID) as row (row.id)}<div
 				class="flex flex-wrap items-center justify-between gap-3 border-b py-3"
 			>
 				<div>
@@ -231,7 +235,16 @@
 				<h3 class="font-semibold">{row.reference} · {row.personName}</h3>
 				<p>{row.callerName} · {row.callerPhone}</p>
 				<p class="muted">Routing: {routingDescription(row.routingReason)}</p>
-				{#if row.status === 'Not assigned'}<form
+				{#if row.provincialIntake}<p>
+						GPS suggestion: {row.suggestedLguName ?? 'Needs location review'} · {routingDescription(
+							row.suggestionReason ?? ''
+						)}
+					</p>{/if}
+				{#if row.provincialWorkflow}<p class="muted">
+						Provincial dispatch retains this case and contacts municipalities outside HandLink. No
+						municipal acceptance is required.
+					</p>
+				{:else if row.status === 'Not assigned'}<form
 						class="flex flex-wrap items-end gap-3"
 						onsubmit={(event) => {
 							event.preventDefault();
@@ -245,7 +258,7 @@
 								required
 								disabled={busy}
 								><option value="">Choose LGU</option
-								>{#each data.lgus.filter((item) => item.active) as item (item.id)}<option
+								>{#each data.lgus.filter((item) => item.active && item.id !== PROVINCIAL_LGU_ID) as item (item.id)}<option
 										value={item.id}>{item.name}</option
 									>{/each}</select
 							></label

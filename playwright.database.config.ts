@@ -17,6 +17,7 @@ export default defineConfig({
 		'tests/incidents.api.ts',
 		'tests/incident-location.api.ts',
 		'tests/lgu.api.ts',
+		'tests/provincial.api.ts',
 		'tests/report-export.api.ts',
 		'tests/sos-consent.api.ts',
 		'tests/sos-consent.frontend.ts',

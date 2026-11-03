@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { canonicalPhone } from '#lib/phone.ts';
 import { eligibleBirthday } from '#lib/birthday.ts';
+import { MAX_SHARING_MINUTES } from '#lib/sharing.ts';
 
 const name = z.string().trim().min(1).max(100);
 export const emptyInput = z.strictObject({});
@@ -85,7 +86,11 @@ export const incidentInput = z.strictObject({
 	idempotencyKey: z.uuid()
 });
 export const confirmationInput = z.strictObject({ verballyConfirmed: z.literal(true) });
-export const statusInput = z.strictObject({ status: z.enum(['On route', 'Resolved']) });
+export const statusInput = z.strictObject({
+	status: z.enum(['On route', 'Resolved']),
+	source: z.string().trim().min(1).max(150).optional(),
+	details: z.string().trim().min(1).max(1500).optional()
+});
 export const cancellationInput = z.strictObject({ reason: z.string().trim().min(1).max(500) });
 export const cancellationReviewInput = z.strictObject({ decision: z.enum(['approve', 'reject']) });
 export const notificationListInput = z.strictObject({
@@ -100,6 +105,7 @@ export const addendumInput = z.strictObject({
 	notes: z.string().trim().min(1).max(2000)
 });
 export const incidentListInput = z.strictObject({
+	coordination: z.enum(['all', 'provincial', 'municipal', 'accepted']).default('all'),
 	from: z.iso.date().optional(),
 	to: z.iso.date().optional(),
 	dispatcherId: z.string().min(1).max(100).optional(),
@@ -132,7 +138,7 @@ export const trustedActionInput = z.discriminatedUnion('action', [
 	z.strictObject({ action: z.literal('revoke') })
 ]);
 export const locationSessionInput = z.strictObject({
-	durationMinutes: z.number().int().min(1).max(240),
+	durationMinutes: z.number().int().min(1).max(MAX_SHARING_MINUTES),
 	recipientUserIds: z.array(z.string().min(1).max(128)).min(1).max(20)
 });
 export const locationPointInput = z.strictObject({

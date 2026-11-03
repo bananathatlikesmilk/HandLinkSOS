@@ -1,7 +1,7 @@
 import { error, type RequestEvent } from '@sveltejs/kit';
 import { and, count, eq, ne } from 'drizzle-orm';
 import { z } from 'zod';
-import { boundaryContains, parseBoundary } from '../lgu.ts';
+import { boundaryContains, parseBoundary, PROVINCIAL_LGU_ID } from '../lgu.ts';
 import { db } from './db/index.ts';
 import {
 	incident,
@@ -12,8 +12,9 @@ import {
 	staffLgu,
 	user
 } from './db/schema.ts';
-import { requireCentralAdmin } from './api.ts';
+import { requireCentralAdmin, requireCoordinator } from './api.ts';
 import { routingLguId } from './lgu-scope.ts';
+import { isProvincialIncident } from './incident-workflow.ts';
 
 export const lguInput = z.strictObject({
 	name: z.string().trim().min(1).max(100),
@@ -42,6 +43,8 @@ export function saveLgu(
 	input: z.output<typeof lguInput>
 ) {
 	requireCentralAdmin(event);
+	if (id === PROVINCIAL_LGU_ID)
+		error(409, 'Provincial intake is a permanent system queue, not a municipal boundary.');
 	let boundary;
 	try {
 		boundary = parseBoundary(input.boundary);
@@ -108,18 +111,31 @@ export function routeEmergencyLocation(point: { latitude: number; longitude: num
 		: { lguId: null, reason: matches.length ? 'ambiguous' : 'outside_boundaries' };
 }
 
-export function assignIncidentLgu(event: RequestEvent, id: string, lguId: string) {
+export function assignIncidentLgu(
+	event: RequestEvent,
+	id: string,
+	lguId: string,
+	expectedLguId?: string | null
+) {
 	return db.transaction(
 		(tx) => {
-			const actor = requireCentralAdmin(event);
+			const actor = requireCoordinator(event);
 			requireActiveLgu(lguId);
+			if (lguId === PROVINCIAL_LGU_ID) error(422, 'Choose a municipal LGU for assignment.');
 			const row = tx.select().from(incident).where(eq(incident.id, id)).get();
 			if (!row) error(404, 'Incident not found.');
+			if (isProvincialIncident(row.id))
+				error(
+					409,
+					'Provincial dispatch keeps this case. Contact the municipality through its official hotline; do not transfer it in HandLink.'
+				);
 			if (row.status !== 'Not assigned' || row.dispatcherUserId)
 				error(409, 'Only unassigned incidents can be routed.');
 			const previous = tx.select().from(incidentLgu).where(eq(incidentLgu.incidentId, id)).get();
 			const from = previous ? previous.lguId : 'legacy';
 			if (from === lguId) return { ok: true };
+			if (expectedLguId !== undefined && from !== expectedLguId)
+				error(409, 'Municipal assignment changed. Refresh the incident before assigning it again.');
 			tx.insert(incidentLgu)
 				.values({ incidentId: id, lguId, reason: 'manual' })
 				.onConflictDoUpdate({ target: incidentLgu.incidentId, set: { lguId, reason: 'manual' } })
@@ -141,6 +157,11 @@ export function assignStaffLgu(event: RequestEvent, userId: string, lguId: strin
 			const target = tx.select().from(user).where(eq(user.id, userId)).get();
 			if (!target || !['admin', 'dispatcher'].includes(target.role ?? ''))
 				error(404, 'Staff account not found.');
+			if (lguId === PROVINCIAL_LGU_ID && target.role !== 'dispatcher')
+				error(
+					422,
+					'Only dispatchers can join provincial intake. Provincial oversight uses central Admin accounts.'
+				);
 			if (target.id === actor.id)
 				error(409, 'You cannot remove your own central administrator access.');
 			const existing = tx.select().from(staffLgu).where(eq(staffLgu.userId, userId)).get();
