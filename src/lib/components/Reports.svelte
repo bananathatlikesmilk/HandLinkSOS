@@ -189,6 +189,14 @@
 	}
 	async function changeStatus(status: 'On route' | 'Resolved') {
 		if (busy || !selected || !ownIncident) return;
+		if (
+			!window.confirm(
+				status === 'Resolved'
+					? `Resolve incident ${selected.incident.reference}? This closes the incident and locks its original notes. Continue only if the final outcome is confirmed.`
+					: `Mark incident ${selected.incident.reference} as on route? Continue only if responder departure is confirmed.`
+			)
+		)
+			return;
 		busy = true;
 		actionError = '';
 		notice = '';
@@ -592,19 +600,29 @@
 						/>{/key}
 				{/if}
 				{#if ownIncident && !selected.incident.provincialWorkflow}
-					<div class="flex flex-wrap gap-3" aria-label="Update incident status">
-						<button
-							class="btn btn-primary"
-							disabled={busy || selected.incident.status !== 'In progress'}
-							onclick={() => changeStatus('On route')}>Mark on route</button
-						>
-						<button
-							class="btn btn-primary"
-							disabled={busy ||
-								selected.incident.status !== 'On route' ||
-								selected.cancellation?.decision === 'pending'}
-							onclick={() => changeStatus('Resolved')}>Mark resolved</button
-						>
+					<div class="legacy-status-actions" aria-label="Update incident status">
+						<section class="status-action">
+							<h3 class="section-heading">Responder departure</h3>
+							<p class="muted">Keep the incident open while responders travel.</p>
+							<button
+								class="btn btn-primary"
+								disabled={busy || selected.incident.status !== 'In progress'}
+								onclick={() => changeStatus('On route')}>Mark on route</button
+							>
+						</section>
+						<section class="status-action resolution-action">
+							<h3 class="section-heading">Close incident</h3>
+							<p class="muted">
+								Resolve only after confirming the final outcome. Original notes will be locked.
+							</p>
+							<button
+								class="btn btn-primary"
+								disabled={busy ||
+									selected.incident.status !== 'On route' ||
+									selected.cancellation?.decision === 'pending'}
+								onclick={() => changeStatus('Resolved')}>Mark resolved</button
+							>
+						</section>
 					</div>
 				{/if}
 				<p class="report-footer">
@@ -621,6 +639,20 @@
 </div>
 
 <style>
+	.legacy-status-actions {
+		display: grid;
+		gap: 28px;
+	}
+	.status-action {
+		display: grid;
+		gap: 0.85rem;
+		padding: 1rem;
+		border: 1px solid var(--app-border);
+		border-radius: 12px;
+	}
+	.resolution-action {
+		border-top: 4px solid var(--app-danger);
+	}
 	.records-cue,
 	.document-label {
 		display: flex;

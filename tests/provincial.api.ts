@@ -166,15 +166,16 @@ test('provincial handler keeps caller information, notes and confirmed external 
 			db.close();
 		}
 		const progress = page.getByRole('region', { name: 'Confirmed response updates', exact: true });
-		await progress.getByLabel('Confirmed status', { exact: false }).selectOption('On route');
+		await progress.getByRole('button', { name: 'Record departure', exact: true }).click();
+		expect((await (await page.request.get(endpoint)).json()).incident.status).toBe('In progress');
 		await expect(
-			progress.getByRole('button', { name: 'Save confirmed update', exact: true })
+			progress.getByRole('button', { name: 'Confirm and mark on route', exact: true })
 		).toBeDisabled();
 		await progress.getByLabel('Update confirmed by', { exact: false }).fill(confirmation.source);
 		await progress
 			.getByLabel('Confirmed update / outcome', { exact: false })
 			.fill(confirmation.details);
-		await progress.getByRole('button', { name: 'Save confirmed update', exact: true }).click();
+		await progress.getByRole('button', { name: 'Confirm and mark on route', exact: true }).click();
 		await expect(progress).toContainText('Ambulance departed. Confirmed by radio.');
 		expect((await (await page.request.get(endpoint)).json()).incident).toMatchObject({
 			lguId: province,
@@ -193,21 +194,52 @@ test('provincial handler keeps caller information, notes and confirmed external 
 			name: 'Confirmed response updates',
 			exact: true
 		});
-		await reportProgress.getByLabel('Confirmed status', { exact: false }).selectOption('Resolved');
+		await reportProgress.getByRole('button', { name: 'Review resolution', exact: true }).click();
+		expect((await (await page.request.get(endpoint)).json()).incident.status).toBe('On route');
 		await reportProgress
 			.getByLabel('Update confirmed by', { exact: false })
 			.fill('Municipal EMS response lead');
 		await reportProgress
 			.getByLabel('Confirmed update / outcome', { exact: false })
 			.fill('Patient transported; municipal response completed and confirmed by telephone.');
+		const resolveButton = reportProgress.getByRole('button', {
+			name: 'Confirm and mark resolved',
+			exact: true
+		});
+		await expect(resolveButton).toBeDisabled();
+		await reportProgress.getByRole('button', { name: 'Cancel status change', exact: true }).click();
+		expect((await (await page.request.get(endpoint)).json()).incident.status).toBe('On route');
+		await reportProgress.getByRole('button', { name: 'Review resolution', exact: true }).click();
 		await reportProgress
-			.getByRole('button', { name: 'Save confirmed update', exact: true })
-			.click();
+			.getByLabel('Update confirmed by', { exact: false })
+			.fill('Municipal EMS response lead');
+		await reportProgress
+			.getByLabel('Confirmed update / outcome', { exact: false })
+			.fill('Patient transported; municipal response completed and confirmed by telephone.');
+		const outcomeCheck = reportProgress.getByRole('checkbox', {
+			name: 'I confirmed the final outcome and intend to close this incident.',
+			exact: true
+		});
+		await expect(outcomeCheck).not.toBeChecked();
+		await outcomeCheck.check();
+		await page.setViewportSize({ width: 390, height: 844 });
+		const departureBounds = await reportProgress
+			.getByRole('region', { name: 'On route action', exact: true })
+			.boundingBox();
+		const resolutionBounds = await reportProgress
+			.getByRole('region', { name: 'Resolve incident action', exact: true })
+			.boundingBox();
+		expect(resolutionBounds!.y).toBeGreaterThan(departureBounds!.y + departureBounds!.height + 20);
+		await reportProgress.screenshot({
+			path: test.info().outputPath('separate-response-actions.png'),
+			animations: 'disabled'
+		});
+		await resolveButton.click();
 		await expect(reportProgress).toContainText(
 			'Patient transported; municipal response completed and confirmed by telephone.'
 		);
 		await expect(
-			reportProgress.getByRole('button', { name: 'Save confirmed update', exact: true })
+			reportProgress.getByRole('button', { name: 'Confirm and mark resolved', exact: true })
 		).toHaveCount(0);
 		const report = await (await page.request.get(`/api/staff/reports/${incident.id}`)).json();
 		expect(report.incident).toMatchObject({

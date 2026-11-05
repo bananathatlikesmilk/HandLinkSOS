@@ -280,6 +280,15 @@
 			return;
 		}
 		if (busy || !selected || !(await flushNotes()) || leaving) return;
+		if (
+			action === 'status' &&
+			!window.confirm(
+				status === 'Resolved'
+					? `Resolve incident ${selected.incident.reference}? This closes the incident and locks its original notes. Continue only if the final outcome is confirmed.`
+					: `Mark incident ${selected.incident.reference} as on route? Continue only if responder departure is confirmed.`
+			)
+		)
+			return;
 		busy = true;
 		actionError = '';
 		notice = '';
@@ -751,31 +760,42 @@
 						/>{/key}
 				{/if}
 				{#if role === 'dispatch' && !selected.incident.provincialWorkflow}
-					<div class="detail-actions">
-						<button
-							class="on-route-button btn"
-							disabled={busy ||
-								leaving ||
-								!!detailError ||
-								!ownIncident ||
-								notesDirty ||
-								savingNotes ||
-								!!noteError ||
-								selected.incident.status !== 'In progress'}
-							onclick={() => mutate('status', 'On route')}>Mark on route</button
-						><button
-							class="resolved-button btn"
-							disabled={busy ||
-								leaving ||
-								!!detailError ||
-								!ownIncident ||
-								notesDirty ||
-								savingNotes ||
-								!!noteError ||
-								selected.incident.status !== 'On route' ||
-								selected.cancellation?.decision === 'pending'}
-							onclick={() => mutate('status', 'Resolved')}>Mark resolved</button
-						>
+					<div class="detail-actions" aria-label="Separate incident status actions">
+						<section class="status-action">
+							<h3 class="section-heading">Responder departure</h3>
+							<p class="muted">Keep the incident open while responders travel.</p>
+							<button
+								class="on-route-button btn"
+								disabled={busy ||
+									leaving ||
+									!!detailError ||
+									!ownIncident ||
+									notesDirty ||
+									savingNotes ||
+									!!noteError ||
+									selected.incident.status !== 'In progress'}
+								onclick={() => mutate('status', 'On route')}>Mark on route</button
+							>
+						</section>
+						<section class="status-action resolution-action">
+							<h3 class="section-heading">Close incident</h3>
+							<p class="muted">
+								Resolve only after confirming the final outcome. Original notes will be locked.
+							</p>
+							<button
+								class="resolved-button btn"
+								disabled={busy ||
+									leaving ||
+									!!detailError ||
+									!ownIncident ||
+									notesDirty ||
+									savingNotes ||
+									!!noteError ||
+									selected.incident.status !== 'On route' ||
+									selected.cancellation?.decision === 'pending'}
+								onclick={() => mutate('status', 'Resolved')}>Mark resolved</button
+							>
+						</section>
 					</div>
 				{/if}
 			{:else}<h2 id="details-heading" class="section-heading">Select an SOS alert</h2>
@@ -951,13 +971,22 @@
 		flex-shrink: 0;
 	}
 	.detail-actions {
-		display: flex;
-		justify-content: space-between;
-		gap: 12px;
+		display: grid;
+		gap: 28px;
 		margin-top: 28px;
 		padding-top: 20px;
 		border-top: 1px solid #555;
 		flex-wrap: wrap;
+	}
+	.status-action {
+		display: grid;
+		gap: 0.85rem;
+		padding: 1rem;
+		border: 1px solid var(--app-border);
+		border-radius: 12px;
+	}
+	.resolution-action {
+		border-top: 4px solid var(--app-danger);
 	}
 	.on-route-button {
 		background: #e3cd5e;
