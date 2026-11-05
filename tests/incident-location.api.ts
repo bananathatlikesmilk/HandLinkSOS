@@ -108,16 +108,46 @@ test('trusted SOS exposes only beneficiary coordinates in staff views and preser
 			(await (await page.request.get(`/api/staff/reports/${id}`)).json()).personLocation
 		).toEqual(point);
 		await page.goto('/dispatch');
+		const providerRequests: string[] = [];
+		await page.route('https://www.openstreetmap.org/**', (route) => {
+			providerRequests.push(route.request().url());
+			return route.fulfill({
+				contentType: 'text/html',
+				body: '<html><body>Test incident map</body></html>'
+			});
+		});
 		const location = page.getByRole('region', { name: 'Incident location', exact: true });
 		await expect(location).toContainText('15.25, 121.5');
 		await expect(location).toContainText('Approximately 18 metres');
 		await expect(location).not.toContainText('Reporter’s device location');
 		await expect(location).not.toContainText(`${input.latitude}, ${input.longitude}`);
+		await expect(location.locator('iframe')).toHaveCount(0);
+		expect(providerRequests).toEqual([]);
+		await location.getByRole('button', { name: 'Load map', exact: true }).click();
+		await expect(location.getByTitle('Map of incident location')).toHaveAttribute(
+			'src',
+			/marker=15.25%2C121.5/
+		);
+		await expect.poll(() => providerRequests.length).toBe(1);
+		expect(providerRequests[0]).not.toContain(String(input.latitude));
+		await page.setViewportSize({ width: 390, height: 844 });
+		expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+			true
+		);
+		await location.screenshot({
+			path: test.info().outputPath('dispatch-incident-map.png'),
+			animations: 'disabled'
+		});
 		await page.goto('/dispatch/reports');
 		await page.getByRole('button').filter({ hasText: reference }).click();
 		await expect(location).toContainText('15.25, 121.5');
 		await expect(location).toContainText('This is not live tracking.');
 		await expect(location).not.toContainText(`${input.latitude}, ${input.longitude}`);
+		await location.getByRole('button', { name: 'Load map', exact: true }).click();
+		await expect(location.getByTitle('Map of incident location')).toHaveAttribute(
+			'src',
+			/marker=15.25%2C121.5/
+		);
 		const report = await (await page.request.get(`/api/staff/reports/${id}`)).json();
 		expect(report).toMatchObject({
 			latitude: point.latitude,
@@ -211,6 +241,11 @@ for (const unavailable of [
 			await expect(page.getByRole('region', { name: 'Incident location' })).toContainText(
 				'No shared location was available when SOS was sent.'
 			);
+			await expect(page.getByRole('region', { name: 'Incident location' })).toContainText(
+				'Map unavailable: no saved GPS location.'
+			);
+			await expect(page.getByRole('button', { name: 'Load map', exact: true })).toHaveCount(0);
+			await expect(page.locator('iframe')).toHaveCount(0);
 		}
 	});
 }
@@ -248,4 +283,13 @@ test('clients cannot supply a beneficiary location snapshot and self SOS keeps i
 		latitude: input.latitude,
 		longitude: input.longitude
 	});
+	await page.route('https://www.openstreetmap.org/**', (route) =>
+		route.fulfill({ contentType: 'text/html', body: '<html><body>Test self map</body></html>' })
+	);
+	await page.goto('/dispatch');
+	await page.getByRole('button', { name: 'Load map', exact: true }).click();
+	await expect(page.getByTitle('Map of incident location')).toHaveAttribute(
+		'src',
+		/marker=14.5995%2C120.9842/
+	);
 });

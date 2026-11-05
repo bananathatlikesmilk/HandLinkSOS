@@ -2,8 +2,9 @@
 	let {
 		latitude,
 		longitude,
-		name = 'Shared location'
-	}: { latitude: number; longitude: number; name?: string } = $props();
+		name = 'Shared location',
+		label = 'Shared location map'
+	}: { latitude: number; longitude: number; name?: string; label?: string } = $props();
 	let loaded = $state(false);
 	const valid = $derived(
 		Number.isFinite(latitude) &&
@@ -29,7 +30,7 @@
 </script>
 
 {#if valid}
-	<section class="user-panel space-y-4" aria-label="Shared location map">
+	<section class="user-panel space-y-4" aria-label={label}>
 		<p class="user-copy text-sm">
 			Loading the map sends these viewed coordinates to OpenStreetMap, an external map provider.
 		</p>

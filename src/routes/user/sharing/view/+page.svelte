@@ -4,7 +4,7 @@
 	import { Clock3, MapPin } from '@lucide/svelte';
 	import { apiRequest } from '#lib/client/request.ts';
 	import type { SharedLocationSession } from '#lib/sharing.ts';
-	import UserMap from '#lib/user/UserMap.svelte';
+	import LocationMap from '#lib/components/LocationMap.svelte';
 	let session = $state<SharedLocationSession | null>(null);
 	let loadedKey = $state('');
 	let loading = $state(true);
@@ -91,7 +91,7 @@
 			<p class="user-copy mt-3">Sharing until {new Date(share.expiresAt).toLocaleString()}.</p>
 		</div>
 		{#if share.point}
-			<UserMap
+			<LocationMap
 				latitude={share.point.latitude}
 				longitude={share.point.longitude}
 				name={share.ownerName}

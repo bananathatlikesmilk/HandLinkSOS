@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { IncidentLocationSnapshot } from '#lib/incidents.ts';
+	import LocationMap from './LocationMap.svelte';
 	let {
 		personLocation,
 		reporter,
@@ -13,6 +14,7 @@
 		isStranger?: boolean;
 		locationSource?: 'device' | 'reported';
 	} = $props();
+	const mapPoint = $derived(isForSomeoneElse && !isStranger ? personLocation : reporter);
 </script>
 
 <section class="incident-location" aria-label="Incident location">
@@ -64,6 +66,19 @@
 				? ` — ${reporter.locationLabel}`
 				: ''}
 		</p>
+	{/if}
+	{#if mapPoint && mapPoint.latitude !== null && mapPoint.longitude !== null}
+		{#key `${mapPoint.latitude}:${mapPoint.longitude}`}
+			<LocationMap
+				latitude={mapPoint.latitude}
+				longitude={mapPoint.longitude}
+				name="incident location"
+				label="Incident map"
+			/>
+		{/key}
+		<p>The pin shows the saved incident location, not live tracking. Confirm it with the caller.</p>
+	{:else}
+		<p>Map unavailable: no saved GPS location. Confirm the address with the caller.</p>
 	{/if}
 </section>
 

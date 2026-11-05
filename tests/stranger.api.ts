@@ -82,22 +82,20 @@ test('stranger SOS validates identity and location, isolates medical details, an
 		).status()
 	).toBe(409);
 	// Separate reports may describe separate strangers. Do not collapse all unknown people into one person.
-	expect(
-		(
-			await request.post('/api/incidents', {
-				headers,
-				data: {
-					...input,
-					idempotencyKey: crypto.randomUUID(),
-					strangerName: 'Example Person',
-					latitude: 14.5,
-					longitude: 121.5,
-					locationSource: 'device',
-					locationLabel: ''
-				}
-			})
-		).status()
-	).toBe(201);
+	const deviceSos = await request.post('/api/incidents', {
+		headers,
+		data: {
+			...input,
+			idempotencyKey: crypto.randomUUID(),
+			strangerName: 'Example Person',
+			latitude: 14.5,
+			longitude: 121.5,
+			locationSource: 'device',
+			locationLabel: ''
+		}
+	});
+	expect(deviceSos.status()).toBe(201);
+	const deviceIncident = (await deviceSos.json()).incident;
 	expect(
 		(await request.post('/api/incidents', { headers, data: sos(caller.profileId) })).status()
 	).toBe(201);
@@ -137,6 +135,10 @@ test('stranger SOS validates identity and location, isolates medical details, an
 		await expect(page.getByLabel('Incident location', { exact: true })).toContainText(
 			input.locationLabel
 		);
+		await expect(page.getByLabel('Incident location', { exact: true })).toContainText(
+			'Map unavailable: no saved GPS location.'
+		);
+		await expect(page.getByRole('button', { name: 'Load map', exact: true })).toHaveCount(0);
 		await page.getByRole('checkbox', { name: /I verbally confirmed/ }).check();
 		await page.getByRole('button', { name: 'Confirm caller and handle case', exact: true }).click();
 		const notes = page.getByRole('textbox', { name: 'Additional information', exact: true });
@@ -213,6 +215,22 @@ test('stranger SOS validates identity and location, isolates medical details, an
 		} finally {
 			await task.destroy();
 		}
+		await page.route('https://www.openstreetmap.org/**', (route) =>
+			route.fulfill({
+				contentType: 'text/html',
+				body: '<html><body>Test stranger map</body></html>'
+			})
+		);
+		await page.goto('/dispatch');
+		await page.getByRole('button', { name: new RegExp(deviceIncident.reference) }).click();
+		await page.getByRole('button', { name: 'Load map', exact: true }).click();
+		await expect(page.getByTitle('Map of incident location')).toHaveAttribute(
+			'src',
+			/marker=14.5%2C121.5/
+		);
+		// An address-only case must never retain another incident's map.
+		await page.getByRole('button', { name: new RegExp(row.reference) }).click();
+		await expect(page.getByTitle('Map of incident location')).toHaveCount(0);
 	} finally {
 		await outsider.dispose();
 	}
