@@ -29,6 +29,14 @@ This file describes current source. The history explains how the discussion evol
 
 ## 1. Purpose and account roles
 
+### Trusted-profile SOS location correction, 5 November 2026
+
+**Local verification:** All nine focused location/export cases passed across the initial run and corrected beneficiary-case rerun. Production builds, zero-error/zero-warning type checks, targeted ESLint, formatting and diff checks passed. Tests cover dispatch/coordination/report/PDF location fields, sender-coordinate omission, snapshot stability, sharing eligibility failures and self-SOS preservation. Deployment and device behavior remain unverified.
+
+The user requested dispatch receive the trusted person's location rather than the sender's. The server already captured an authorized beneficiary shared-location snapshot, but staff API coordinates still represented the sender and PDFs displayed both. Staff detail, provincial coordination and report APIs now project trusted-person coordinates from `incident_person_location`; if no snapshot exists, coordinates are null and the location label is empty. The shared dispatch/report location panel and PDF show only the beneficiary's snapshot for trusted-person SOS, including its time and accuracy. Self-SOS continues to show the sender's reported location. This supersedes earlier documentation about showing both locations to staff.
+
+Existing sharing consent, recipient eligibility, expiry/revocation and GPS suggestion freshness rules remain. A trusted relationship alone does not authorize remote GPS retrieval or start sharing. The trusted person needs an eligible sharing session with the sender when SOS is saved. A historical snapshot is not live tracking and may be older than the five-minute automatic suggestion threshold; it remains labeled with its recorded time. Without a snapshot, dispatch must confirm the emergency location verbally; sender coordinates are never a fallback. Original sender coordinates remain stored for incident creation/idempotency compatibility and historical preservation, but are omitted from structured staff location responses, location panels and PDFs for trusted-person SOS. User-entered notes are not automatically scrubbed of coordinates. No schema migration is needed.
+
 ### Current local workflow: provincial case handling with external calls, 4 November 2026
 
 The user explicitly confirmed that HandLink supplies caller/beneficiary information, available location, incident notes and manually recorded progress. The office's own call equipment answers the caller. Staff contact municipal hotlines and verbally relay needed information outside HandLink; municipal operations contact fire/EMS/police through their existing procedures. HandLink does not transport voice, call municipalities, forward profiles, dispatch responders, or track them automatically. Municipal staff do not need to accept these cases in HandLink.

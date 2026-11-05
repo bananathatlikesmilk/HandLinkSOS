@@ -6,7 +6,7 @@
 		isForSomeoneElse
 	}: {
 		personLocation: IncidentLocationSnapshot | null;
-		reporter: { latitude: number; longitude: number; locationLabel: string };
+		reporter: { latitude: number | null; longitude: number | null; locationLabel: string };
 		isForSomeoneElse: boolean;
 	} = $props();
 </script>
@@ -41,16 +41,14 @@
 				person.
 			</p>
 		{/if}
+	{:else}
+		<h3>Reported location</h3>
+		<p>
+			{reporter.latitude}, {reporter.longitude}{reporter.locationLabel
+				? ` — ${reporter.locationLabel}`
+				: ''}
+		</p>
 	{/if}
-	<h3>{isForSomeoneElse ? 'Reporter’s device location' : 'Reported location'}</h3>
-	<p>
-		{reporter.latitude}, {reporter.longitude}{reporter.locationLabel
-			? ` — ${reporter.locationLabel}`
-			: ''}
-	</p>
-	{#if isForSomeoneElse}<p>
-			These coordinates belong to the sender, not the person needing help.
-		</p>{/if}
 </section>
 
 <style>

@@ -9,8 +9,9 @@ import {
 	sos
 } from './incident-fixture';
 import { approveSharingTrust, sharingInput } from './sharing-fixture';
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
-test('trusted SOS snapshots the beneficiary shared location, preserves retries and labels both locations in staff views', async ({
+test('trusted SOS exposes only beneficiary coordinates in staff views and preserves the snapshot across retries', async ({
 	request,
 	page,
 	playwright
@@ -22,6 +23,7 @@ test('trusted SOS snapshots the beneficiary shared location, preserves retries a
 	approveSharingTrust(person.profileId, caller.profileId);
 	await login(request, caller);
 	const owner = await playwright.request.newContext({ baseURL: origin });
+	const oversight = await playwright.request.newContext({ baseURL: origin });
 	try {
 		await login(owner, person);
 		const sharing = sharingInput(caller.id);
@@ -47,11 +49,28 @@ test('trusted SOS snapshots the beneficiary shared location, preserves retries a
 		} finally {
 			db.close();
 		}
-		const input = sos(person.profileId);
+		const input = { ...sos(person.profileId), locationLabel: 'SENDER-ONLY-LOCATION-MARKER' };
 		const created = await request.post('/api/incidents', { headers, data: input });
 		expect(created.status()).toBe(201);
 		const { id, reference } = (await created.json()).incident;
-		stageMunicipalIntake(id);
+		const staffDb = database();
+		try {
+			staffDb
+				.prepare('INSERT INTO staff_lgu (user_id,lgu_id) VALUES (?,?)')
+				.run(staff.id, 'provincial-intake');
+		} finally {
+			staffDb.close();
+		}
+		await login(oversight, await provision('admin'));
+		const oversightDetail = await (await oversight.get(`/api/staff/incidents/${id}`)).json();
+		expect(oversightDetail.coordination).toMatchObject({
+			latitude: point.latitude,
+			longitude: point.longitude,
+			locationLabel: '',
+			personLocation: point
+		});
+		expect(JSON.stringify(oversightDetail)).not.toContain(input.locationLabel);
+		expect(JSON.stringify(oversightDetail)).not.toContain(String(input.latitude));
 		await login(page.request, staff);
 		expect(
 			(await (await page.request.get(`/api/staff/incidents/${id}`)).json()).personal
@@ -66,10 +85,12 @@ test('trusted SOS snapshots the beneficiary shared location, preserves retries a
 		).toBe(200);
 		let detail = await (await page.request.get(`/api/staff/incidents/${id}`)).json();
 		expect(detail.personal).toMatchObject({
-			latitude: input.latitude,
-			longitude: input.longitude,
+			latitude: point.latitude,
+			longitude: point.longitude,
 			personLocation: point
 		});
+		expect(JSON.stringify(detail)).not.toContain(input.locationLabel);
+		expect(detail.personal.locationLabel).toBe('');
 		const moved = await owner.post(`/api/sharing/${sharing.id}/points`, {
 			headers,
 			data: { ...sharing.point, latitude: 16, recordedAt: new Date().toISOString() }
@@ -90,14 +111,35 @@ test('trusted SOS snapshots the beneficiary shared location, preserves retries a
 		const location = page.getByRole('region', { name: 'Incident location', exact: true });
 		await expect(location).toContainText('15.25, 121.5');
 		await expect(location).toContainText('Approximately 18 metres');
-		await expect(location).toContainText('Reporter’s device location');
-		await expect(location).toContainText(`${input.latitude}, ${input.longitude}`);
+		await expect(location).not.toContainText('Reporter’s device location');
+		await expect(location).not.toContainText(`${input.latitude}, ${input.longitude}`);
 		await page.goto('/dispatch/reports');
 		await page.getByRole('button').filter({ hasText: reference }).click();
 		await expect(location).toContainText('15.25, 121.5');
 		await expect(location).toContainText('This is not live tracking.');
+		await expect(location).not.toContainText(`${input.latitude}, ${input.longitude}`);
+		const report = await (await page.request.get(`/api/staff/reports/${id}`)).json();
+		expect(report).toMatchObject({
+			latitude: point.latitude,
+			longitude: point.longitude,
+			locationLabel: ''
+		});
+		const pdf = await page.request.get(`/api/staff/reports/export?search=${reference}&status=All`);
+		expect(pdf.status()).toBe(200);
+		const task = getDocument({ data: new Uint8Array(await pdf.body()), useSystemFonts: true });
+		const document = await task.promise;
+		let contents = '';
+		for (let number = 1; number <= document.numPages; number++) {
+			const content = await (await document.getPage(number)).getTextContent();
+			contents += content.items.map((item) => ('str' in item ? item.str : '')).join(' ');
+		}
+		await task.destroy();
+		expect(contents).toContain('15.25, 121.5');
+		expect(contents).not.toContain(input.locationLabel);
+		expect(contents).not.toContain(String(input.latitude));
 	} finally {
 		await owner.dispose();
+		await oversight.dispose();
 	}
 });
 
@@ -163,6 +205,7 @@ for (const unavailable of [
 		).toBe(200);
 		const report = await (await page.request.get(`/api/staff/reports/${id}`)).json();
 		expect(report.personLocation).toBeNull();
+		expect(report).toMatchObject({ latitude: null, longitude: null, locationLabel: '' });
 		if (unavailable === 'no session') {
 			await page.goto('/dispatch');
 			await expect(page.getByRole('region', { name: 'Incident location' })).toContainText(

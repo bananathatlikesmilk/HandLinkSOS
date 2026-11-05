@@ -50,6 +50,23 @@ function personLocationSnapshot(incidentId: string) {
 }
 
 const callerProfile = alias(profile, 'caller_profile');
+
+// Staff locations describe the person needing help. Never substitute the sender's GPS for a trusted person.
+function staffIncidentLocation(row: typeof incident.$inferSelect) {
+	const person = db
+		.select({ userId: profile.userId })
+		.from(profile)
+		.where(eq(profile.id, row.personProfileId))
+		.get();
+	if (person?.userId === row.callerUserId)
+		return { latitude: row.latitude, longitude: row.longitude, locationLabel: row.locationLabel };
+	const point = personLocationSnapshot(row.id);
+	return {
+		latitude: point?.latitude ?? null,
+		longitude: point?.longitude ?? null,
+		locationLabel: ''
+	};
+}
 const dispatcher = alias(user, 'handling_dispatcher');
 const suggestedLgu = alias(lgu, 'suggested_lgu');
 const summaryColumns = {
@@ -555,9 +572,7 @@ export function getIncidentReport(event: RequestEvent, id: string | undefined): 
 			cancellation: getCancellation(row.id),
 			callerRelationship: row.callerRelationship,
 			personLocation: personLocationSnapshot(row.id),
-			latitude: row.latitude,
-			longitude: row.longitude,
-			locationLabel: row.locationLabel,
+			...staffIncidentLocation(row),
 			notes: latestNote(row.id)
 		};
 	});
@@ -616,9 +631,7 @@ export function getIncidentDetail(event: RequestEvent, id: string | undefined): 
 		if (actor.centralAdmin || actor.provincialDispatcher) {
 			result.responseUpdates = responseUpdates(row.id);
 			result.coordination = {
-				latitude: row.latitude,
-				longitude: row.longitude,
-				locationLabel: row.locationLabel,
+				...staffIncidentLocation(row),
 				personLocation: personLocationSnapshot(row.id),
 				history: db
 					.select({
@@ -654,9 +667,7 @@ export function getIncidentDetail(event: RequestEvent, id: string | undefined): 
 			age: now.getUTCFullYear() - birth.getUTCFullYear() - Number(beforeBirthday),
 			sex: person.sex,
 			phone: person.phone,
-			latitude: row.latitude,
-			longitude: row.longitude,
-			locationLabel: row.locationLabel
+			...staffIncidentLocation(row)
 		};
 		const medical = db
 			.select()

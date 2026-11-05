@@ -84,11 +84,13 @@
 		</p>
 	{/if}
 	{#if detail.coordination}
-		<IncidentLocation
-			personLocation={detail.coordination.personLocation}
-			reporter={detail.coordination}
-			isForSomeoneElse={detail.incident.isForSomeoneElse}
-		/>
+		{#if !detail.personal}
+			<IncidentLocation
+				personLocation={detail.coordination.personLocation}
+				reporter={detail.coordination}
+				isForSomeoneElse={detail.incident.isForSomeoneElse}
+			/>
+		{/if}
 		{#if detail.coordination.history.length}
 			<h4 class="font-semibold">Assignment history</h4>
 			<ul class="space-y-2">

@@ -50,8 +50,8 @@ export type IncidentSummary = {
 export type IncidentDetail = {
 	responseUpdates?: ResponseUpdate[];
 	coordination?: {
-		latitude: number;
-		longitude: number;
+		latitude: number | null;
+		longitude: number | null;
 		locationLabel: string;
 		personLocation: IncidentLocationSnapshot | null;
 		history: { id: string; destination: string; actorName: string; createdAt: string }[];
@@ -66,8 +66,8 @@ export type IncidentDetail = {
 		age: number;
 		sex: string;
 		phone: string;
-		latitude: number;
-		longitude: number;
+		latitude: number | null;
+		longitude: number | null;
 		locationLabel: string;
 	};
 	medical: null | {
@@ -102,8 +102,8 @@ export type IncidentReport = {
 	cancellation: IncidentCancellation | null;
 	incident: IncidentSummary;
 	callerRelationship: string;
-	latitude: number;
-	longitude: number;
+	latitude: number | null;
+	longitude: number | null;
 	locationLabel: string;
 	notes: string;
 };

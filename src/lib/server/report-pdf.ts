@@ -155,15 +155,16 @@ export function reportPdf(data: ReturnType<typeof filteredIncidentReports>): Pro
 				['Response duration', incidentDuration(row.startedAt, row.endedAt)]
 			]);
 			section('Location');
-			text(
-				`Reporter GPS: ${report.latitude}, ${report.longitude}${report.locationLabel ? ` | ${report.locationLabel}` : ''}`
-			);
 			if (row.isForSomeoneElse) {
 				const point = report.personLocation;
 				text(
 					point
 						? `Beneficiary shared GPS: ${point.latitude}, ${point.longitude} | Accuracy: ${point.accuracy} m | Recorded: ${formatTime(point.recordedAt)}. Historical snapshot, not live tracking.`
-						: 'Beneficiary shared location: unavailable. Reporter GPS is not the beneficiary location.'
+						: 'Beneficiary shared location: unavailable. Confirm the emergency location with the caller.'
+				);
+			} else {
+				text(
+					`Reported GPS: ${report.latitude}, ${report.longitude}${report.locationLabel ? ` | ${report.locationLabel}` : ''}`
 				);
 			}
 			if (report.cancellation) {
