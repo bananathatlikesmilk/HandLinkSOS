@@ -2,10 +2,23 @@
 	import { onMount } from 'svelte';
 	import { Moon, Sun } from '@lucide/svelte';
 	let appearance = $state<'light' | 'dark'>('dark');
-	function apply(value: 'light' | 'dark') {
+	let transitionTimer: ReturnType<typeof setTimeout> | undefined;
+	function apply(value: 'light' | 'dark', animate = false) {
+		const root = document.documentElement;
+		clearTimeout(transitionTimer);
+		if (
+			animate &&
+			root.dataset.appearance !== value &&
+			!matchMedia('(prefers-reduced-motion: reduce)').matches
+		) {
+			root.dataset.appearanceTransition = '';
+			transitionTimer = setTimeout(() => {
+				delete root.dataset.appearanceTransition;
+			}, 350);
+		} else delete root.dataset.appearanceTransition;
 		appearance = value;
-		document.documentElement.dataset.appearance = value;
-		document.documentElement.style.colorScheme = value;
+		root.dataset.appearance = value;
+		root.style.colorScheme = value;
 	}
 	onMount(() => {
 		let saved: string | null = null;
@@ -26,13 +39,17 @@
 				event.key === 'handlink:appearance' &&
 				(event.newValue === 'light' || event.newValue === 'dark')
 			)
-				apply(event.newValue);
+				apply(event.newValue, true);
 		};
 		window.addEventListener('storage', synchronize);
-		return () => window.removeEventListener('storage', synchronize);
+		return () => {
+			window.removeEventListener('storage', synchronize);
+			clearTimeout(transitionTimer);
+			delete document.documentElement.dataset.appearanceTransition;
+		};
 	});
 	function toggle() {
-		apply(appearance === 'dark' ? 'light' : 'dark');
+		apply(appearance === 'dark' ? 'light' : 'dark', true);
 		try {
 			localStorage.setItem('handlink:appearance', appearance);
 		} catch {

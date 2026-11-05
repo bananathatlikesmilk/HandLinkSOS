@@ -557,6 +557,19 @@
 }
 
 /* Shared appearance tokens. Components use semantic colors in both modes. */
+/* Animate colors only during a deliberate theme change, never layout or first paint. */
+@media screen and (prefers-reduced-motion: no-preference) {
+	:root[data-appearance-transition],
+	:root[data-appearance-transition] *,
+	:root[data-appearance-transition] *::before,
+	:root[data-appearance-transition] *::after {
+		transition-property:
+			background-color, color, border-color, outline-color, fill, stroke, box-shadow !important;
+		transition-duration: 280ms !important;
+		transition-timing-function: ease-in-out !important;
+		transition-delay: 0s !important;
+	}
+}
 :root {
 	color-scheme: dark;
 	--app-bg: #000000;

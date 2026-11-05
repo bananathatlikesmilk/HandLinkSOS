@@ -725,3 +725,15 @@ The following entries have fuller assistant/tool evidence in the available conve
 **Final presentation verification:** The final three stranger API/browser cases passed on a fresh production build after the PDF section-order and active-notes-tab refinements. Mobile screenshots exposed an inherited confirmation message falsely promising registered information; corrected stranger confirmation/restriction wording and added a regression assertion. Increased the new SOS buttons' text/background contrast; the light/dark form tests verify white text when enabled. The final three cases passed again with those corrections, including saved-response recovery, staff notes/AI preview/PDF, no horizontal overflow at 390 pixels, and mocked once-only native dialer behavior. Light/dark form and mobile staff screenshots were visually inspected. The 19 distinct focused cases and all 23 database cases passed across the stated runs; repeated three-case checks are not additional distinct coverage.
 
 **Final checks:** `pnpm check` reported zero errors and warnings after the last application edits. Targeted ESLint, Prettier and `git diff --check` passed. Application source and migration are local edits; no rollout was performed.
+
+### H061 — Animate light/dark appearance changes
+
+**Date:** 5 November 2026, Asia/Manila.
+
+**User objective:** Requested an animation when switching light modes. Used the existing shared icon-only theme switch so User, Admin, and Dispatcher screens use the same behavior.
+
+**Change and reasoning:** ThemeToggle.svelte temporarily marks the root during an interactive or cross-tab appearance change. Shared layout.css transitions only color-related properties over 280 milliseconds, preserving layout and the existing theme preference/storage mechanism. A 350-millisecond timer removes the temporary rules; repeated switching clears and replaces the timer, and component cleanup clears both timer and marker. Initial loading applies the saved/system appearance instantly. Both the JavaScript gate and CSS media query honor prefers-reduced-motion. No dependency, native plugin, database/schema change, or new setting was added.
+
+**Verification and delivery:** Source inspection traced the shared switch, root preference loading, semantic appearance tokens, and existing theme persistence browser coverage. `pnpm check` reported zero errors and warnings. Svelte documentation/autofixer and Context7 tools were unavailable; no successful use was claimed. Browser/lint results are recorded below after completion. No commit, push, server deployment, APK rebuild, real-device action, private database access, or credential read occurred. Updated PROJECT_CONTEXT.md and appended this entry.
+
+**Results:** Targeted ESLint passed. Production build and both existing focused browser cases passed: welcome/registration mobile light styling and User navigation/theme persistence through page changes and reload. These tests exercise theme switching and final appearance; reduced-motion behavior and temporary transition cleanup were inspected in source rather than claimed as separately instrumented device tests.

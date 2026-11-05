@@ -29,6 +29,10 @@ This file describes current source. The history explains how the discussion evol
 
 ## 1. Purpose and account roles
 
+### Light/dark appearance transition, 5 November 2026
+
+The shared [ThemeToggle.svelte](src/lib/components/ThemeToggle.svelte) now enables a temporary appearance-transition marker when the User, Admin, or Dispatcher changes theme, including a synchronized change from another browser tab. [layout.css](src/routes/layout.css) fades background, text, border, outline, SVG fill/stroke, and shadow colors over 280 milliseconds. The marker clears after 350 milliseconds; repeated switches restart its cleanup timer, and component cleanup removes it. It does not permanently replace ordinary hover transitions or animate layout dimensions. Initial preference loading remains instant, saved appearance behavior remains, and the button stays an accessible icon-only control. Both JavaScript and CSS respect reduced-motion preferences. This is local web styling/component work, with no native Android method, database migration, publishing, or deployment performed. See H061 for verification.
+
 ### SOS for an unregistered person, 5 November 2026
 
 **Confirmed local implementation:** A signed-in User with a saved active profile can select **SOS for someone I don't know** on the dashboard. The person needing help does not need an account, QR invitation, or trusted connection. This is identified reporting, not anonymous/public SOS. The reporter enters what happened (required, at most 1,000 characters), an optional name (at most 100 characters; blank displays Unknown person), and the emergency location. Choosing “I'm with them” uses the reporting device's GPS after permission checks. Choosing “I'm elsewhere” requires an address/landmark (at most 250 characters) and sends no device GPS. Address-only reports receive no automatic municipality suggestion; provincial dispatch confirms the municipality with the caller. There is no address geocoding or map-pin picker in this first version.
