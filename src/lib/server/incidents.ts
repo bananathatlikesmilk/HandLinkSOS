@@ -789,10 +789,7 @@ export function changeIncident(
 					if (action === 'Resolved' && getCancellation(row.id)?.decision === 'pending')
 						error(409, 'Review pending cancellation first.');
 					const expected = action === 'On route' ? 'In progress' : 'On route';
-					if (
-						row.status !== expected &&
-						!(provincial && action === 'Resolved' && row.status === 'In progress')
-					)
+					if (row.status !== expected)
 						error(409, `The incident must be ${expected} before this update.`);
 					tx.update(incident)
 						.set({ status: action, endedAt: action === 'Resolved' ? new Date() : null })

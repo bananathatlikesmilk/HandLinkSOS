@@ -114,6 +114,10 @@ test('provincial handler keeps caller information, notes and confirmed external 
 		await expect(page.getByText(privateMedical, { exact: true })).toHaveCount(0);
 		await page.getByRole('checkbox', { name: /I verbally confirmed/ }).check();
 		await page.getByRole('button', { name: 'Confirm caller and handle case', exact: true }).click();
+		await expect(
+			page.getByRole('button', { name: 'Review resolution', exact: true })
+		).toBeDisabled();
+		await expect(page.getByRole('button', { name: 'Record departure', exact: true })).toBeEnabled();
 		await page.getByRole('button', { name: 'Medical information', exact: true }).click();
 		await expect(page.getByText(privateMedical, { exact: true })).toBeVisible();
 		expect((await (await other.get(endpoint)).json()).medical).toBeNull();
@@ -319,7 +323,7 @@ test('provincial handler keeps caller information, notes and confirmed external 
 	}
 });
 
-test('provincial claims serialize; confirmed no-response closure and beneficiary cancellation preserve the same owner', async ({
+test('provincial claims serialize; resolution requires departure and beneficiary cancellation preserves the same owner', async ({
 	request,
 	playwright
 }) => {
@@ -362,10 +366,37 @@ test('provincial claims serialize; confirmed no-response closure and beneficiary
 					}
 				})
 			).status()
+		).toBe(409);
+		const unchanged = await (await winner.get(endpoint)).json();
+		expect(unchanged.incident).toMatchObject({ status: 'In progress', endedAt: null });
+		expect(unchanged.responseUpdates).toHaveLength(0);
+		expect(
+			(
+				await winner.patch(endpoint, {
+					headers,
+					data: {
+						status: 'On route',
+						source: 'Municipal duty officer',
+						details: 'Confirmed responders departed.'
+					}
+				})
+			).status()
+		).toBe(200);
+		expect(
+			(
+				await winner.patch(endpoint, {
+					headers,
+					data: {
+						status: 'Resolved',
+						source: 'Municipal response lead',
+						details: 'Responders completed the response and confirmed the final outcome.'
+					}
+				})
+			).status()
 		).toBe(200);
 		const closed = await (await winner.get(endpoint)).json();
 		expect(closed.incident.status).toBe('Resolved');
-		expect(closed.responseUpdates).toHaveLength(1);
+		expect(closed.responseUpdates).toHaveLength(2);
 		const person = await provision();
 		approveSharingTrust(person.profileId, caller.profileId);
 		await login(beneficiary, person);

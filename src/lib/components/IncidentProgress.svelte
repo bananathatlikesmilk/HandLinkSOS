@@ -35,9 +35,7 @@
 	const actionAllowed = $derived(
 		status === 'On route'
 			? incident.status === 'In progress'
-			: status === 'Resolved' &&
-					['In progress', 'On route'].includes(incident.status) &&
-					!incident.cancellationPending
+			: status === 'Resolved' && incident.status === 'On route' && !incident.cancellationPending
 	);
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
@@ -134,13 +132,16 @@
 					class="btn btn-outline"
 					disabled={disabled ||
 						busy ||
-						!['In progress', 'On route'].includes(incident.status) ||
+						incident.status !== 'On route' ||
 						incident.cancellationPending}
 					aria-expanded={status === 'Resolved'}
 					onclick={() => choose('Resolved')}>Review resolution</button
 				>
 				{#if incident.cancellationPending}<p class="muted">
 						Review the pending cancellation request first.
+					</p>{/if}
+				{#if incident.status !== 'On route'}<p class="muted">
+						Record confirmed responder departure before resolving this incident.
 					</p>{/if}
 			</section>
 		</div>
