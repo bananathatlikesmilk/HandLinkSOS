@@ -92,9 +92,16 @@ export const incidentInput = z.union([
 			latitude: z.number().min(-90).max(90).nullable(),
 			longitude: z.number().min(-180).max(180).nullable(),
 			strangerName: z.string().trim().max(100).default(''),
-			emergencyDescription: z.string().trim().min(1).max(1000),
-			locationSource: z.enum(['device', 'reported'])
+			emergencyDescription: z.string().trim().max(1000).default(''),
+			locationSource: z.enum(['device', 'reported']).default('device')
 		})
+		.refine(
+			(value) => value.locationSource !== 'reported' || value.emergencyDescription.length > 0,
+			{
+				message: 'Describe the emergency for an address-only report.',
+				path: ['emergencyDescription']
+			}
+		)
 		.refine((value) => value.locationSource !== 'reported' || value.locationLabel.length > 0, {
 			message: 'Enter the emergency address or landmark.',
 			path: ['locationLabel']

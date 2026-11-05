@@ -26,7 +26,7 @@
 		{#if reporter.locationLabel}<p>{reporter.locationLabel}</p>{/if}
 		<p>
 			{locationSource === 'device'
-				? 'Reporter said they were with the person. GPS was saved when SOS was sent.'
+				? 'Reporter device GPS saved when SOS was sent. Confirm they are with the person.'
 				: 'Address supplied by the reporter. No GPS was captured for this person.'} Confirm the location
 			with the caller.
 		</p>

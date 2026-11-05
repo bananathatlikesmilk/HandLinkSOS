@@ -513,8 +513,15 @@
 				{#key selected.incident.id}
 					{#if selected.incident.isStranger}<section class="my-4 alert">
 							<div>
-								<strong>Unregistered person — caller-reported details</strong>
-								<p class="whitespace-pre-wrap">{selected.incident.emergencyDescription}</p>
+								<strong
+									>{selected.incident.emergencyDescription
+										? 'Unregistered person — caller-reported details'
+										: 'Unregistered person — confirm details by phone'}</strong
+								>
+								<p class="whitespace-pre-wrap">
+									{selected.incident.emergencyDescription ||
+										'No description was entered. Details must be confirmed with the caller by phone.'}
+								</p>
 								<p>Identity and details require confirmation.</p>
 							</div>
 						</section>{/if}

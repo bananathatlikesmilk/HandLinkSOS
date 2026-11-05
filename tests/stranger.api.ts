@@ -96,6 +96,23 @@ test('stranger SOS validates identity and location, isolates medical details, an
 	});
 	expect(deviceSos.status()).toBe(201);
 	const deviceIncident = (await deviceSos.json()).incident;
+	const quickResponse = await request.post('/api/incidents', {
+		headers,
+		data: {
+			personProfileId: null,
+			latitude: 14.6,
+			longitude: 121.6,
+			locationLabel: '',
+			idempotencyKey: crypto.randomUUID()
+		}
+	});
+	expect(quickResponse.status()).toBe(201);
+	const quickIncident = (await quickResponse.json()).incident;
+	expect(quickIncident).toMatchObject({
+		personName: 'Unknown person',
+		emergencyDescription: '',
+		locationSource: 'device'
+	});
 	expect(
 		(await request.post('/api/incidents', { headers, data: sos(caller.profileId) })).status()
 	).toBe(201);
@@ -231,67 +248,46 @@ test('stranger SOS validates identity and location, isolates medical details, an
 		// An address-only case must never retain another incident's map.
 		await page.getByRole('button', { name: new RegExp(row.reference) }).click();
 		await expect(page.getByTitle('Map of incident location')).toHaveCount(0);
+		await page.getByRole('button', { name: new RegExp(quickIncident.reference) }).click();
+		await expect(page.getByLabel('Caller-reported emergency', { exact: true })).toContainText(
+			'No description was entered.'
+		);
+		await page.getByRole('button', { name: 'Load map', exact: true }).click();
+		await expect(page.getByTitle('Map of incident location')).toHaveAttribute(
+			'src',
+			/marker=14.6%2C121.6/
+		);
 	} finally {
 		await outsider.dispose();
 	}
 });
 
-test('stranger SOS form supports address without GPS, cancellation, and saved-request recovery', async ({
+test('stranger SOS gathers GPS without a form, supports cancellation and safely recovers a lost response', async ({
 	page
 }) => {
 	test.setTimeout(90000);
 	await login(page.request, await provision());
+	await page.context().grantPermissions(['geolocation']);
+	await page.context().setGeolocation({ latitude: 14.5995, longitude: 120.9842 });
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/user/dashboard');
-	await page.getByRole('link', { name: "SOS for someone I don't know", exact: true }).click();
-	const next = page.getByRole('button', { name: 'Continue to SOS countdown' });
-	await expect(next).toBeDisabled();
-	await page
-		.getByRole('textbox', { name: 'What happened? *', exact: true })
-		.fill('Someone needs help near the market.');
-	await page.getByRole('radio', { name: "I'm elsewhere. Enter their address." }).check();
-	await expect(next).toBeDisabled();
-	await page
-		.getByRole('textbox', { name: 'Emergency address / landmark *', exact: true })
-		.fill('Example market, Example municipality');
-	for (const appearance of ['light', 'dark']) {
-		await page.evaluate(
-			(value) => document.documentElement.setAttribute('data-appearance', value),
-			appearance
-		);
-		expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-			true
-		);
-		await expect(next).toHaveCSS('color', 'rgb(255, 255, 255)');
-		await page.screenshot({
-			path: test.info().outputPath(`stranger-form-${appearance}.png`),
-			fullPage: true,
-			animations: 'disabled'
-		});
-	}
 	let sent = 0;
 	page.on('request', (r) => {
 		if (r.method() === 'POST' && r.url().endsWith('/api/incidents')) sent++;
 	});
-	await next.click();
+	await page.getByRole('link', { name: "SOS for someone I don't know", exact: true }).click();
+	await expect(page.getByRole('timer')).toBeVisible();
+	await expect(page.getByRole('textbox')).toHaveCount(0);
+	await expect(page.getByRole('radio')).toHaveCount(0);
 	await page.getByRole('button', { name: 'Cancel SOS', exact: true }).click();
 	await expect(page.getByRole('heading', { name: 'SOS cancelled', exact: true })).toBeVisible();
 	expect(sent).toBe(0);
-	await page.goto('/user/sos?stranger=1');
-	await page
-		.getByRole('textbox', { name: 'What happened? *', exact: true })
-		.fill('Someone needs help near the market.');
-	await page.getByRole('radio', { name: "I'm elsewhere. Enter their address." }).check();
-	await page
-		.getByRole('textbox', { name: 'Emergency address / landmark *', exact: true })
-		.fill('Example market, Example municipality');
-	await next.click();
-	// Lose the first response after the server saves the alert. Reload must retry the original key.
 	await page.route('**/api/incidents', async (route) => {
 		if (route.request().method() !== 'POST') return route.continue();
 		await route.fetch();
 		await route.abort('failed');
 	});
+	await page.goto('/user/sos?stranger=1');
 	await page.getByRole('button', { name: 'Send SOS now', exact: true }).click();
 	await expect(
 		page.getByRole('button', { name: 'Retry saved SOS request', exact: true })
@@ -302,20 +298,22 @@ test('stranger SOS form supports address without GPS, cancellation, and saved-re
 	await expect(page).toHaveURL(/\/user\/call\?incident=/);
 	const own = await (await page.request.get('/api/incidents')).json();
 	expect(own.incidents).toHaveLength(1);
-	expect(own.incidents[0]).toMatchObject({ isStranger: true, personName: 'Unknown person' });
+	expect(own.incidents[0]).toMatchObject({
+		isStranger: true,
+		personName: 'Unknown person',
+		emergencyDescription: '',
+		locationSource: 'device'
+	});
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
-test('stranger SOS uses reporter GPS only after choosing to be with the person and opens dialer once', async ({
+test('stranger SOS automatically captures onsite GPS and opens the dialer once', async ({
 	page
 }) => {
 	await installNativeBridge(page);
 	await login(page.request, await provision());
 	await page.goto('/user/sos?stranger=1');
-	await page
-		.getByRole('textbox', { name: 'What happened? *', exact: true })
-		.fill('A person fell. I am beside them.');
-	await page.getByRole('button', { name: 'Continue to SOS countdown' }).click();
+	await expect(page.getByRole('textbox')).toHaveCount(0);
 	await page.getByRole('button', { name: 'Send SOS now', exact: true }).click();
 	await expect(page).toHaveURL(/\/user\/call\?incident=/);
 	await expect

@@ -268,7 +268,7 @@ export const incident = sqliteTable(
 		index('incident_person_idx').on(t.personProfileId),
 		check(
 			'incident_subject',
-			sql`(${t.personProfileId} is not null and ${t.strangerName} = '' and ${t.emergencyDescription} = '' and ${t.locationSource} = 'device') or (${t.personProfileId} is null and length(trim(${t.emergencyDescription})) between 1 and 1000 and length(${t.strangerName}) <= 100 and ${t.locationSource} in ('device','reported') and (${t.locationSource} <> 'reported' or length(trim(${t.locationLabel})) > 0))`
+			sql`(${t.personProfileId} is not null and ${t.strangerName} = '' and ${t.emergencyDescription} = '' and ${t.locationSource} = 'device') or (${t.personProfileId} is null and length(trim(${t.emergencyDescription})) between 0 and 1000 and (${t.locationSource} <> 'reported' or length(trim(${t.emergencyDescription})) > 0) and length(${t.strangerName}) <= 100 and ${t.locationSource} in ('device','reported') and (${t.locationSource} <> 'reported' or length(trim(${t.locationLabel})) > 0))`
 		),
 		uniqueIndex('incident_retry_unique').on(t.callerUserId, t.idempotencyKey),
 		check(

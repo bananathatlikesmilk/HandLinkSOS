@@ -25,7 +25,7 @@ export function readPendingSos(key: string): PendingSos | null {
 		(value.personProfileId === null &&
 			(typeof value.strangerName !== 'string' ||
 				typeof value.emergencyDescription !== 'string' ||
-				!value.emergencyDescription.trim() ||
+				(value.locationSource === 'reported' && !value.emergencyDescription.trim()) ||
 				!['device', 'reported'].includes(value.locationSource ?? ''))) ||
 		typeof value.idempotencyKey !== 'string' ||
 		!(

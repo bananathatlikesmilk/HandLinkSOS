@@ -164,8 +164,15 @@ export function reportPdf(data: ReturnType<typeof filteredIncidentReports>): Pro
 				['Response duration', incidentDuration(row.startedAt, row.endedAt)]
 			]);
 			if (row.isStranger) {
-				section('Caller-reported details — not verified');
-				text(row.emergencyDescription);
+				section(
+					row.emergencyDescription
+						? 'Caller-reported details — not verified'
+						: 'Details to confirm with caller'
+				);
+				text(
+					row.emergencyDescription ||
+						'No description was entered. Confirm details with the caller by phone.'
+				);
 				text(
 					'No registered medical profile is linked to this person. Confirm details with the caller.',
 					muted
@@ -175,7 +182,7 @@ export function reportPdf(data: ReturnType<typeof filteredIncidentReports>): Pro
 			if (row.isStranger) {
 				text(
 					row.locationSource === 'device'
-						? `Reporter said they were with the person. Saved GPS: ${report.latitude}, ${report.longitude}.`
+						? `Reporter device GPS saved with SOS: ${report.latitude}, ${report.longitude}. Confirm they are with the person.`
 						: `Caller-reported address: ${report.locationLabel}. No GPS captured for this person.`
 				);
 				text('Confirm the emergency location with the caller.', muted);

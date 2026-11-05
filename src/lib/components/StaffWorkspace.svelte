@@ -570,8 +570,15 @@
 						aria-label="Caller-reported emergency"
 					>
 						<div>
-							<strong>Caller-reported details — not verified</strong>
-							<p class="whitespace-pre-wrap">{selected.incident.emergencyDescription}</p>
+							<strong
+								>{selected.incident.emergencyDescription
+									? 'Caller-reported details — not verified'
+									: 'Confirm details with the caller'}</strong
+							>
+							<p class="whitespace-pre-wrap">
+								{selected.incident.emergencyDescription ||
+									'No description was entered. Ask the caller what happened during the call.'}
+							</p>
 							<p>No registered medical profile or emergency contacts are linked to this person.</p>
 						</div>
 					</section>{/if}

@@ -104,6 +104,47 @@ test('stranger migration preserves incident children and immutable references wi
 		);
 		assert.throws(() => client.exec("DELETE FROM incident_reference WHERE incident_id='existing'"));
 		assert.throws(() => client.exec("DELETE FROM incident WHERE id='existing'"));
+		const beforeOptional = tables.map((table) => client.prepare(`SELECT * FROM ${table}`).all());
+		const optional = () => {
+			for (const statement of migrations[20].sql) client.exec(statement);
+		};
+		assert.throws(() =>
+			client.transaction(() => {
+				optional();
+				throw new Error('optional rollback proof');
+			})()
+		);
+		assert.deepEqual(
+			tables.map((table) => client.prepare(`SELECT * FROM ${table}`).all()),
+			beforeOptional
+		);
+		client.transaction(optional)();
+		assert.deepEqual(
+			tables.map((table) => client.prepare(`SELECT * FROM ${table}`).all()),
+			beforeOptional
+		);
+		client.exec(
+			"INSERT INTO incident (id,person_profile_id,caller_user_id,caller_name,latitude,longitude,idempotency_key) VALUES ('quick',NULL,'owner','Owner',14,121,'quick-retry')"
+		);
+		assert.equal(
+			client.prepare("SELECT emergency_description FROM incident WHERE id='quick'").get()
+				.emergency_description,
+			''
+		);
+		assert.ok(
+			client.prepare("SELECT number FROM incident_reference WHERE incident_id='quick'").get()
+		);
+		assert.throws(() =>
+			client.exec("UPDATE incident SET emergency_description='' WHERE id='stranger'")
+		);
+		assert.throws(() =>
+			client.exec("UPDATE incident SET latitude=NULL,longitude=NULL WHERE id='quick'")
+		);
+		assert.throws(() =>
+			client.exec(
+				"UPDATE incident SET emergency_description='Wrong beneficiary information' WHERE id='existing'"
+			)
+		);
 		assert.equal(client.pragma('foreign_keys', { simple: true }), 1);
 		assert.deepEqual(client.pragma('foreign_key_check'), []);
 	} finally {
