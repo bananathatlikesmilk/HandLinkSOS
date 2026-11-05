@@ -54,6 +54,23 @@ export const aiProviderSetting = sqliteTable(
 	]
 );
 
+export const emergencyPhoneSetting = sqliteTable(
+	'emergency_phone_setting',
+	{
+		id: text('id').primaryKey(),
+		number: text('number').notNull(),
+		updatedByUserId: accountReference('updated_by_user_id'),
+		updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull()
+	},
+	(table) => [
+		check('emergency_phone_singleton', sql`${table.id} = 'sos'`),
+		check(
+			'emergency_phone_format',
+			sql`length(${table.number}) between 3 and 16 and ((${table.number} not glob '*[^0-9]*' and length(${table.number}) <= 15) or (substr(${table.number},1,1) = '+' and length(${table.number}) >= 4 and substr(${table.number},2) not glob '*[^0-9]*'))`
+		)
+	]
+);
+
 export const accountAudit = sqliteTable(
 	'account_audit',
 	{

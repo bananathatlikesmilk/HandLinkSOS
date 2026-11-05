@@ -3,12 +3,8 @@
 	import { afterNavigate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { CircleCheck, Phone } from '@lucide/svelte';
-	import {
-		dialerHandoffKey,
-		nativeDialerAvailable,
-		openPhoneDialer,
-		PHONE_DIALER_HREF
-	} from '#lib/native/phone.ts';
+	import { dialerHandoffKey, nativeDialerAvailable, openPhoneDialer } from '#lib/native/phone.ts';
+	import { phoneDialerHref } from '#lib/emergency-phone.ts';
 	import type { PageProps } from './$types';
 	let { data }: PageProps = $props();
 	let native = $state(false);
@@ -24,14 +20,14 @@
 		error = '';
 		notice = '';
 		try {
-			await openPhoneDialer();
+			await openPhoneDialer(data.phoneNumber);
 			if (!disposed && data.account?.id === accountId && data.incident?.id === incidentId)
-				notice = 'Phone dialer opened with 911 filled in. Tap Call to place the call.';
+				notice = `Phone dialer opened with ${data.phoneNumber} filled in. Tap Call to place the call.`;
 		} catch {
 			if (!disposed && data.account?.id === accountId && data.incident?.id === incidentId)
 				error = data.incident
-					? 'Your SOS remains saved. The phone dialer could not open. Try again or open your Phone app yourself.'
-					: 'The phone dialer could not open. Try again or open your Phone app yourself.';
+					? `Your SOS remains saved. Open your Phone app and enter ${data.phoneNumber}. If this APK lacks custom-number support, update HandLink.`
+					: `The phone dialer could not open. Open your Phone app and enter ${data.phoneNumber}. Update HandLink if custom-number support is missing.`;
 		} finally {
 			if (!disposed) opening = false;
 		}
@@ -74,7 +70,7 @@
 	{/if}
 	<p class="user-copy mt-4">SOS shares information. Phone calls use a separate system.</p>
 	<p class="user-copy mt-4">
-		Open the dialer with 911 ready. You must tap Call. HandLink never calls automatically.
+		Open the dialer with {data.phoneNumber} ready. You must tap Call. HandLink never calls automatically.
 	</p>
 	{#if native}
 		<button class="btn mt-6 w-full btn-primary" disabled={opening} onclick={openDialer}>
@@ -83,11 +79,11 @@
 		</button>
 	{:else}
 		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- The Android intent opens an external dial screen, not an app route. -->
-		<a class="btn mt-6 w-full btn-primary" href={PHONE_DIALER_HREF}>
+		<a class="btn mt-6 w-full btn-primary" href={phoneDialerHref(data.phoneNumber)}>
 			<Phone size={19} aria-hidden="true" /> Open phone dialer
 		</a>
 		<p class="user-copy mt-3">
-			Supported Android browsers only. Otherwise, open your Phone app and enter 911.
+			Supported Android browsers only. Otherwise, open your Phone app and enter {data.phoneNumber}.
 		</p>
 	{/if}
 	{#if error}<p class="user-error mt-4" role="alert">{error}</p>{/if}

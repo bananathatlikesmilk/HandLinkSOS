@@ -56,7 +56,8 @@
 					...(account?.centralAdmin
 						? [
 								{ href: '/admin/lgus' as const, label: 'LGUs and routing', icon: Users },
-								{ href: '/admin/ai' as const, label: 'AI settings', icon: Sparkles }
+								{ href: '/admin/ai' as const, label: 'AI settings', icon: Sparkles },
+								{ href: '/admin/emergency-phone' as const, label: 'SOS phone number', icon: Siren }
 							]
 						: [])
 				]

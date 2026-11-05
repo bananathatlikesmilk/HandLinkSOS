@@ -39,6 +39,41 @@ function seed(client) {
 			.run(id, owner, 'First', 'Last', '2000-01-01', 'Female', '+639171234567', Date.now());
 }
 
+test('SOS number migration preserves incidents and validates the singleton setting', () => {
+	const client = new Database(':memory:');
+	client.pragma('foreign_keys=ON');
+	try {
+		const migrations = readMigrationFiles({ migrationsFolder: './drizzle' });
+		for (const migration of migrations.slice(0, 18))
+			for (const statement of migration.sql) client.exec(statement);
+		seed(client);
+		client
+			.prepare(
+				"INSERT INTO incident (id,person_profile_id,caller_user_id,caller_name,latitude,longitude,idempotency_key) VALUES ('old','profile-owner','owner','Owner',14,121,'retry')"
+			)
+			.run();
+		const before = client.prepare('SELECT * FROM incident').all();
+		for (const statement of migrations[18].sql) client.exec(statement);
+		assert.deepEqual(client.prepare('SELECT * FROM incident').all(), before);
+		assert.deepEqual(client.prepare('SELECT * FROM emergency_phone_setting').all(), []);
+		const insert = client.prepare(
+			'INSERT INTO emergency_phone_setting (id,number,updated_by_user_id,updated_at) VALUES (?,?,?,?)'
+		);
+		for (const number of ['911#Intent;end', '*123#', '+12', '12', '1234567890123456'])
+			assert.throws(() => insert.run('sos', number, 'owner', Date.now()));
+		assert.throws(() => insert.run('other', '911', 'owner', Date.now()));
+		assert.throws(() => insert.run('sos', '911', 'missing', Date.now()));
+		insert.run('sos', '+639171234567', 'owner', Date.now());
+		assert.equal(
+			client.prepare('SELECT number FROM emergency_phone_setting').get().number,
+			'+639171234567'
+		);
+		assert.deepEqual(client.pragma('foreign_key_check'), []);
+	} finally {
+		client.close();
+	}
+});
+
 test('24-hour sharing migration preserves sessions and dependencies with rollback safety', () => {
 	const client = new Database(':memory:');
 	client.pragma('foreign_keys=ON');

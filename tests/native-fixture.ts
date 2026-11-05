@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 
 export async function installNativeBridge(
 	page: Page,
-	options: { denyInitialPermissions?: boolean } = {}
+	options: { denyInitialPermissions?: boolean; legacyPhone?: boolean } = {}
 ) {
 	await page.addInitScript((options) => {
 		const state = {
@@ -16,6 +16,7 @@ export async function installNativeBridge(
 			statusChecks: 0,
 			gpsChecks: 0,
 			dialerAttempts: 0,
+			dialedNumbers: [] as string[],
 			denyDialer: false,
 			initialRequests: 0,
 			cameraRequests: 0,
@@ -78,7 +79,13 @@ export async function installNativeBridge(
 							].map((name) => ({ name, rtype: 'promise' }))
 						]
 					},
-					{ name: 'HandLinkPhone', methods: [{ name: 'openDialer', rtype: 'promise' }] },
+					{
+						name: 'HandLinkPhone',
+						methods: (options.legacyPhone
+							? ['openDialer']
+							: ['openDialer', 'openDialerWithNumber']
+						).map((name) => ({ name, rtype: 'promise' }))
+					},
 					{
 						name: 'Geolocation',
 						methods: [
@@ -109,7 +116,12 @@ export async function installNativeBridge(
 				async nativePromise(
 					plugin: string,
 					method: string,
-					options?: { sessionId?: string; kind?: 'location' | 'camera'; enabled?: boolean }
+					options?: {
+						sessionId?: string;
+						kind?: 'location' | 'camera';
+						enabled?: boolean;
+						number?: string;
+					}
 				) {
 					if (plugin === 'HandLinkPermissions') {
 						if (method === 'setAccessEnabled' && options?.kind) {
@@ -195,7 +207,11 @@ export async function installNativeBridge(
 						if (method === 'unregister') state.pushUnregisters++;
 						return;
 					}
-					if (plugin === 'HandLinkPhone' && method === 'openDialer') {
+					if (
+						plugin === 'HandLinkPhone' &&
+						(method === 'openDialer' || method === 'openDialerWithNumber')
+					) {
+						state.dialedNumbers.push(method === 'openDialer' ? '911' : String(options?.number));
 						state.dialerAttempts++;
 						if (state.denyDialer) throw new Error('No dialer available.');
 						return;

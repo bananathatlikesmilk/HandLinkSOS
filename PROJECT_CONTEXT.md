@@ -29,6 +29,16 @@ This file describes current source. The history explains how the discussion evol
 
 ## 1. Purpose and account roles
 
+### Admin-configurable SOS phone number, 5 November 2026
+
+Central Admin can change the installation-wide phone number at **SOS phone number** (`/admin/emergency-phone`). It defaults to `911` until saved. The setting persists in SQLite with the updating Admin and timestamp; local LGU Admins, Dispatchers and Users cannot change it. Migration `0018_emergency_phone.sql` adds the singleton table without changing existing incidents or authentication records. Input accepts 3–15 ASCII digits with an optional leading plus; extensions, USSD, URI/intent fragments, spaces inside numbers and executable syntax are rejected. Format validation does not verify the number belongs to an emergency office.
+
+Newly opened `/user/call` screens load the server's current number, including navigation after a saved SOS. Existing already-open screens retain their loaded number until reloaded/reopened. The web Android-intent link, displayed/manual instructions and native handoff use that loaded value. The dialer still requires the user to press Call; web has no automatic phone navigation, and cancellation/reload handoff behavior remains. This number is a telephone destination, separate from GPS suggestions and provincial case ownership.
+
+The Android plugin adds `openDialerWithNumber` and validates the number again before creating ACTION_DIAL. Existing `openDialer` remains 911-only for older clients/default compatibility. New web code calls the new method for custom numbers; old APKs missing that method fail with manual-number/update instructions rather than silently opening 911. Users need the updated APK for native custom-number support. The local debug APK is `android/app/build/outputs/apk/debug/handlink-dynamic-sos-number-2026-11-05.apk`, targets `https://thebois.fyi/user`, and its signature was verified. SHA256: `7A6050F1744A50E89C766A94DB53E6EAAA3888E4315311B78E12D88D015C81D7`. No device installation or physical dialer test was performed. Server deployment/migration remain unverified.
+
+**Verification:** All 22 database tests and six focused settings/dialer API/browser cases passed. Production build, Android compilation/debug assembly, APK signature, type checks, targeted ESLint and formatting checks passed. Tests cover role/MFA/origin restrictions, unsafe-number rejection, saved-setting persistence/UI, web intent values, native payload on saved SOS, no repeat on reload, legacy APK behavior and existing default dialer safety. A first run failed in test cleanup when reusing a staff login; corrected isolated fixture cleanup and reran all six successfully.
+
 ### Trusted-profile SOS location correction, 5 November 2026
 
 **Local verification:** All nine focused location/export cases passed across the initial run and corrected beneficiary-case rerun. Production builds, zero-error/zero-warning type checks, targeted ESLint, formatting and diff checks passed. Tests cover dispatch/coordination/report/PDF location fields, sender-coordinate omission, snapshot stability, sharing eligibility failures and self-SOS preservation. Deployment and device behavior remain unverified.

@@ -1,5 +1,13 @@
 # Android phone testing
 
+## Configurable SOS phone number, 5 November 2026
+
+Central Admin can use **SOS phone number** (`/admin/emergency-phone`) to save the number shown in the phone dialer. Default is `911`. The setting applies installation-wide and is loaded whenever the User call screen opens. Existing screens need reopening/reloading to see a later change. Accepts 3–15 digits with an optional leading plus; include area/country codes as needed. It does not place a call automatically or change incident queue ownership.
+
+Deploy the server with migration `0018_emergency_phone.sql` and install the updated APK for native custom-number support. This migration preserves existing incidents and adds a persistent setting with updating Admin/time. Old APKs can still open the default 911 dialer; with a custom number, new web code shows manual-dial/update instructions rather than invoking the old hardcoded method. Browser users receive an explicit Android ACTION_DIAL intent link and manual instructions on other devices. No automatic web phone-link launch was introduced.
+
+Updated local debug APK: `android/app/build/outputs/apk/debug/handlink-dynamic-sos-number-2026-11-05.apk`. Target: `https://thebois.fyi/user`. SHA256: `7A6050F1744A50E89C766A94DB53E6EAAA3888E4315311B78E12D88D015C81D7`. Java compilation, assembly and signature verification passed. Six browser/API dialer/settings tests and 22 database tests passed. No device installation, physical call, server deployment or production migration was performed. Earlier APK descriptions below are historical.
+
 ## Current online test APK
 
 The latest build, completed **2 November 2026**, supports location-sharing sessions up to **24 hours** in the screen-off service. Install `android/app/build/outputs/apk/debug/handlink-sharing-24h-2026-11-02.apk` (also available as the latest `app-debug.apk`), 6,529,310 bytes. SHA-256: `3DAAB28711C580E6FFD5A756F742B708908724287E8C92448EC2F468B783569F`. APK signature and target `https://thebois.fyi/user` were verified, along with the compiled native limit. Earlier APKs can reject starting screen-off updates for a session longer than four hours. Deploy the matching web/server update and migration `0016_longer_location_sharing` too. The default remains 15 minutes; existing sessions are not automatically extended. Existing consent, Stop sharing, expiry/warnings, and Android battery limitations still apply. No production migration, installation, or physical-device tracking test occurred during this build.
