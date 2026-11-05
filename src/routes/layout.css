@@ -920,7 +920,7 @@ body {
 }
 :root[data-appearance='light']
 	.user-preview
-	:is(.profile-avatar, .qr-action, .trusted-wrap, .countdown-ring, .sharing-symbol) {
+	:is(.qr-action, .trusted-wrap, .countdown-ring, .sharing-symbol) {
 	color: var(--app-text);
 	border-color: var(--app-border);
 }

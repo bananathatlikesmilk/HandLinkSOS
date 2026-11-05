@@ -367,10 +367,12 @@
 		flex-shrink: 0;
 		width: 60px;
 		height: 60px;
-		border: 1px solid #b2af9c;
+		border: 1px solid var(--app-accent);
 		border-radius: 50%;
-		color: #e8e4d2;
+		background: var(--app-accent);
+		color: var(--app-accent-text);
 		font-size: 1.15rem;
+		font-weight: 600;
 	}
 	.profile-avatar.small {
 		width: 44px;

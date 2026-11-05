@@ -103,7 +103,8 @@ test('light login and User feature panels keep readable colors', async ({ page }
 	await page.goto('/user/profiles');
 	await expect(page.locator('html')).toHaveAttribute('data-appearance', 'light');
 	const avatar = page.locator('.profile-avatar').first();
-	await expect(avatar).toHaveCSS('color', 'rgb(24, 45, 52)');
+	await expect(avatar).toHaveCSS('color', 'rgb(255, 255, 255)');
+	await expect(avatar).toHaveCSS('background-color', 'rgb(20, 103, 86)');
 	await page.locator('.qr-action').first().hover();
 	await expectLightSurface(page.locator('.qr-action').first());
 	await page.goto('/user/profiles/scan');

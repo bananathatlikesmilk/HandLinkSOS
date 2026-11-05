@@ -131,7 +131,8 @@
 		>
 		<div class="flex items-center justify-between gap-3">
 			<h2 id="trusted-title">Added profiles</h2>
-			<a href={resolve('/user/profiles')}><Plus size={14} /> Add profile</a>
+			<a class="add-profile-link" href={resolve('/user/profiles')}><Plus size={14} /> Add profile</a
+			>
 		</div>
 		<label class="recipient-search">
 			<Search size={18} aria-hidden="true" />
@@ -196,9 +197,20 @@
 </div>
 
 <style>
-	.stranger-sos {
+	.trusted-section .stranger-sos {
 		color: #fff;
 		background: #b91c1c;
+		border-color: #b91c1c;
+		font-size: 16px;
+		font-weight: 600;
+		min-height: 52px;
+		padding: 0.8rem 1rem;
+		white-space: normal;
+		text-align: center;
+	}
+	.trusted-section .stranger-sos:hover {
+		background: #991b1b;
+		border-color: #991b1b;
 	}
 	.dashboard-screen {
 		display: flex;
@@ -250,7 +262,7 @@
 		font-size: 16px;
 		font-weight: 500;
 	}
-	.trusted-section a {
+	.add-profile-link {
 		color: var(--app-accent);
 		font-size: 12px;
 		display: flex;

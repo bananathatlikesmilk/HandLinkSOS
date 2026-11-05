@@ -29,6 +29,12 @@ This file describes current source. The history explains how the discussion evol
 
 ## 1. Purpose and account roles
 
+### Profile avatar and stranger SOS readability, 5 November 2026
+
+The User Profiles page's initials/person-icon avatar now uses the paired semantic accent background and accent-text foreground in both themes, with a stronger initial weight. Removed the global light-only avatar foreground override so it cannot conflict with the filled badge. This concerns the existing avatar display; no image upload/account-image feature was added.
+
+The dashboard stranger SOS link previously inherited accent-colored, small text from `.trusted-section a`, which was intended for Add profile. That rule now targets only the named Add profile link. The stranger SOS control owns its white-on-red text/background/border, larger 16-pixel text, 52-pixel minimum height, centered wrapping and darker hover state. Existing SOS navigation, countdown and sharing rules remain. See H068 for verification and local delivery state.
+
 ### Separate departure and resolution actions, 5 November 2026
 
 **Inline confirmations, H067:** After the user clarified that they meant the departure/resolution form rather than the caller-identity checkbox, moved the shared confirmation form inside the corresponding action card, directly after Record departure or Review resolution. A highlighted border and contrasting surface distinguish the expanded form. Its heading receives keyboard focus and scrolls into view when opened; validation/request errors stay inside the same box. The source/outcome inputs, explicit final button, resolution checkbox and Cancel action remain together. Business rules and server guards are unchanged.
