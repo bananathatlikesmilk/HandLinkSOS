@@ -121,29 +121,28 @@
 					onclick={() => choose('On route')}>Record departure</button
 				>
 			</section>
-			<section class="response-action resolution-action" aria-label="Resolve incident action">
-				<h4>Resolve incident</h4>
-				<p class="muted">
-					Close this incident only after confirming the final outcome. Original notes will be
-					locked.
-				</p>
-				<button
-					type="button"
-					class="btn btn-outline"
-					disabled={disabled ||
-						busy ||
-						incident.status !== 'On route' ||
-						incident.cancellationPending}
-					aria-expanded={status === 'Resolved'}
-					onclick={() => choose('Resolved')}>Review resolution</button
-				>
-				{#if incident.cancellationPending}<p class="muted">
-						Review the pending cancellation request first.
-					</p>{/if}
-				{#if incident.status !== 'On route'}<p class="muted">
-						Record confirmed responder departure before resolving this incident.
-					</p>{/if}
-			</section>
+			{#if incident.status === 'On route'}
+				<section class="response-action resolution-action" aria-label="Resolve incident action">
+					<h4>Resolve incident</h4>
+					<p class="muted">
+						Close this incident only after confirming the final outcome. Original notes will be
+						locked.
+					</p>
+					<button
+						type="button"
+						class="btn btn-outline"
+						disabled={disabled ||
+							busy ||
+							incident.status !== 'On route' ||
+							incident.cancellationPending}
+						aria-expanded={status === 'Resolved'}
+						onclick={() => choose('Resolved')}>Review resolution</button
+					>
+					{#if incident.cancellationPending}<p class="muted">
+							Review the pending cancellation request first.
+						</p>{/if}
+				</section>
+			{/if}
 		</div>
 		{#if status}
 			<form

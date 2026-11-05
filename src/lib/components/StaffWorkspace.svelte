@@ -777,25 +777,27 @@
 								onclick={() => mutate('status', 'On route')}>Mark on route</button
 							>
 						</section>
-						<section class="status-action resolution-action">
-							<h3 class="section-heading">Close incident</h3>
-							<p class="muted">
-								Resolve only after confirming the final outcome. Original notes will be locked.
-							</p>
-							<button
-								class="resolved-button btn"
-								disabled={busy ||
-									leaving ||
-									!!detailError ||
-									!ownIncident ||
-									notesDirty ||
-									savingNotes ||
-									!!noteError ||
-									selected.incident.status !== 'On route' ||
-									selected.cancellation?.decision === 'pending'}
-								onclick={() => mutate('status', 'Resolved')}>Mark resolved</button
-							>
-						</section>
+						{#if selected.incident.status === 'On route'}
+							<section class="status-action resolution-action">
+								<h3 class="section-heading">Close incident</h3>
+								<p class="muted">
+									Resolve only after confirming the final outcome. Original notes will be locked.
+								</p>
+								<button
+									class="resolved-button btn"
+									disabled={busy ||
+										leaving ||
+										!!detailError ||
+										!ownIncident ||
+										notesDirty ||
+										savingNotes ||
+										!!noteError ||
+										selected.incident.status !== 'On route' ||
+										selected.cancellation?.decision === 'pending'}
+									onclick={() => mutate('status', 'Resolved')}>Mark resolved</button
+								>
+							</section>
+						{/if}
 					</div>
 				{/if}
 			{:else}<h2 id="details-heading" class="section-heading">Select an SOS alert</h2>

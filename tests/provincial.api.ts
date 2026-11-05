@@ -114,9 +114,9 @@ test('provincial handler keeps caller information, notes and confirmed external 
 		await expect(page.getByText(privateMedical, { exact: true })).toHaveCount(0);
 		await page.getByRole('checkbox', { name: /I verbally confirmed/ }).check();
 		await page.getByRole('button', { name: 'Confirm caller and handle case', exact: true }).click();
-		await expect(
-			page.getByRole('button', { name: 'Review resolution', exact: true })
-		).toBeDisabled();
+		await expect(page.getByRole('button', { name: 'Review resolution', exact: true })).toHaveCount(
+			0
+		);
 		await expect(page.getByRole('button', { name: 'Record departure', exact: true })).toBeEnabled();
 		await page.getByRole('button', { name: 'Medical information', exact: true }).click();
 		await expect(page.getByText(privateMedical, { exact: true })).toBeVisible();
@@ -171,6 +171,9 @@ test('provincial handler keeps caller information, notes and confirmed external 
 		}
 		const progress = page.getByRole('region', { name: 'Confirmed response updates', exact: true });
 		await progress.getByRole('button', { name: 'Record departure', exact: true }).click();
+		await expect(
+			progress.getByRole('button', { name: 'Review resolution', exact: true })
+		).toHaveCount(0);
 		expect((await (await page.request.get(endpoint)).json()).incident.status).toBe('In progress');
 		await expect(
 			progress.getByRole('button', { name: 'Confirm and mark on route', exact: true })
@@ -180,6 +183,9 @@ test('provincial handler keeps caller information, notes and confirmed external 
 			.getByLabel('Confirmed update / outcome', { exact: false })
 			.fill(confirmation.details);
 		await progress.getByRole('button', { name: 'Confirm and mark on route', exact: true }).click();
+		await expect(
+			progress.getByRole('button', { name: 'Review resolution', exact: true })
+		).toBeEnabled();
 		await expect(progress).toContainText('Ambulance departed. Confirmed by radio.');
 		expect((await (await page.request.get(endpoint)).json()).incident).toMatchObject({
 			lguId: province,

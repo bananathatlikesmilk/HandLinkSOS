@@ -291,6 +291,7 @@ test('cancel sends nothing; a real SOS reaches dispatcher confirmation and resol
 		).toBeVisible();
 		await expect(staff.getByText('Caller reports chest pain.', { exact: true })).toBeVisible();
 		staff.once('dialog', (dialog) => dialog.dismiss());
+		await expect(staff.getByRole('button', { name: 'Mark resolved', exact: true })).toHaveCount(0);
 		await staff.getByRole('button', { name: 'Mark on route', exact: true }).click();
 		expect(
 			(await (await staff.request.get(`/api/staff/incidents/${id}`)).json()).incident.status
@@ -309,7 +310,7 @@ test('cancel sends nothing; a real SOS reaches dispatcher confirmation and resol
 		await staff.reload();
 		await expect(staff.getByText('Caller reports chest pain.', { exact: true })).toBeVisible();
 		await expect(staff.getByRole('button', { name: 'Mark on route', exact: true })).toBeDisabled();
-		await expect(staff.getByRole('button', { name: 'Mark resolved', exact: true })).toBeDisabled();
+		await expect(staff.getByRole('button', { name: 'Mark resolved', exact: true })).toHaveCount(0);
 		await staff
 			.getByRole('textbox', { name: 'Addendum', exact: false })
 			.fill('Caller confirmed safe after follow-up.');
