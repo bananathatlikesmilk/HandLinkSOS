@@ -39,6 +39,78 @@ function seed(client) {
 			.run(id, owner, 'First', 'Last', '2000-01-01', 'Female', '+639171234567', Date.now());
 }
 
+test('stranger migration preserves incident children and immutable references with atomic rollback', () => {
+	const client = new Database(':memory:');
+	client.pragma('foreign_keys=ON');
+	try {
+		const migrations = readMigrationFiles({ migrationsFolder: './drizzle' });
+		for (const migration of migrations.slice(0, 19))
+			for (const statement of migration.sql) client.exec(statement);
+		seed(client);
+		client.exec(
+			"INSERT INTO incident (id,person_profile_id,caller_user_id,caller_name,latitude,longitude,idempotency_key) VALUES ('existing','profile-owner','owner','Owner',14,121,'old'); INSERT INTO incident_event (id,incident_id,actor_user_id,type,notes) VALUES ('note','existing','owner','note','Synthetic note'); INSERT INTO incident_lgu (incident_id,lgu_id,reason) VALUES ('existing','legacy','legacy'); INSERT INTO incident_intake (incident_id,suggestion_reason) VALUES ('existing','no_match'); INSERT INTO incident_person_location VALUES ('existing',15,122,10,1000);"
+		);
+		const tables = [
+			'incident',
+			'incident_event',
+			'incident_reference',
+			'incident_lgu',
+			'incident_intake',
+			'incident_person_location'
+		];
+		const before = tables.map((table) => client.prepare(`SELECT * FROM ${table}`).all());
+		const apply = () => {
+			for (const statement of migrations[19].sql) client.exec(statement);
+		};
+		assert.throws(() =>
+			client.transaction(() => {
+				apply();
+				throw new Error('rollback proof');
+			})()
+		);
+		assert.deepEqual(
+			tables.map((table) => client.prepare(`SELECT * FROM ${table}`).all()),
+			before
+		);
+		client.transaction(apply)();
+		const migrated = client.prepare('SELECT * FROM incident WHERE id=?').get('existing');
+		const { stranger_name, emergency_description, location_source, ...original } = migrated;
+		assert.deepEqual(original, before[0][0]);
+		assert.equal(stranger_name, '');
+		assert.equal(emergency_description, '');
+		assert.equal(location_source, 'device');
+		assert.deepEqual(
+			tables.slice(1).map((table) => client.prepare(`SELECT * FROM ${table}`).all()),
+			before.slice(1)
+		);
+		client.exec(
+			"INSERT INTO incident (id,person_profile_id,caller_user_id,caller_name,latitude,longitude,idempotency_key,emergency_description,location_source,location_label) VALUES ('stranger',NULL,'owner','Owner',NULL,NULL,'new','Person fell','reported','Example barangay');"
+		);
+		assert.ok(
+			client.prepare("SELECT number FROM incident_reference WHERE incident_id='stranger'").get()
+		);
+		assert.throws(() =>
+			client.exec("UPDATE incident SET emergency_description='' WHERE id='stranger'")
+		);
+		assert.throws(() =>
+			client.exec("UPDATE incident SET location_source='device' WHERE id='stranger'")
+		);
+		assert.throws(() => client.exec("UPDATE incident SET latitude=NULL WHERE id='existing'"));
+		assert.throws(() =>
+			client.exec("UPDATE incident SET stranger_name='Wrong person' WHERE id='existing'")
+		);
+		assert.throws(() =>
+			client.exec("UPDATE incident_reference SET number=999 WHERE incident_id='existing'")
+		);
+		assert.throws(() => client.exec("DELETE FROM incident_reference WHERE incident_id='existing'"));
+		assert.throws(() => client.exec("DELETE FROM incident WHERE id='existing'"));
+		assert.equal(client.pragma('foreign_keys', { simple: true }), 1);
+		assert.deepEqual(client.pragma('foreign_key_check'), []);
+	} finally {
+		client.close();
+	}
+});
+
 test('SOS number migration preserves incidents and validates the singleton setting', () => {
 	const client = new Database(':memory:');
 	client.pragma('foreign_keys=ON');

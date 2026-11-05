@@ -89,6 +89,8 @@
 				personLocation={detail.coordination.personLocation}
 				reporter={detail.coordination}
 				isForSomeoneElse={detail.incident.isForSomeoneElse}
+				isStranger={detail.incident.isStranger}
+				locationSource={detail.incident.locationSource}
 			/>
 		{/if}
 		{#if detail.coordination.history.length}

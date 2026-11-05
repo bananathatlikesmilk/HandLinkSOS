@@ -238,9 +238,14 @@ export const incident = sqliteTable(
 	'incident',
 	{
 		id: id(),
-		personProfileId: text('person_profile_id')
+		personProfileId: text('person_profile_id').references(() => profile.id, {
+			onDelete: 'restrict'
+		}),
+		strangerName: text('stranger_name').notNull().default(''),
+		emergencyDescription: text('emergency_description').notNull().default(''),
+		locationSource: text('location_source', { enum: ['device', 'reported'] })
 			.notNull()
-			.references(() => profile.id, { onDelete: 'restrict' }),
+			.default('device'),
 		callerUserId: accountReference('caller_user_id'),
 		callerName: text('caller_name').notNull(),
 		callerRelationship: text('caller_relationship').notNull().default(''),
@@ -250,8 +255,8 @@ export const incident = sqliteTable(
 		status: text('status', { enum: ['Not assigned', 'In progress', 'On route', 'Resolved'] })
 			.notNull()
 			.default('Not assigned'),
-		latitude: real('latitude').notNull(),
-		longitude: real('longitude').notNull(),
+		latitude: real('latitude'),
+		longitude: real('longitude'),
 		locationLabel: text('location_label').notNull().default(''),
 		idempotencyKey: text('idempotency_key').notNull(),
 		startedAt: created(),
@@ -261,10 +266,14 @@ export const incident = sqliteTable(
 	(t) => [
 		index('incident_status_idx').on(t.status, t.startedAt),
 		index('incident_person_idx').on(t.personProfileId),
+		check(
+			'incident_subject',
+			sql`(${t.personProfileId} is not null and ${t.strangerName} = '' and ${t.emergencyDescription} = '' and ${t.locationSource} = 'device') or (${t.personProfileId} is null and length(trim(${t.emergencyDescription})) between 1 and 1000 and length(${t.strangerName}) <= 100 and ${t.locationSource} in ('device','reported') and (${t.locationSource} <> 'reported' or length(trim(${t.locationLabel})) > 0))`
+		),
 		uniqueIndex('incident_retry_unique').on(t.callerUserId, t.idempotencyKey),
 		check(
 			'incident_coordinates',
-			sql`${t.latitude} between -90 and 90 and ${t.longitude} between -180 and 180`
+			sql`(${t.latitude} is not null and ${t.longitude} is not null and ${t.latitude} between -90 and 90 and ${t.longitude} between -180 and 180) or (${t.personProfileId} is null and ${t.locationSource} = 'reported' and ${t.latitude} is null and ${t.longitude} is null)`
 		),
 		check(
 			'incident_status',

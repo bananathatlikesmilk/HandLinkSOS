@@ -15,6 +15,7 @@ export default defineConfig({
 		'tests/accounts.api.ts',
 		'tests/staff-profile.frontend.ts',
 		'tests/incidents.api.ts',
+		'tests/stranger.api.ts',
 		'tests/incident-location.api.ts',
 		'tests/lgu.api.ts',
 		'tests/provincial.api.ts',

@@ -301,7 +301,9 @@
 			if (action === 'confirm') verballyConfirmed = false;
 			notice =
 				action === 'confirm'
-					? 'Incident confirmed. Registered information is now available.'
+					? result.incident.isStranger
+						? 'Caller confirmed. You are handling this case. No registered profile is linked.'
+						: 'Incident confirmed. Registered information is now available.'
 					: `Incident marked ${status?.toLowerCase()}.`;
 		} catch (cause) {
 			if (!disposed)
@@ -517,8 +519,12 @@
 				{#if selected.incident.isForSomeoneElse}
 					<div class="my-4 alert" aria-label="SOS for someone else">
 						<p>
-							<strong>SOS for someone else</strong><br />{selected.incident.callerName} sent this SOS
-							for {selected.incident.personName}.
+							<strong
+								>{selected.incident.isStranger
+									? 'SOS for an unregistered person'
+									: 'SOS for someone else'}</strong
+							><br />{selected.incident.callerName} sent this SOS for {selected.incident
+								.personName}.
 						</p>
 					</div>
 				{/if}
@@ -550,6 +556,16 @@
 							</tr>{/each}
 					</tbody>
 				</table>
+				{#if selected.incident.isStranger}<section
+						class="my-4 alert"
+						aria-label="Caller-reported emergency"
+					>
+						<div>
+							<strong>Caller-reported details — not verified</strong>
+							<p class="whitespace-pre-wrap">{selected.incident.emergencyDescription}</p>
+							<p>No registered medical profile or emergency contacts are linked to this person.</p>
+						</div>
+					</section>{/if}
 				{#key selected.incident.id}
 					<IncidentCancellationReview
 						incidentId={selected.incident.id}
@@ -575,20 +591,24 @@
 							}}
 						/>{/key}
 				{/if}
-				{#if !selected.personal}
+				{#if !selected.personal && !(selected.incident.isStranger && ownIncident)}
 					<div class="confirmation-panel">
 						<ShieldCheck size={27} />
 						<h3 class="section-heading">
 							{canHandleSelected && selected.incident.status === 'Not assigned'
 								? 'Confirm caller identity'
-								: 'Registered information restricted'}
+								: selected.incident.isStranger
+									? 'Case handling restricted'
+									: 'Registered information restricted'}
 						</h3>
 						<p>
-							{role === 'admin'
-								? 'Admin oversight shows incident status. Medical and registered information are available only to the assigned dispatcher.'
-								: selected.incident.status === 'Not assigned'
-									? 'Verbally confirm the caller’s name and phone number before opening registered information.'
-									: 'Only the assigned dispatcher can view registered information and update this incident.'}
+							{selected.incident.isStranger
+								? 'Only the assigned dispatcher can update this case. Confirm the caller’s name, phone number, and emergency details. No registered profile is linked.'
+								: role === 'admin'
+									? 'Admin oversight shows incident status. Medical and registered information are available only to the assigned dispatcher.'
+									: selected.incident.status === 'Not assigned'
+										? 'Verbally confirm the caller’s name and phone number before opening registered information.'
+										: 'Only the assigned dispatcher can view registered information and update this incident.'}
 						</p>
 
 						{#if canHandleSelected && selected.incident.status === 'Not assigned'}<label
@@ -611,22 +631,22 @@
 										: 'Confirm incident'}</button
 							>{/if}
 					</div>
-				{:else if selected.personal}
+				{:else if selected.personal || (selected.incident.isStranger && ownIncident)}
 					<p class="muted">
 						LGU: {selected.incident.lguName ?? 'Unrouted — central review'} · Routing: {routingDescription(
 							selected.incident.routingReason
 						)}
 					</p>
 					<div class="detail-tabs" aria-label="Incident detail sections">
-						{#each ['Personal information', 'Medical information', 'Emergency contacts', 'Additional information'] as tab (tab)}<button
-								class:active={detail === tab}
-								aria-pressed={detail === tab}
+						{#each selected.incident.isStranger ? ['Additional information'] : ['Personal information', 'Medical information', 'Emergency contacts', 'Additional information'] as tab (tab)}<button
+								class:active={detail === tab || selected.incident.isStranger}
+								aria-pressed={detail === tab || selected.incident.isStranger}
 								onclick={() => {
 									detail = tab;
 								}}>{tab}</button
 							>{/each}
 					</div>
-					{#if detail === 'Personal information'}
+					{#if detail === 'Personal information' && selected.personal}
 						<table class="detail-table">
 							<tbody>
 								{#each [['First name', selected.personal.firstName], ['Last name', selected.personal.lastName], ['Age', selected.personal.age + ' years'], ['Sex', selected.personal.sex], ['Phone number', selected.personal.phone], ['Status', incidentStatusLabel(selected.incident)], ['Incident reference', selected.incident.reference]] as [label, value] (label)}<tr
@@ -641,7 +661,7 @@
 							reporter={selected.personal}
 							isForSomeoneElse={selected.incident.isForSomeoneElse}
 						/>
-					{:else if detail === 'Medical information'}
+					{:else if detail === 'Medical information' && !selected.incident.isStranger}
 						{#if selected.medical}<table class="detail-table">
 								<tbody>
 									{#each [['Blood type', selected.medical.bloodType], ['Chronic conditions', selected.medical.chronicCondition], ['Allergies', selected.medical.allergies], ['Current medications', selected.medical.currentMedications], ['Additional medical information', selected.medical.additionalInformation]] as [label, value] (label)}<tr
@@ -651,7 +671,7 @@
 										</tr>{/each}
 								</tbody>
 							</table>{:else}<p class="muted">No medical information registered.</p>{/if}
-					{:else if detail === 'Emergency contacts'}
+					{:else if detail === 'Emergency contacts' && !selected.incident.isStranger}
 						{#each selected.emergencyContacts as contact, index (index)}<table
 								class="detail-table mb-6"
 							>

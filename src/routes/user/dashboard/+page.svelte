@@ -126,6 +126,9 @@
 		</p>
 	</div>
 	<section class="trusted-section" aria-labelledby="trusted-title">
+		<a class="stranger-sos btn mb-6 w-full btn-error" href={resolve('/user/sos?stranger=1')}
+			>SOS for someone I don't know</a
+		>
 		<div class="flex items-center justify-between gap-3">
 			<h2 id="trusted-title">Added profiles</h2>
 			<a href={resolve('/user/profiles')}><Plus size={14} /> Add profile</a>
@@ -193,6 +196,10 @@
 </div>
 
 <style>
+	.stranger-sos {
+		color: #fff;
+		background: #b91c1c;
+	}
 	.dashboard-screen {
 		display: flex;
 		flex-direction: column;

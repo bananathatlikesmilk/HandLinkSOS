@@ -1,6 +1,6 @@
 # HandLink-SOS project context
 
-Last inspected: **4 November 2026, Asia/Manila**. Local branch: `main`; inspected baseline HEAD: `84c33f7` (`clearer notice of use`). The preceding notice styling is committed in this local baseline; longer sharing duration and provincial workflow below are new local work. Earlier inspections used the commits recorded in the historical notes below. No new GitHub synchronization or production deployment was verified.
+Last inspected: **5 November 2026, Asia/Manila**. Local branch: `main`; inspected baseline HEAD: `901dcd7` (`phone number hotline fix`). Stranger SOS below is new local work. Earlier inspections used the commits recorded in the historical notes below. No new GitHub synchronization or production deployment was verified.
 
 ### Local Git authorship maintenance
 
@@ -28,6 +28,22 @@ This file describes current source. The history explains how the discussion evol
 - **Proposed / open:** not confirmed as implemented or completed.
 
 ## 1. Purpose and account roles
+
+### SOS for an unregistered person, 5 November 2026
+
+**Confirmed local implementation:** A signed-in User with a saved active profile can select **SOS for someone I don't know** on the dashboard. The person needing help does not need an account, QR invitation, or trusted connection. This is identified reporting, not anonymous/public SOS. The reporter enters what happened (required, at most 1,000 characters), an optional name (at most 100 characters; blank displays Unknown person), and the emergency location. Choosing “I'm with them” uses the reporting device's GPS after permission checks. Choosing “I'm elsewhere” requires an address/landmark (at most 250 characters) and sends no device GPS. Address-only reports receive no automatic municipality suggestion; provincial dispatch confirms the municipality with the caller. There is no address geocoding or map-pin picker in this first version.
+
+The existing five-second countdown, immediate-send control, cancellation before sending, saved-request recovery, account/minute limits, incident references, provincial ownership, configured hotline, and user-controlled phone Call action remain. Retries compare the entire submitted incident identity/location/description and use the same idempotency key. Separate unknown people are not merged or automatically rejected as duplicates. The earlier registered-profile active-SOS rule remains for self/trusted cases. Related-report linking is a possible future improvement, not implemented here.
+
+**Identity and access invariant:** A stranger incident has a null `person_profile_id`; it never uses the reporter as a placeholder beneficiary and does not create a fake account/profile. Reporter name, phone, and authenticated account remain separate. Dispatch and reports explicitly label the incident as for an unregistered person and show caller-reported, unverified information. No registered medical profile, emergency contacts, beneficiary notification, or beneficiary cancellation identity is attached. Names are claims, not automatic account matches. The assigned provincial dispatcher still verbally confirms the caller, saves/version-controls notes, records externally confirmed progress, and can use the existing reviewed AI-summary and report/addendum paths. The summary redaction path now handles an absent beneficiary and includes any supplied stranger name among known identifiers; it does not query a nonexistent medical profile. The original caller description remains distinct from dispatcher notes.
+
+Reports support the additional **For an unregistered person** filter. PDF exports identify reporter and subject separately and include the original caller description and its location source. Trusted-only report filtering excludes strangers. Self/trusted location-sharing consent and snapshots remain unchanged. HandLink does not locate a stranger's phone, answer/record calls, contact municipal hotlines, dispatch units, or infer response status. Calls and municipal coordination remain external.
+
+**Storage and rollout:** [0019_stranger_sos.sql](drizzle/0019_stranger_sos.sql) rebuilds the incident parent table transactionally to permit a null beneficiary and address-only coordinates, adds description/name/location-source fields, copies old incident data, and recreates its indexes/reference-allocation trigger. Existing child rows and immutable references remain. A foreign-key integrity assertion runs before deferred constraint bookkeeping is cleared. Registered/device-location cases still require valid coordinate pairs; address-only stranger cases can store null coordinates. Source readers use left joins so stranger cases cannot vanish from lists/reports. Use the existing backup-producing migration command before starting the updated server. Deploy all server instances consistently; older readers cannot safely handle new stranger rows. After new stranger writes, prefer a forward fix rather than an old-code downgrade or a backup restore that discards incidents. No production migration, deployment, push, APK rebuild, physical-device check, or actual emergency call was performed. This feature adds web/server behavior and no native Android method.
+
+Sources: [SOS screen](src/routes/user/sos/+page.svelte), [incident validation](src/lib/server/validation.ts), [incident service](src/lib/server/incidents.ts), [staff workspace](src/lib/components/StaffWorkspace.svelte), [reports](src/lib/components/Reports.svelte), [PDF renderer](src/lib/server/report-pdf.ts), and [focused tests](tests/stranger.api.ts). Verification results are recorded in H060 after execution; local source is not evidence of deployment.
+
+**Local verification:** All 23 database tests and 19 focused API/browser cases passed across the recorded runs. The final three stranger cases passed again after mobile presentation corrections, including updated confirmation wording, readable light/dark buttons, lost-response retry without duplication, staff ownership/medical isolation, notes and AI preview, filtered PDF content, and mocked native dialer handoff. Production builds completed. Mobile form/staff screenshots were inspected and 390-pixel overflow checks passed. These checks use fictional records, isolated databases and a native bridge mock, not actual emergency calls or physical-device installation.
 
 ### Admin-configurable SOS phone number, 5 November 2026
 
@@ -194,8 +210,8 @@ The dashboard searches approved SOS profiles by name, ignoring case and surround
 
 ### SOS and incident handling
 
-1. The User chooses self or an approved trusted profile.
-2. The reporting device obtains its location. For on-behalf SOS, the server also snapshots the represented person's latest location if that person has an active sharing session explicitly including the reporter.
+1. The User chooses self, an approved trusted profile, or someone they do not know. Stranger SOS requires no beneficiary account or trusted permission; the reporter must remain signed in.
+2. Self/trusted SOS obtains the reporting device's location. For trusted SOS, the server also snapshots the represented person's latest location if that person has an active sharing session explicitly including the reporter. Stranger SOS captures reporter GPS only when the reporter says they are with the person; otherwise it saves a caller-entered address without GPS.
 3. A five-second cancellation countdown starts; an explicit immediate-send option can bypass the remaining countdown.
 4. The client sends JSON with a retry/idempotency key.
 5. The server rechecks current identity, account/profile availability, trusted permission, input, rate/duplicate rules, and prior request state.

@@ -103,7 +103,9 @@ export function reportPdf(data: ReturnType<typeof filteredIncidentReports>): Pro
 				? 'For self'
 				: data.input.sosType === 'trusted'
 					? 'For a trusted person'
-					: 'All types';
+					: data.input.sosType === 'stranger'
+						? 'For an unregistered person'
+						: 'All types';
 		const metadata = [
 			`Generated: ${formatTime(new Date().toISOString())} | ${data.reports.length} matching reports`,
 			`Incident start date range: ${data.input.from ?? 'Any'} to ${data.input.to ?? 'Any'} (both dates included)`,
@@ -142,7 +144,14 @@ export function reportPdf(data: ReturnType<typeof filteredIncidentReports>): Pro
 			section('Incident details');
 			fields([
 				['Person in distress', row.personName],
-				['SOS', row.isForSomeoneElse ? 'For a trusted person' : 'For self'],
+				[
+					'SOS',
+					row.isStranger
+						? 'For an unregistered person'
+						: row.isForSomeoneElse
+							? 'For a trusted person'
+							: 'For self'
+				],
 				['Caller', row.callerName],
 				['Caller phone', row.callerPhone],
 				['Caller relationship', report.callerRelationship || 'Self'],
@@ -154,8 +163,23 @@ export function reportPdf(data: ReturnType<typeof filteredIncidentReports>): Pro
 				['Ended', formatTime(row.endedAt)],
 				['Response duration', incidentDuration(row.startedAt, row.endedAt)]
 			]);
+			if (row.isStranger) {
+				section('Caller-reported details — not verified');
+				text(row.emergencyDescription);
+				text(
+					'No registered medical profile is linked to this person. Confirm details with the caller.',
+					muted
+				);
+			}
 			section('Location');
-			if (row.isForSomeoneElse) {
+			if (row.isStranger) {
+				text(
+					row.locationSource === 'device'
+						? `Reporter said they were with the person. Saved GPS: ${report.latitude}, ${report.longitude}.`
+						: `Caller-reported address: ${report.locationLabel}. No GPS captured for this person.`
+				);
+				text('Confirm the emergency location with the caller.', muted);
+			} else if (row.isForSomeoneElse) {
 				const point = report.personLocation;
 				text(
 					point

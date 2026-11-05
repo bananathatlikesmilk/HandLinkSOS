@@ -31,6 +31,11 @@
 	let deadline = 0;
 	let locatingAttempt = 0;
 	let refreshing = false;
+	let strangerMode = $state(false);
+	let strangerName = $state('');
+	let emergencyDescription = $state('');
+	let locationSource = $state<'device' | 'reported'>('device');
+	let emergencyAddress = $state('');
 	const storageKey = $derived('handlink:sos:pending:' + (data.account?.id ?? ''));
 	async function refreshRecent() {
 		if (refreshing) return;
@@ -51,15 +56,28 @@
 		}
 	}
 	function locate() {
-		if (!mounted || !target || pending) return;
+		if (!mounted || (!target && !strangerMode) || pending) return;
 		const attempt = ++locatingAttempt;
 		phase = 'locating';
 		message = '';
 		void getDeviceLocation().then(
 			(position) => {
-				if (!mounted || attempt !== locatingAttempt || phase !== 'locating' || !target) return;
+				if (
+					!mounted ||
+					attempt !== locatingAttempt ||
+					phase !== 'locating' ||
+					(!target && !strangerMode)
+				)
+					return;
 				pending = {
-					personProfileId: target.id,
+					personProfileId: strangerMode ? null : target!.id,
+					...(strangerMode
+						? {
+								strangerName: strangerName.trim(),
+								emergencyDescription: emergencyDescription.trim(),
+								locationSource: 'device' as const
+							}
+						: {}),
 					latitude: position.coords.latitude,
 					longitude: position.coords.longitude,
 					locationLabel: '',
@@ -80,6 +98,27 @@
 							: 'Could not get your location. Check location services, then retry.';
 			}
 		);
+	}
+	function prepareStranger() {
+		if (!mounted || pending || !emergencyDescription.trim()) return;
+		if (locationSource === 'device') {
+			locate();
+			return;
+		}
+		if (!emergencyAddress.trim()) return;
+		pending = {
+			personProfileId: null,
+			strangerName: strangerName.trim(),
+			emergencyDescription: emergencyDescription.trim(),
+			locationSource: 'reported',
+			latitude: null,
+			longitude: null,
+			locationLabel: emergencyAddress.trim(),
+			idempotencyKey: crypto.randomUUID()
+		};
+		countdown = 5;
+		deadline = Date.now() + 5000;
+		phase = 'countdown';
 	}
 	function cancel() {
 		if (!['countdown', 'locating'].includes(phase)) return;
@@ -146,6 +185,9 @@
 	async function initialize() {
 		try {
 			pending = readPendingSos(storageKey);
+			strangerMode = pending
+				? pending.personProfileId === null
+				: page.url.searchParams.get('stranger') === '1';
 			if (pending) {
 				phase = 'error';
 				message =
@@ -158,7 +200,8 @@
 			const id = pending?.personProfileId ?? page.url.searchParams.get('profile');
 			target = result.targets.find((item) => item.id === id) ?? null;
 			if (pending) return;
-			if (target) locate();
+			if (strangerMode) phase = 'idle';
+			else if (target) locate();
 			else {
 				phase = 'idle';
 				message = id
@@ -202,12 +245,18 @@
 		<h1 class="user-title">Preparing SOS</h1>
 		<p class="user-copy mt-4" role="status">Checking your saved profile...</p>
 	{:else if phase === 'locating' || phase === 'countdown'}
-		<p class="user-kicker">SOS FOR {target?.name}</p>
+		<p class="user-kicker">
+			SOS FOR {strangerMode ? strangerName.trim() || 'UNKNOWN PERSON' : target?.name}
+		</p>
 		<h1 class="user-title mt-4">You can still cancel</h1>
 		<p class="user-copy mt-3">
-			{target?.id !== data.accountProfile?.id
-				? 'Their shared location is included if available. Your device location is recorded separately.'
-				: 'Your device location is sent with this SOS.'}
+			{strangerMode
+				? locationSource === 'device'
+					? 'You confirmed you are with them. Your GPS marks the emergency location.'
+					: 'The emergency address you entered will be sent. Your GPS will not be used.'
+				: target?.id !== data.accountProfile?.id
+					? 'Their shared location is included if available. Your device location is recorded separately.'
+					: 'Your device location is sent with this SOS.'}
 		</p>
 		{#if phase === 'locating'}
 			<p class="user-copy my-10" role="status">
@@ -259,12 +308,76 @@
 		{#if pending}<button class="btn mt-6 w-full btn-primary" onclick={submit}
 				>Retry saved SOS request</button
 			>
+		{:else if strangerMode}<button
+				class="btn mt-6 w-full btn-primary"
+				onclick={() => {
+					phase = 'idle';
+				}}>Review emergency details</button
+			>
 		{:else if target}<button class="btn mt-6 w-full btn-primary" onclick={locate}
 				>Retry location</button
 			>
 		{:else}<button class="btn mt-6 w-full btn-primary" onclick={initialize}
 				>Retry preparation</button
 			>{/if}
+	{:else if strangerMode}
+		<h1 class="user-title">SOS for someone I don't know</h1>
+		<p class="user-copy mt-3">
+			You are the reporter. No account is needed for the person needing help.
+		</p>
+		<form
+			class="user-panel mt-6 w-full space-y-5 text-left"
+			onsubmit={(event) => {
+				event.preventDefault();
+				prepareStranger();
+			}}
+		>
+			<label class="field-label"
+				>Their name (optional)<input
+					class="input w-full"
+					maxlength="100"
+					placeholder="Unknown is okay"
+					bind:value={strangerName}
+				/></label
+			>
+			<label class="field-label"
+				>What happened? *<textarea
+					class="textarea w-full"
+					required
+					maxlength="1000"
+					bind:value={emergencyDescription}
+					placeholder="Describe what you can see. Do not guess a diagnosis."></textarea></label
+			>
+			<fieldset class="space-y-3">
+				<legend class="field-label">Where is the emergency? *</legend>
+				<label class="flex items-center gap-3"
+					><input class="radio" type="radio" bind:group={locationSource} value="device" /> I'm with them.
+					Use my location.</label
+				>
+				<label class="flex items-center gap-3"
+					><input class="radio" type="radio" bind:group={locationSource} value="reported" /> I'm elsewhere.
+					Enter their address.</label
+				>
+			</fieldset>
+			{#if locationSource === 'reported'}<label class="field-label"
+					>Emergency address / landmark *<textarea
+						class="textarea w-full"
+						required
+						maxlength="250"
+						bind:value={emergencyAddress}
+						placeholder="Barangay, municipality, street, nearby landmark"></textarea></label
+				>{/if}
+			<p class="user-copy">
+				Details are caller-reported. Dispatch will confirm them. This does not track the person's
+				phone.
+			</p>
+			<button
+				class="stranger-submit btn w-full btn-error"
+				disabled={!emergencyDescription.trim() ||
+					(locationSource === 'reported' && !emergencyAddress.trim())}
+				>Continue to SOS countdown</button
+			>
+		</form>
 	{:else}
 		<h1 class="user-title">No active SOS countdown</h1>
 		<p class="user-copy mt-4">
@@ -288,6 +401,10 @@
 </div>
 
 <style>
+	.stranger-submit {
+		color: #fff;
+		background: #b91c1c;
+	}
 	.sos-screen {
 		min-height: 580px;
 		padding: 45px 6px 15px;

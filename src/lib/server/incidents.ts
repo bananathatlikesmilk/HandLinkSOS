@@ -53,6 +53,8 @@ const callerProfile = alias(profile, 'caller_profile');
 
 // Staff locations describe the person needing help. Never substitute the sender's GPS for a trusted person.
 function staffIncidentLocation(row: typeof incident.$inferSelect) {
+	if (row.personProfileId === null)
+		return { latitude: row.latitude, longitude: row.longitude, locationLabel: row.locationLabel };
 	const person = db
 		.select({ userId: profile.userId })
 		.from(profile)
@@ -82,10 +84,16 @@ const summaryColumns = {
 	routingReason: sql<string>`coalesce(${incidentLgu.reason}, 'legacy')`,
 	id: incident.id,
 	reference: incidentReferenceCode,
-	personName: sql<string>`${profile.firstName} || ' ' || ${profile.lastName}`,
+	personName: sql<string>`case when ${incident.personProfileId} is null then coalesce(nullif(${incident.strangerName}, ''), 'Unknown person') else ${profile.firstName} || ' ' || ${profile.lastName} end`,
+	isStranger: sql<boolean>`${incident.personProfileId} is null`.mapWith(Boolean),
+	emergencyDescription: incident.emergencyDescription,
+	locationSource: incident.locationSource,
 	callerName: incident.callerName,
 	callerPhone: callerProfile.phone,
-	isForSomeoneElse: sql<boolean>`${profile.userId} <> ${incident.callerUserId}`.mapWith(Boolean),
+	isForSomeoneElse:
+		sql<boolean>`${incident.personProfileId} is null or ${profile.userId} <> ${incident.callerUserId}`.mapWith(
+			Boolean
+		),
 	callerRelationship: incident.callerRelationship,
 	status: incident.status,
 	dispatcherUserId: incident.dispatcherUserId,
@@ -103,7 +111,7 @@ function summaries() {
 		.select(summaryColumns)
 		.from(incident)
 		.innerJoin(incidentReference, eq(incidentReference.incidentId, incident.id))
-		.innerJoin(profile, eq(profile.id, incident.personProfileId))
+		.leftJoin(profile, eq(profile.id, incident.personProfileId))
 		.innerJoin(callerProfile, eq(callerProfile.userId, incident.callerUserId))
 		.leftJoin(incidentLgu, eq(incidentLgu.incidentId, incident.id))
 		.leftJoin(lgu, eq(lgu.id, routingLguId))
@@ -236,6 +244,11 @@ export function createIncident(event: RequestEvent, input: z.output<typeof incid
 			if (previous) {
 				if (
 					previous.personProfileId !== input.personProfileId ||
+					previous.strangerName !== ('strangerName' in input ? input.strangerName : '') ||
+					previous.emergencyDescription !==
+						('emergencyDescription' in input ? input.emergencyDescription : '') ||
+					previous.locationSource !==
+						('locationSource' in input ? input.locationSource : 'device') ||
 					previous.latitude !== input.latitude ||
 					previous.longitude !== input.longitude ||
 					previous.locationLabel !== input.locationLabel
@@ -243,22 +256,26 @@ export function createIncident(event: RequestEvent, input: z.output<typeof incid
 					error(409, 'This SOS retry key was already used with different information.');
 				return { incident: summary(previous.id), created: false };
 			}
-			const person = tx
-				.select({ profile, user })
-				.from(profile)
-				.innerJoin(user, eq(user.id, profile.userId))
-				.where(eq(profile.id, input.personProfileId))
-				.get();
+			const person =
+				input.personProfileId === null
+					? undefined
+					: tx
+							.select({ profile, user })
+							.from(profile)
+							.innerJoin(user, eq(user.id, profile.userId))
+							.where(eq(profile.id, input.personProfileId))
+							.get();
 			if (
-				!person ||
-				person.profile.deactivatedAt ||
-				person.user.banned ||
-				!person.user.emailVerified ||
-				(person.user.role ?? 'user') !== 'user'
+				input.personProfileId !== null &&
+				(!person ||
+					person.profile.deactivatedAt ||
+					person.user.banned ||
+					!person.user.emailVerified ||
+					(person.user.role ?? 'user') !== 'user')
 			)
 				error(403, 'This profile is not available for SOS.');
-			let relationship = '';
-			if (person.profile.id !== ownProfile.id) {
+			let relationship = input.personProfileId === null ? 'Bystander' : '';
+			if (person && person.profile.id !== ownProfile.id) {
 				const permission = tx
 					.select()
 					.from(trustedConnection)
@@ -276,6 +293,7 @@ export function createIncident(event: RequestEvent, input: z.output<typeof incid
 				relationship = permission.relationship;
 			}
 			if (
+				input.personProfileId !== null &&
 				tx
 					.select({ id: incident.id })
 					.from(incident)
@@ -301,16 +319,21 @@ export function createIncident(event: RequestEvent, input: z.output<typeof incid
 				.get()!.n;
 			if (recent >= 10) error(429, 'Too many SOS requests. Wait a minute before trying again.');
 			const personPoint =
-				person.profile.id !== ownProfile.id
+				person && person.profile.id !== ownProfile.id
 					? sharedPointForRecipient(tx, person.profile.id, identity.id)
 					: undefined;
-			const routing = routeEmergencyLocation(
-				person.profile.id === ownProfile.id
-					? input
-					: personPoint && Date.now() - personPoint.recordedAt.getTime() <= 300000
-						? personPoint
-						: null
-			);
+			const routing =
+				input.personProfileId === null && input.locationSource === 'reported'
+					? { lguId: null, reason: 'reported_address' }
+					: routeEmergencyLocation(
+							!person || person.profile.id === ownProfile.id
+								? input.latitude !== null && input.longitude !== null
+									? { latitude: input.latitude, longitude: input.longitude }
+									: null
+								: personPoint && Date.now() - personPoint.recordedAt.getTime() <= 300000
+									? personPoint
+									: null
+						);
 			const saved = tx
 				.insert(incident)
 				.values({
@@ -339,7 +362,7 @@ export function createIncident(event: RequestEvent, input: z.output<typeof incid
 			tx.insert(incidentEvent)
 				.values({ incidentId: saved.id, actorUserId: identity.id, type: 'created' })
 				.run();
-			if (person.user.id !== identity.id)
+			if (person && person.user.id !== identity.id)
 				tx.insert(notification)
 					.values({
 						userId: person.user.id,
@@ -382,7 +405,9 @@ function staffIncidentSearch(event: RequestEvent) {
 			? eq(profile.userId, incident.callerUserId)
 			: input.sosType === 'trusted'
 				? ne(profile.userId, incident.callerUserId)
-				: undefined,
+				: input.sosType === 'stranger'
+					? isNull(incident.personProfileId)
+					: undefined,
 		actor.centralAdmin || actor.provincialDispatcher ? undefined : eq(routingLguId, actor.lguId!),
 		input.coordination === 'provincial' ? eq(routingLguId, PROVINCIAL_LGU_ID) : undefined,
 		input.coordination === 'municipal'
@@ -406,7 +431,7 @@ function staffIncidentSearch(event: RequestEvent) {
 				? ne(incident.status, 'Resolved')
 				: eq(incident.status, input.status),
 		input.search
-			? sql`instr(lower(${incidentReferenceCode} || ' ' || ${incident.id} || ' ' || ${incident.callerName} || ' ' || ${profile.firstName} || ' ' || ${profile.lastName}), ${input.search.toLowerCase()}) > 0`
+			? sql`instr(lower(${incidentReferenceCode} || ' ' || ${incident.id} || ' ' || ${incident.callerName} || ' ' || coalesce(${profile.firstName}, '') || ' ' || coalesce(${profile.lastName}, '') || ' ' || ${incident.strangerName}), ${input.search.toLowerCase()}) > 0`
 			: undefined
 	);
 	return { actor, input, condition };
@@ -418,7 +443,7 @@ export function listStaffIncidents(event: RequestEvent) {
 		.select({ n: count() })
 		.from(incident)
 		.innerJoin(incidentReference, eq(incidentReference.incidentId, incident.id))
-		.innerJoin(profile, eq(profile.id, incident.personProfileId))
+		.leftJoin(profile, eq(profile.id, incident.personProfileId))
 		.leftJoin(incidentLgu, eq(incidentLgu.incidentId, incident.id))
 		.where(condition)
 		.get()!.n;
@@ -654,6 +679,11 @@ export function getIncidentDetail(event: RequestEvent, id: string | undefined): 
 		// Medical and registered contact details belong only to the dispatcher who confirmed this incident.
 		if (!canHandleIncident(actor, row.id) || row.dispatcherUserId !== actor.id) return result;
 		result.cancellation = getCancellation(row.id);
+		if (row.personProfileId === null) {
+			result.notes = latestNote(row.id);
+			result.noteId = latestIncidentNote(row.id)?.id ?? null;
+			return result;
+		}
 		const person = db.select().from(profile).where(eq(profile.id, row.personProfileId)).get()!;
 		const birth = new Date(`${person.birthday}T00:00:00Z`);
 		const now = new Date();

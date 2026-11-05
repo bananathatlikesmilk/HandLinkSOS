@@ -1,9 +1,12 @@
 export type SosTarget = { id: string; name: string; favorite: boolean };
 
 export type PendingSos = {
-	personProfileId: string;
-	latitude: number;
-	longitude: number;
+	personProfileId: string | null;
+	strangerName?: string;
+	emergencyDescription?: string;
+	locationSource?: 'device' | 'reported';
+	latitude: number | null;
+	longitude: number | null;
 	locationLabel: string;
 	idempotencyKey: string;
 };
@@ -18,12 +21,23 @@ export function readPendingSos(key: string): PendingSos | null {
 	if (!raw) return null;
 	const value = JSON.parse(raw) as Partial<PendingSos>;
 	if (
-		typeof value.personProfileId !== 'string' ||
+		(typeof value.personProfileId !== 'string' && value.personProfileId !== null) ||
+		(value.personProfileId === null &&
+			(typeof value.strangerName !== 'string' ||
+				typeof value.emergencyDescription !== 'string' ||
+				!value.emergencyDescription.trim() ||
+				!['device', 'reported'].includes(value.locationSource ?? ''))) ||
 		typeof value.idempotencyKey !== 'string' ||
-		typeof value.latitude !== 'number' ||
-		!Number.isFinite(value.latitude) ||
-		typeof value.longitude !== 'number' ||
-		!Number.isFinite(value.longitude) ||
+		!(
+			(typeof value.latitude === 'number' &&
+				Number.isFinite(value.latitude) &&
+				typeof value.longitude === 'number' &&
+				Number.isFinite(value.longitude)) ||
+			(value.personProfileId === null &&
+				value.locationSource === 'reported' &&
+				value.latitude === null &&
+				value.longitude === null)
+		) ||
 		typeof value.locationLabel !== 'string'
 	)
 		throw new Error(

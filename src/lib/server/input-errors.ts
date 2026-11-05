@@ -40,6 +40,10 @@ const labels: Record<string, string> = {
 	page: 'Page',
 	active: 'Account status',
 	favorite: 'Favorite',
+	strangerName: 'Person needing help',
+	emergencyDescription: 'What happened',
+	locationSource: 'Emergency location source',
+	locationLabel: 'Emergency address or landmark',
 	token: 'QR code'
 };
 

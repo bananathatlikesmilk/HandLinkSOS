@@ -7,7 +7,8 @@ export function routingDescription(reason: string) {
 		unconfigured: 'GPS boundaries not configured',
 		ambiguous: 'Overlapping boundaries ? central review',
 		outside_boundaries: 'Outside configured boundaries',
-		beneficiary_location_unavailable: 'No current shared location for the person needing help'
+		beneficiary_location_unavailable: 'No current shared location for the person needing help',
+		reported_address: 'Caller-reported address; confirm the municipality with the caller'
 	};
 	return Object.hasOwn(labels, reason) ? labels[reason] : 'Routing review required';
 }

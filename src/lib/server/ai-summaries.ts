@@ -42,25 +42,23 @@ function owned(event: RequestEvent, id: string | undefined) {
 	return { actor, row };
 }
 function identifiers(row: typeof incident.$inferSelect) {
-	const person = db.select().from(profile).where(eq(profile.id, row.personProfileId)).get()!;
+	const person = row.personProfileId
+		? db.select().from(profile).where(eq(profile.id, row.personProfileId)).get()
+		: null;
 	const caller = db.select().from(profile).where(eq(profile.userId, row.callerUserId)).get();
 	const dispatcher = row.dispatcherUserId
 		? db.select().from(user).where(eq(user.id, row.dispatcherUserId)).get()
 		: null;
-	const accounts = db
-		.select({ email: user.email })
-		.from(user)
-		.where(eq(user.id, person.userId))
-		.all();
-	const contacts = db
-		.select()
-		.from(emergencyContact)
-		.where(eq(emergencyContact.profileId, person.id))
-		.all();
+	const accounts = person
+		? db.select({ email: user.email }).from(user).where(eq(user.id, person.userId)).all()
+		: [];
+	const contacts = person
+		? db.select().from(emergencyContact).where(eq(emergencyContact.profileId, person.id)).all()
+		: [];
 	const names = [
-		`${person.firstName} ${person.lastName}`,
-		person.firstName,
-		person.lastName,
+		person ? `${person.firstName} ${person.lastName}` : row.strangerName,
+		person?.firstName ?? '',
+		person?.lastName ?? '',
 		row.callerName,
 		caller?.firstName ?? '',
 		caller?.lastName ?? '',
@@ -74,8 +72,8 @@ function identifiers(row: typeof incident.$inferSelect) {
 	return [
 		...names,
 		...names.flatMap((name) => name.split(/\s+/)),
-		person.phone,
-		person.birthday,
+		person?.phone ?? '',
+		person?.birthday ?? '',
 		caller?.phone ?? '',
 		row.locationLabel,
 		String(row.latitude),

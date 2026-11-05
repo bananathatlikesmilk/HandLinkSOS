@@ -386,7 +386,7 @@
 						disabled={busy}
 						><option value="all">All SOS types</option><option value="self">For self</option><option
 							value="trusted">For a trusted person</option
-						></select
+						><option value="stranger">For an unregistered person</option></select
 					></label
 				>
 				<button class="btn w-full btn-outline" disabled={busy || loading}>Apply filters</button>
@@ -503,10 +503,19 @@
 					)}
 				</p>
 				{#key selected.incident.id}
+					{#if selected.incident.isStranger}<section class="my-4 alert">
+							<div>
+								<strong>Unregistered person — caller-reported details</strong>
+								<p class="whitespace-pre-wrap">{selected.incident.emergencyDescription}</p>
+								<p>Identity and details require confirmation.</p>
+							</div>
+						</section>{/if}
 					<IncidentLocation
 						personLocation={selected.personLocation}
 						reporter={selected}
 						isForSomeoneElse={selected.incident.isForSomeoneElse}
+						isStranger={selected.incident.isStranger}
+						locationSource={selected.incident.locationSource}
 					/>
 					<IncidentCancellationReview
 						incidentId={selected.incident.id}

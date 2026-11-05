@@ -37,6 +37,9 @@ export type IncidentSummary = {
 	callerName: string;
 	callerPhone: string;
 	isForSomeoneElse: boolean;
+	isStranger: boolean;
+	emergencyDescription: string;
+	locationSource: 'device' | 'reported';
 	callerRelationship: string;
 	status: IncidentStatus;
 	dispatcherUserId: string | null;

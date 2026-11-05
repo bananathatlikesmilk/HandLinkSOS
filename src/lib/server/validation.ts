@@ -78,13 +78,37 @@ export const coordinatesInput = z.strictObject({
 	latitude: z.number().min(-90).max(90),
 	longitude: z.number().min(-180).max(180)
 });
-export const incidentInput = z.strictObject({
-	personProfileId: z.uuid(),
+const incidentLocationInput = z.strictObject({
 	latitude: z.number().min(-90).max(90),
 	longitude: z.number().min(-180).max(180),
 	locationLabel: z.string().trim().max(250),
 	idempotencyKey: z.uuid()
 });
+export const incidentInput = z.union([
+	incidentLocationInput.extend({ personProfileId: z.uuid() }),
+	incidentLocationInput
+		.extend({
+			personProfileId: z.null(),
+			latitude: z.number().min(-90).max(90).nullable(),
+			longitude: z.number().min(-180).max(180).nullable(),
+			strangerName: z.string().trim().max(100).default(''),
+			emergencyDescription: z.string().trim().min(1).max(1000),
+			locationSource: z.enum(['device', 'reported'])
+		})
+		.refine((value) => value.locationSource !== 'reported' || value.locationLabel.length > 0, {
+			message: 'Enter the emergency address or landmark.',
+			path: ['locationLabel']
+		})
+		.refine(
+			(value) =>
+				(value.latitude === null) === (value.longitude === null) &&
+				(value.locationSource === 'reported' || value.latitude !== null),
+			{
+				message: 'Device location requires valid coordinates.',
+				path: ['latitude']
+			}
+		)
+]);
 export const confirmationInput = z.strictObject({ verballyConfirmed: z.literal(true) });
 export const statusInput = z.strictObject({
 	status: z.enum(['On route', 'Resolved']),
@@ -109,7 +133,7 @@ export const incidentListInput = z.strictObject({
 	from: z.iso.date().optional(),
 	to: z.iso.date().optional(),
 	dispatcherId: z.string().min(1).max(100).optional(),
-	sosType: z.enum(['all', 'self', 'trusted']).default('all'),
+	sosType: z.enum(['all', 'self', 'trusted', 'stranger']).default('all'),
 	lguId: z.string().min(1).max(100).optional(),
 	view: z.enum(['alerts', 'reports']).default('alerts'),
 	search: z.string().trim().max(100).default(''),

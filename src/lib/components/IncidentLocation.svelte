@@ -3,16 +3,32 @@
 	let {
 		personLocation,
 		reporter,
-		isForSomeoneElse
+		isForSomeoneElse,
+		isStranger = false,
+		locationSource = 'device'
 	}: {
 		personLocation: IncidentLocationSnapshot | null;
 		reporter: { latitude: number | null; longitude: number | null; locationLabel: string };
 		isForSomeoneElse: boolean;
+		isStranger?: boolean;
+		locationSource?: 'device' | 'reported';
 	} = $props();
 </script>
 
 <section class="incident-location" aria-label="Incident location">
-	{#if isForSomeoneElse}
+	{#if isStranger}
+		<h3>Caller-reported emergency location</h3>
+		{#if reporter.latitude !== null && reporter.longitude !== null}<p>
+				{reporter.latitude}, {reporter.longitude}
+			</p>{/if}
+		{#if reporter.locationLabel}<p>{reporter.locationLabel}</p>{/if}
+		<p>
+			{locationSource === 'device'
+				? 'Reporter said they were with the person. GPS was saved when SOS was sent.'
+				: 'Address supplied by the reporter. No GPS was captured for this person.'} Confirm the location
+			with the caller.
+		</p>
+	{:else if isForSomeoneElse}
 		<h3>Location of person needing help</h3>
 		{#if personLocation}
 			<p>Last shared location saved when SOS was sent. This is not live tracking.</p>

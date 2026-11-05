@@ -99,6 +99,9 @@
 	{#if data.incident}
 		<h1 class="user-title">SOS sent</h1>
 		<p class="user-copy mt-4">SOS for {data.incident.personName} was saved for dispatchers.</p>
+		{#if data.incident.isStranger}<p class="user-copy mt-3">
+				For an unregistered person. Tell the dispatcher what happened and confirm their location.
+			</p>{/if}
 		<p class="user-copy mt-3">Incident reference: {data.incident.reference}</p>
 		<p class="user-copy mt-3">Status: {data.incident.status}</p>
 		<p class="user-copy mt-3">LGU: {data.incident.lguName ?? 'Awaiting central routing review'}</p>
