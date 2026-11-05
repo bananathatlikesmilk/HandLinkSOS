@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import type { IncidentSummary, ResponseUpdate } from '#lib/incidents.ts';
 	import { apiRequest } from '#lib/client/request.ts';
 	let {
@@ -24,13 +25,17 @@
 	let busy = $state(false);
 	let error = $state('');
 	let outcomeConfirmed = $state(false);
-	function choose(value: 'On route' | 'Resolved') {
+	let confirmationHeading: HTMLHeadingElement | undefined;
+	async function choose(value: 'On route' | 'Resolved') {
 		if (disabled || busy || status === value) return;
 		status = value;
 		source = '';
 		details = '';
 		outcomeConfirmed = false;
 		error = '';
+		await tick();
+		confirmationHeading?.focus();
+		confirmationHeading?.scrollIntoView({ block: 'center' });
 	}
 	const actionAllowed = $derived(
 		status === 'On route'
@@ -80,6 +85,73 @@
 	}
 </script>
 
+{#snippet confirmationForm()}
+	<form
+		class="response-confirmation space-y-4"
+		aria-label={status === 'On route'
+			? 'Confirm responder departure'
+			: 'Confirm incident resolution'}
+		onsubmit={save}
+	>
+		<fieldset class="space-y-4" disabled={disabled || busy}>
+			<h4 bind:this={confirmationHeading} tabindex="-1">
+				{status === 'On route' ? 'Confirm responder departure' : 'Confirm incident resolution'}
+			</h4>
+			<p class="muted">
+				Incident: {incident.reference}. {status === 'On route'
+					? 'This will mark responders as on route.'
+					: 'This will close the incident and lock its original notes.'}
+			</p>
+			<label class="field-label"
+				>Update confirmed by *<input
+					class="input w-full"
+					bind:value={source}
+					maxlength="150"
+					required
+					placeholder="Municipal office or responder name / unit"
+				/></label
+			>
+			<label class="field-label"
+				>Confirmed update / outcome *<textarea
+					class="textarea min-h-28 w-full"
+					bind:value={details}
+					maxlength="1500"
+					required
+					placeholder="What they confirmed, including the outcome or reason no response was needed"
+				></textarea></label
+			>
+			<p class="muted">
+				A placed call does not mean help is on route. Resolve only after confirming the outcome.
+			</p>
+			{#if status === 'Resolved'}<label class="resolution-check"
+					><input type="checkbox" class="checkbox" required bind:checked={outcomeConfirmed} /> I confirmed
+					the final outcome and intend to close this incident.</label
+				>{/if}
+			<button
+				class="btn btn-primary"
+				disabled={!actionAllowed ||
+					!source.trim() ||
+					!details.trim() ||
+					(status === 'Resolved' && !outcomeConfirmed)}
+				>{busy
+					? 'Saving…'
+					: status === 'On route'
+						? 'Confirm and mark on route'
+						: 'Confirm and mark resolved'}</button
+			>
+			<button
+				type="button"
+				class="btn btn-outline"
+				onclick={() => {
+					status = '';
+					outcomeConfirmed = false;
+				}}>Cancel status change</button
+			>
+		</fieldset>
+		{#if error}<p class="alert alert-error" role="alert">{error}</p>{/if}
+	</form>
+{/snippet}
+
 <section class="my-5 space-y-4" aria-label="Confirmed response updates">
 	<h3 class="section-heading">Confirmed response updates</h3>
 	<p class="muted">
@@ -120,6 +192,7 @@
 					aria-expanded={status === 'On route'}
 					onclick={() => choose('On route')}>Record departure</button
 				>
+				{#if status === 'On route'}{@render confirmationForm()}{/if}
 			</section>
 			{#if incident.status === 'On route'}
 				<section class="response-action resolution-action" aria-label="Resolve incident action">
@@ -138,79 +211,14 @@
 						aria-expanded={status === 'Resolved'}
 						onclick={() => choose('Resolved')}>Review resolution</button
 					>
+					{#if status === 'Resolved'}{@render confirmationForm()}{/if}
 					{#if incident.cancellationPending}<p class="muted">
 							Review the pending cancellation request first.
 						</p>{/if}
 				</section>
 			{/if}
 		</div>
-		{#if status}
-			<form
-				class="response-confirmation space-y-4"
-				aria-label={status === 'On route'
-					? 'Confirm responder departure'
-					: 'Confirm incident resolution'}
-				onsubmit={save}
-			>
-				<fieldset class="space-y-4" disabled={disabled || busy}>
-					<h4>
-						{status === 'On route' ? 'Confirm responder departure' : 'Confirm incident resolution'}
-					</h4>
-					<p class="muted">
-						Incident: {incident.reference}. {status === 'On route'
-							? 'This will mark responders as on route.'
-							: 'This will close the incident and lock its original notes.'}
-					</p>
-					<label class="field-label"
-						>Update confirmed by *<input
-							class="input w-full"
-							bind:value={source}
-							maxlength="150"
-							required
-							placeholder="Municipal office or responder name / unit"
-						/></label
-					>
-					<label class="field-label"
-						>Confirmed update / outcome *<textarea
-							class="textarea min-h-28 w-full"
-							bind:value={details}
-							maxlength="1500"
-							required
-							placeholder="What they confirmed, including the outcome or reason no response was needed"
-						></textarea></label
-					>
-					<p class="muted">
-						A placed call does not mean help is on route. Resolve only after confirming the outcome.
-					</p>
-					{#if status === 'Resolved'}<label class="resolution-check"
-							><input type="checkbox" class="checkbox" required bind:checked={outcomeConfirmed} /> I confirmed
-							the final outcome and intend to close this incident.</label
-						>{/if}
-					<button
-						class="btn btn-primary"
-						disabled={!actionAllowed ||
-							!source.trim() ||
-							!details.trim() ||
-							(status === 'Resolved' && !outcomeConfirmed)}
-						>{busy
-							? 'Saving…'
-							: status === 'On route'
-								? 'Confirm and mark on route'
-								: 'Confirm and mark resolved'}</button
-					>
-					<button
-						type="button"
-						class="btn btn-outline"
-						onclick={() => {
-							status = '';
-							outcomeConfirmed = false;
-						}}>Cancel status change</button
-					>
-				</fieldset>
-			</form>
-		{/if}
 	{/if}
-	{#if error}<p class="alert alert-error" role="alert">{error}</p>{/if}
 </section>
 
 <style>
@@ -229,6 +237,11 @@
 	}
 	.resolution-action {
 		border-top: 4px solid var(--app-danger);
+	}
+	.response-confirmation {
+		border: 2px solid var(--app-accent);
+		background: var(--app-surface);
+		margin-top: 0.25rem;
 	}
 	h4 {
 		font-size: 1rem;

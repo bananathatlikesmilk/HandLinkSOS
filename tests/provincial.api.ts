@@ -172,6 +172,14 @@ test('provincial handler keeps caller information, notes and confirmed external 
 		const progress = page.getByRole('region', { name: 'Confirmed response updates', exact: true });
 		await progress.getByRole('button', { name: 'Record departure', exact: true }).click();
 		await expect(
+			progress
+				.getByRole('region', { name: 'On route action', exact: true })
+				.getByRole('form', { name: 'Confirm responder departure', exact: true })
+		).toBeVisible();
+		await expect(
+			progress.getByRole('heading', { name: 'Confirm responder departure', exact: true })
+		).toBeFocused();
+		await expect(
 			progress.getByRole('button', { name: 'Review resolution', exact: true })
 		).toHaveCount(0);
 		expect((await (await page.request.get(endpoint)).json()).incident.status).toBe('In progress');
@@ -205,6 +213,14 @@ test('provincial handler keeps caller information, notes and confirmed external 
 			exact: true
 		});
 		await reportProgress.getByRole('button', { name: 'Review resolution', exact: true }).click();
+		await expect(
+			reportProgress
+				.getByRole('region', { name: 'Resolve incident action', exact: true })
+				.getByRole('form', { name: 'Confirm incident resolution', exact: true })
+		).toBeVisible();
+		await expect(
+			reportProgress.getByRole('heading', { name: 'Confirm incident resolution', exact: true })
+		).toBeFocused();
 		expect((await (await page.request.get(endpoint)).json()).incident.status).toBe('On route');
 		await reportProgress
 			.getByLabel('Update confirmed by', { exact: false })
