@@ -1,6 +1,6 @@
 # HandLink-SOS project context
 
-Last inspected: **5 November 2026, Asia/Manila**. Local branch: `main`; inspected baseline HEAD: `901dcd7` (`phone number hotline fix`). Stranger SOS below is new local work. Earlier inspections used the commits recorded in the historical notes below. No new GitHub synchronization or production deployment was verified.
+Last inspected: **6 November 2026, Asia/Manila**. Inspected baseline HEAD: `11b29f2` (`sos for stranger fix`). Manage Accounts LGU selector polish below is new local work; earlier changes were already present in this inspected baseline. Earlier inspections used the commits recorded in the historical notes below. No new GitHub synchronization or production deployment was verified.
 
 ### Local Git authorship maintenance
 
@@ -28,6 +28,12 @@ This file describes current source. The history explains how the discussion evol
 - **Proposed / open:** not confirmed as implemented or completed.
 
 ## 1. Purpose and account roles
+
+### Manage Accounts LGU selector, 6 November 2026
+
+The [Manage Accounts page](src/routes/admin/accounts/+page.svelte) now has a separate **Assigned LGU** column rather than putting the assignment form under Role. Each row clearly identifies the current office, followed by a grouped assignment panel with a labeled full-width native selector, a note that changing office signs the staff member out, and a Save assignment button. The native selector retains keyboard/mobile behavior and the existing role-filtered choices and inactive labels. The creation dialog uses a matching Assigned office panel and required LGU selector. Office icons, semantic theme colors, rounded surfaces and 48-pixel minimum select height improve hierarchy and contrast in both modes.
+
+The existing central-Admin-only assignment visibility, self-account restriction, allowed destinations, explicit save operation, account creation, busy/disabled conditions, endpoints and session invalidation behavior remain unchanged. No database, API, permission or native APK change was added. See H070 for local verification and delivery state.
 
 ### Profile avatar and stranger SOS readability, 5 November 2026
 

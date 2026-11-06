@@ -53,6 +53,16 @@ for (const role of ['dispatcher', 'admin'] as const) {
 		await dialog.getByLabel('Email address', { exact: true }).fill(email);
 		await dialog.getByLabel('Initial password', { exact: true }).fill(password);
 		await dialog.getByLabel('LGU', { exact: false }).selectOption('legacy');
+		for (const appearance of ['light', 'dark']) {
+			await page.evaluate(
+				(value) => document.documentElement.setAttribute('data-appearance', value),
+				appearance
+			);
+			await dialog.locator('.create-lgu-picker').screenshot({
+				path: test.info().outputPath(`choose-lgu-${appearance}.png`),
+				animations: 'disabled'
+			});
+		}
 		await dialog.getByRole('button', { name: 'Create staff account', exact: true }).click();
 		const saved = page.getByRole('dialog', { name: `${label} account saved`, exact: true });
 		await expect(saved).toBeVisible();
@@ -66,6 +76,10 @@ for (const role of ['dispatcher', 'admin'] as const) {
 		await page.reload();
 		const row = page.getByRole('row').filter({ hasText: email });
 		await expect(row.getByText('Unverified', { exact: true })).toBeVisible();
+		await row.locator('.lgu-cell').screenshot({
+			path: test.info().outputPath('account-lgu-assignment.png'),
+			animations: 'disabled'
+		});
 		await page.waitForLoadState('networkidle');
 		await row.getByRole('button', { name: `Deactivate ${email}`, exact: true }).click();
 		await page

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { Check, Mail, Plus, Search, X } from '@lucide/svelte';
+	import { Building2, Check, Mail, Plus, Search, X } from '@lucide/svelte';
 	import type { PageProps } from './$types';
 	import { PROVINCIAL_LGU_ID } from '#lib/lgu.ts';
 	let { data }: PageProps = $props();
@@ -205,9 +205,8 @@
 			<table class="table">
 				<thead
 					><tr
-						><th scope="col">Account</th><th scope="col">Role</th><th scope="col">Access</th><th
-							scope="col">Email</th
-						><th scope="col">Actions</th></tr
+						><th scope="col">Account</th><th scope="col">Role</th><th scope="col">Assigned LGU</th
+						><th scope="col">Access</th><th scope="col">Email</th><th scope="col">Actions</th></tr
 					></thead
 				>
 				<tbody
@@ -218,28 +217,43 @@
 										<span class="muted">(You)</span>{/if}</strong
 								><span class="text-sm text-slate-400">{account.email}</span></td
 							>
-							<td class="capitalize"
-								>{account.role}<span class="muted block normal-case"
-									>{account.centralAdmin
-										? 'Central administrator'
-										: (account.lguName ?? 'Global user account')}</span
-								>
+							<td class="capitalize">{account.role}</td>
+							<td class="lgu-cell">
+								<div class="current-lgu">
+									<span class="lgu-icon"><Building2 size={18} aria-hidden="true" /></span>
+									<div>
+										<span class="lgu-caption">Current office</span><strong
+											>{account.centralAdmin
+												? 'Central administrator'
+												: (account.lguName ?? 'Global user account')}</strong
+										>
+									</div>
+								</div>
 								{#if data.centralAdmin && account.id !== data.currentUserId && ['admin', 'dispatcher'].includes(account.role)}
-									<label class="block text-sm"
-										>Assign LGU<select
-											class="select"
-											bind:value={assignments[account.id]}
-											disabled={busy}
-											><option value="">Choose LGU</option
-											>{#each data.lgus.filter((item) => account.role === 'dispatcher' || item.id !== PROVINCIAL_LGU_ID) as item (item.id)}<option
-													value={item.id}>{item.name}{item.active ? '' : ' (inactive)'}</option
-												>{/each}</select
-										></label
-									><button
-										class="btn mt-2 btn-outline btn-sm"
-										disabled={busy || !assignments[account.id]}
-										onclick={() => moveStaff(account)}>Save LGU for {account.name}</button
-									>
+									<div class="lgu-picker">
+										<label class="field-label"
+											>Assign LGU<select
+												class="select w-full"
+												aria-describedby={`lgu-help-${account.id}`}
+												bind:value={assignments[account.id]}
+												disabled={busy}
+												><option value="">Choose LGU</option
+												>{#each data.lgus.filter((item) => account.role === 'dispatcher' || item.id !== PROVINCIAL_LGU_ID) as item (item.id)}<option
+														value={item.id}>{item.name}{item.active ? '' : ' (inactive)'}</option
+													>{/each}</select
+											></label
+										>
+										<p class="lgu-help" id={`lgu-help-${account.id}`}>
+											Changing office signs this staff member out.
+										</p>
+										<button
+											class="lgu-save btn w-full btn-primary"
+											disabled={busy || !assignments[account.id]}
+											onclick={() => moveStaff(account)}
+											aria-label={`Save LGU for ${account.name}`}
+											><Check size={16} aria-hidden="true" /> Save assignment</button
+										>
+									</div>
 								{/if}</td
 							>
 							<td
@@ -265,7 +279,7 @@
 								</div></td
 							>
 						</tr>{:else}<tr
-							><td colspan="5" class="py-10 text-center">No accounts match these filters.</td></tr
+							><td colspan="6" class="py-10 text-center">No accounts match these filters.</td></tr
 						>{/each}</tbody
 				>
 			</table>
@@ -387,14 +401,22 @@
 						/></label
 					>
 					<p id="password-help" class="muted text-sm">Use 12–128 characters.</p>
-					<label class="field-label"
-						>LGU *<select class="select w-full" bind:value={selectedLgu} required
-							><option value="" disabled>Choose LGU</option
-							>{#each data.lgus.filter((item) => role === 'dispatcher' || item.id !== PROVINCIAL_LGU_ID) as item (item.id)}<option
-									value={item.id}>{item.name}{item.active ? '' : ' (inactive)'}</option
-								>{/each}</select
-						></label
-					>
+					<div class="lgu-picker create-lgu-picker">
+						<div class="current-lgu">
+							<span class="lgu-icon"><Building2 size={20} aria-hidden="true" /></span><strong
+								>Assigned office</strong
+							>
+						</div>
+						<label class="field-label"
+							>LGU *<select class="select w-full" bind:value={selectedLgu} required
+								><option value="" disabled>Choose LGU</option
+								>{#each data.lgus.filter((item) => role === 'dispatcher' || item.id !== PROVINCIAL_LGU_ID) as item (item.id)}<option
+										value={item.id}>{item.name}{item.active ? '' : ' (inactive)'}</option
+									>{/each}</select
+							></label
+						>
+						<p class="lgu-help">Choose the office where this staff member will work.</p>
+					</div>
 					{#if formError}<p class="error-message" role="alert">{formError}</p>{/if}
 					<div class="flex justify-end gap-3 pt-3">
 						<button class="btn btn-ghost" type="button" onclick={() => createDialog().close()}
@@ -443,6 +465,73 @@
 </dialog>
 
 <style>
+	.lgu-cell {
+		min-width: 270px;
+		max-width: 340px;
+		white-space: normal;
+	}
+	.current-lgu {
+		display: flex;
+		align-items: center;
+		gap: 0.7rem;
+		margin-bottom: 0.8rem;
+	}
+	.current-lgu strong {
+		display: block;
+		font-size: 0.875rem;
+		color: var(--app-text);
+		overflow-wrap: anywhere;
+	}
+	.lgu-icon {
+		display: grid;
+		place-items: center;
+		flex-shrink: 0;
+		width: 38px;
+		height: 38px;
+		border-radius: 10px;
+		background: var(--app-surface-alt);
+		color: var(--app-accent);
+		border: 1px solid var(--app-border);
+	}
+	.lgu-caption {
+		display: block;
+		color: var(--app-muted);
+		font-size: 0.72rem;
+		margin-bottom: 0.15rem;
+	}
+	.lgu-picker {
+		display: grid;
+		gap: 0.75rem;
+		padding: 1rem;
+		border: 1px solid var(--app-border);
+		border-radius: 12px;
+		background: var(--app-surface-alt);
+		color: var(--app-text);
+	}
+	.lgu-picker .field-label {
+		display: grid;
+		gap: 0.5rem;
+	}
+	.lgu-picker .select {
+		min-height: 48px;
+		background: var(--app-surface);
+		color: var(--app-text);
+		border-color: var(--app-border);
+		border-radius: 9px;
+	}
+	.lgu-help {
+		margin: 0;
+		font-size: 0.78rem;
+		line-height: 1.5;
+		color: var(--app-muted);
+		white-space: normal;
+	}
+	.lgu-save {
+		white-space: normal;
+	}
+	.create-lgu-picker .current-lgu {
+		margin-bottom: 0;
+	}
 	.search-field {
 		flex: 1 1 230px;
 	}
