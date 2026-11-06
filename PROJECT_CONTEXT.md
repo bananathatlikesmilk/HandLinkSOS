@@ -1,6 +1,6 @@
 # HandLink-SOS project context
 
-Last inspected: **6 November 2026, Asia/Manila**. Inspected baseline HEAD: `11b29f2` (`sos for stranger fix`). Manage Accounts LGU selector polish below is new local work; earlier changes were already present in this inspected baseline. Earlier inspections used the commits recorded in the historical notes below. No new GitHub synchronization or production deployment was verified.
+Last inspected: **7 November 2026, Asia/Manila**. Inspected baseline HEAD: `52d3a7c` (`LGU selector fix`). Compact Manage Accounts LGU styling below is new local work; earlier changes were already present in this inspected baseline. Earlier inspections used the commits recorded in the historical notes below. No new GitHub synchronization or production deployment was verified.
 
 ### Local Git authorship maintenance
 
@@ -29,9 +29,9 @@ This file describes current source. The history explains how the discussion evol
 
 ## 1. Purpose and account roles
 
-### Manage Accounts LGU selector, 6 November 2026
+### Manage Accounts LGU selector, updated 7 November 2026
 
-The [Manage Accounts page](src/routes/admin/accounts/+page.svelte) now has a separate **Assigned LGU** column rather than putting the assignment form under Role. Each row clearly identifies the current office, followed by a grouped assignment panel with a labeled full-width native selector, a note that changing office signs the staff member out, and a Save assignment button. The native selector retains keyboard/mobile behavior and the existing role-filtered choices and inactive labels. The creation dialog uses a matching Assigned office panel and required LGU selector. Office icons, semantic theme colors, rounded surfaces and 48-pixel minimum select height improve hierarchy and contrast in both modes.
+The [Manage Accounts page](src/routes/admin/accounts/+page.svelte) has a separate **Assigned LGU** column rather than putting assignment under Role. Following the user's 7 November preference, the current office now has a smaller plain icon, and the labeled native selector and compact outlined Save button align on one row with a short sign-out notice beneath. Removed the large boxed panel, extra padding and repeated Current office caption. The creation dialog uses a standard required LGU field matching its other fields, without a separate decorative header/card. Native keyboard/mobile operation, role-filtered choices, inactive labels, theme colors and 48-pixel minimum select height remain. This compact layout supersedes H070's larger card styling; see H071.
 
 The existing central-Admin-only assignment visibility, self-account restriction, allowed destinations, explicit save operation, account creation, busy/disabled conditions, endpoints and session invalidation behavior remain unchanged. No database, API, permission or native APK change was added. See H070 for local verification and delivery state.
 

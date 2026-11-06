@@ -222,7 +222,7 @@
 								<div class="current-lgu">
 									<span class="lgu-icon"><Building2 size={18} aria-hidden="true" /></span>
 									<div>
-										<span class="lgu-caption">Current office</span><strong
+										<strong
 											>{account.centralAdmin
 												? 'Central administrator'
 												: (account.lguName ?? 'Global user account')}</strong
@@ -247,11 +247,11 @@
 											Changing office signs this staff member out.
 										</p>
 										<button
-											class="lgu-save btn w-full btn-primary"
+											class="lgu-save btn btn-outline btn-sm"
 											disabled={busy || !assignments[account.id]}
 											onclick={() => moveStaff(account)}
 											aria-label={`Save LGU for ${account.name}`}
-											><Check size={16} aria-hidden="true" /> Save assignment</button
+											><Check size={16} aria-hidden="true" /> Save</button
 										>
 									</div>
 								{/if}</td
@@ -402,11 +402,6 @@
 					>
 					<p id="password-help" class="muted text-sm">Use 12–128 characters.</p>
 					<div class="lgu-picker create-lgu-picker">
-						<div class="current-lgu">
-							<span class="lgu-icon"><Building2 size={20} aria-hidden="true" /></span><strong
-								>Assigned office</strong
-							>
-						</div>
 						<label class="field-label"
 							>LGU *<select class="select w-full" bind:value={selectedLgu} required
 								><option value="" disabled>Choose LGU</option
@@ -466,15 +461,15 @@
 
 <style>
 	.lgu-cell {
-		min-width: 270px;
-		max-width: 340px;
+		min-width: 250px;
+		max-width: 300px;
 		white-space: normal;
 	}
 	.current-lgu {
 		display: flex;
 		align-items: center;
-		gap: 0.7rem;
-		margin-bottom: 0.8rem;
+		gap: 0.4rem;
+		margin-bottom: 0.5rem;
 	}
 	.current-lgu strong {
 		display: block;
@@ -486,27 +481,18 @@
 		display: grid;
 		place-items: center;
 		flex-shrink: 0;
-		width: 38px;
-		height: 38px;
-		border-radius: 10px;
-		background: var(--app-surface-alt);
+		width: 24px;
+		height: 24px;
 		color: var(--app-accent);
-		border: 1px solid var(--app-border);
-	}
-	.lgu-caption {
-		display: block;
-		color: var(--app-muted);
-		font-size: 0.72rem;
-		margin-bottom: 0.15rem;
 	}
 	.lgu-picker {
 		display: grid;
-		gap: 0.75rem;
-		padding: 1rem;
-		border: 1px solid var(--app-border);
-		border-radius: 12px;
-		background: var(--app-surface-alt);
+		gap: 0.5rem;
 		color: var(--app-text);
+	}
+	.lgu-cell .lgu-picker {
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: end;
 	}
 	.lgu-picker .field-label {
 		display: grid;
@@ -514,6 +500,7 @@
 	}
 	.lgu-picker .select {
 		min-height: 48px;
+		min-width: 0;
 		background: var(--app-surface);
 		color: var(--app-text);
 		border-color: var(--app-border);
@@ -526,11 +513,15 @@
 		color: var(--app-muted);
 		white-space: normal;
 	}
-	.lgu-save {
-		white-space: normal;
+	.lgu-cell .lgu-help {
+		grid-column: 1 / -1;
+		grid-row: 2;
+		font-size: 0.72rem;
 	}
-	.create-lgu-picker .current-lgu {
-		margin-bottom: 0;
+	.lgu-save {
+		grid-column: 2;
+		grid-row: 1;
+		white-space: nowrap;
 	}
 	.search-field {
 		flex: 1 1 230px;

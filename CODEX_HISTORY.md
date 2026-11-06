@@ -857,3 +857,15 @@ The following entries have fuller assistant/tool evidence in the available conve
 **Records and delivery:** Updated PROJECT_CONTEXT.md and appended this entry. Inspected starting HEAD was 11b29f2 (sos for stranger fix), with no pre-existing uncommitted changes observed. No private records, credentials, database migration, API/native methods, APK packaging/install, commit, push or production deployment were involved. This is local web styling/layout work.
 
 **Final results:** Both existing phone-sized staff-management browser cases passed on a fresh production build (2 passed): creating/saving Admin and Dispatcher accounts with LGU selection, reloading saved accounts, deactivation/reactivation and no page-level horizontal overflow. Light/dark LGU creation panels and a saved-row assignment screenshot were visually inspected. Type checks reported zero errors/warnings; targeted ESLint passed. Formatting checks identified remaining test-file formatting, which was corrected and rechecked successfully; diff checks passed. No production deployment or physical-device result is claimed.
+
+### H071 — Make LGU selection compact and align it with existing controls
+
+**Date:** 7 November 2026, Asia/Manila.
+
+**User preference:** Preferred the Manage Accounts LGU area smaller and more aligned with the other controls. This supersedes the larger card treatment introduced in H070.
+
+**Change:** Removed the assignment panel's decorative background/border/padding, reduced the office icon from a 38-pixel boxed badge to a 24-pixel plain icon, and removed the repeated Current office caption. The labeled dropdown and short outlined Save button now align on one row, with the existing sign-out notice beneath. Narrowed the table column footprint. The creation dialog's LGU selector now matches the other standard form fields, without an extra Assigned office heading/card. Kept the existing account-specific accessible Save label, native select, 48-pixel minimum select height, theme colors, role/destination restrictions, explicit-save behavior and all existing backend logic.
+
+**Verification progress and delivery:** Existing phone-sized Admin/Dispatcher account-management checks, compiler and targeted lint are being run; final results follow below. Context7/Svelte autofixer tools remain unavailable and were not claimed as run. Updated PROJECT_CONTEXT.md and appended this entry. No private data/credential reads, API/schema/native changes, commit, push or production deployment occurred.
+
+**Final results:** Both existing phone-sized account-management cases passed on a fresh production build (2 passed), including staff creation with LGU selection, saved account reload, deactivation/reactivation and no page-level horizontal overflow. Current compact assignment and standard creation-field screenshots were visually inspected. Type checks reported zero errors/warnings; targeted ESLint, formatting and diff checks passed. Inspected baseline was 52d3a7c (LGU selector fix); this compact revision remains local and uncommitted unless the user publishes it.
