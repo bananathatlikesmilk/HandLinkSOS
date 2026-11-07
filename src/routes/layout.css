@@ -632,6 +632,45 @@ body {
 	background: var(--app-bg);
 	color: var(--app-text);
 }
+.app-loading {
+	position: fixed;
+	top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 80;
+	display: flex;
+	align-items: center;
+	gap: 0.65rem;
+	padding: 0.65rem 1rem;
+	border: 1px solid var(--app-border);
+	border-radius: 999px;
+	background: var(--app-surface);
+	color: var(--app-text);
+	box-shadow: 0 4px 20px rgb(0 0 0 / 12%);
+	font-size: 0.875rem;
+	font-weight: 600;
+	white-space: nowrap;
+	pointer-events: none;
+}
+.app-loading-spinner {
+	width: 18px;
+	height: 18px;
+	flex-shrink: 0;
+	border: 2px solid var(--app-border);
+	border-top-color: var(--app-accent);
+	border-radius: 50%;
+	animation: app-loading-spin 750ms linear infinite;
+}
+@keyframes app-loading-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.app-loading-spinner {
+		animation: none;
+	}
+}
 [data-theme='handlink-user'],
 [data-theme='handlink-staff'] {
 	color-scheme: inherit;

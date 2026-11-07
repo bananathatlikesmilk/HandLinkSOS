@@ -1,6 +1,6 @@
 # HandLink-SOS project context
 
-Last inspected: **7 November 2026, Asia/Manila**. Inspected baseline HEAD: `52d3a7c` (`LGU selector fix`). Compact Manage Accounts LGU styling below is new local work; earlier changes were already present in this inspected baseline. Earlier inspections used the commits recorded in the historical notes below. No new GitHub synchronization or production deployment was verified.
+Last inspected: **7 November 2026, Asia/Manila**. Inspected baseline HEAD: `c64110b` (`manage accounts fix`). Shared page-loading animation below is new local work; earlier changes were already present in this inspected baseline. Earlier inspections used the commits recorded in the historical notes below. No new GitHub synchronization or production deployment was verified.
 
 ### Local Git authorship maintenance
 
@@ -28,6 +28,12 @@ This file describes current source. The history explains how the discussion evol
 - **Proposed / open:** not confirmed as implemented or completed.
 
 ## 1. Purpose and account roles
+
+### Shared page-loading indicator, 7 November 2026
+
+The root [+layout.svelte](src/routes/+layout.svelte) now shows a small fixed loading pill during initial hydration and active client-side page navigation. It uses SvelteKit's real navigating.to state, not a fake percentage, delay or timeout. [layout.css](src/routes/layout.css) provides a theme-aware rotating ring and Loading page text, with a static indicator under reduced motion. The status sits outside the busy content region for screen readers and ignores pointer events so it does not block SOS controls or other taps. Existing initial hydration inert behavior remains; normal navigation does not make the content inert.
+
+This indicator covers app startup and route navigation across roles. Independent API requests, polling and button saves retain their existing loading/status behavior; the animation does not claim every background request is a page navigation. There is no new dependency, data access, database migration, native method or artificial SOS delay. See H072 for verification and local deployment state.
 
 ### Manage Accounts LGU selector, updated 7 November 2026
 

@@ -1,11 +1,13 @@
 <script lang="ts">
 	import favicon from '#lib/assets/favicon.svg';
 	import { onMount } from 'svelte';
+	import { navigating } from '$app/state';
 	import type { LayoutProps } from './$types';
 	import './layout.css';
 
 	let { children }: LayoutProps = $props();
 	let hydrated = $state(false);
+	const loading = $derived(!hydrated || !!navigating.to);
 	onMount(() => {
 		hydrated = true;
 		try {
@@ -33,6 +35,13 @@
 	/>
 </svelte:head>
 
-<div class="app-root" inert={!hydrated} aria-busy={!hydrated}>
+{#if loading}
+	<div class="app-loading" role="status" aria-live="polite">
+		<span class="app-loading-spinner" aria-hidden="true"></span>
+		<span>Loading page…</span>
+	</div>
+{/if}
+
+<div class="app-root" inert={!hydrated} aria-busy={loading}>
 	{@render children()}
 </div>
