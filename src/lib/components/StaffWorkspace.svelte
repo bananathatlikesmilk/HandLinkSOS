@@ -5,6 +5,7 @@
 	import IncidentLocation from './IncidentLocation.svelte';
 	import IncidentCoordination from './IncidentCoordination.svelte';
 	import IncidentProgress from './IncidentProgress.svelte';
+	import UnclaimedAlerts from './UnclaimedAlerts.svelte';
 	import { PROVINCIAL_LGU_ID } from '#lib/lgu.ts';
 	import { routingDescription } from '#lib/lgu.ts';
 	import { resolve } from '$app/paths';
@@ -393,6 +394,7 @@
 		</p>{/if}
 	{#if notice}<p class="alert" role="status"><Check size={17} />{notice}</p>{/if}
 	{#if actionError}<p class="alert alert-error" role="alert">{actionError}</p>{/if}
+	{#if role === 'dispatch'}<UnclaimedAlerts onOpen={selectIncident} />{/if}
 	<div class="incident-grid">
 		<section
 			class="panel incident-list"

@@ -1,6 +1,6 @@
 # HandLink-SOS project context
 
-Last inspected: **7 November 2026, Asia/Manila**. Inspected baseline HEAD: `c64110b` (`manage accounts fix`). Shared page-loading animation below is new local work; earlier changes were already present in this inspected baseline. Earlier inspections used the commits recorded in the historical notes below. No new GitHub synchronization or production deployment was verified.
+Last inspected: **8 November 2026, Asia/Manila**. Inspected baseline HEAD: `1eda7cb` (`loading animation`). Dispatcher unclaimed-alert warnings below are new local work; earlier changes were already present in this inspected baseline. Earlier inspections used the commits recorded in the historical notes below. No new GitHub synchronization or production deployment was verified.
 
 ### Local Git authorship maintenance
 
@@ -28,6 +28,14 @@ This file describes current source. The history explains how the discussion evol
 - **Proposed / open:** not confirmed as implemented or completed.
 
 ## 1. Purpose and account roles
+
+### Dispatcher unclaimed SOS warnings, 8 November 2026
+
+The dispatch alert workspace now includes [UnclaimedAlerts.svelte](src/lib/components/UnclaimedAlerts.svelte), showing the number of unclaimed cases in the dispatcher's assigned queue, the oldest reference, a live elapsed waiting timer and View oldest alert. Its separate authenticated [unclaimed endpoint](src/routes/api/staff/incidents/unclaimed/+server.ts) counts the whole assigned queue independently of table search, filters and pagination. Provincial dispatchers monitor provincial intake; local/legacy dispatchers monitor their own LGU. The endpoint requires current Dispatcher identity, staff MFA and an active LGU, and returns only counts, oldest operational reference/ID/start time, a decimal reference watermark and server check time. It does not disclose names, GPS, medical or contact data and uses private/no-store responses.
+
+**Enable warning sound** explicitly creates/resumes browser audio from a user gesture. While enabled, unacknowledged warnings repeat approximately every 15 seconds while this queue page is visible and a recent successful check exists. **Acknowledge warning** silences the current known SOS arrivals on this opened screen; it does not claim cases, change status, update an audit record, silence other dispatchers, or persist after leaving/reloading. The waiting count/timer remain visible, and a newer unclaimed SOS reference re-arms the warning. **Mute warning sound** disables this screen's sound. The acknowledgment watermark is compared with BigInt so large numeric references are not rounded.
+
+The feed checks every five seconds while visible and refreshes when the page becomes visible again. Elapsed waiting uses the server's clock plus monotonic browser time rather than trusting the device wall clock. Failed refreshes retain explicitly outdated counts and pause sound; checks older than 15 seconds also pause sound. Authentication/access failures clear the displayed snapshot and disable sound. When all cases are claimed, the count becomes zero and the oldest/acknowledgment controls disappear. Timers, pending fetch and audio context are cleaned up on leaving. This is an in-app foreground warning, not background push delivery, automatic escalation, guaranteed audible delivery, an official response-time SLA, or automatic case assignment. Browser audio policy, volume, device restrictions and five-second polling can affect delivery. No new database migration, native method, dependency or third-party audio request was added. See H073 for actual verification and rollout state.
 
 ### Shared page-loading indicator, 7 November 2026
 

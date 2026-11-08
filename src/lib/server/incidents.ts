@@ -1,5 +1,5 @@
 import { error, type RequestEvent } from '@sveltejs/kit';
-import { and, count, desc, eq, gt, gte, lt, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, gte, lt, isNull, ne, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { z } from 'zod';
 import type { IncidentDetail, IncidentReport, IncidentSummary } from '../incidents.ts';
@@ -472,6 +472,43 @@ export function listStaffIncidents(event: RequestEvent) {
 						.all()
 				: []
 	};
+}
+
+export function unclaimedIncidentSummary(event: RequestEvent) {
+	return db.transaction(() => {
+		const actor = requireStaff(event);
+		if (actor.role !== 'dispatcher') error(403, 'Dispatcher access is required.');
+		// Monitor only the queue this dispatcher can claim, independent of search, filters and pagination.
+		const condition = and(
+			eq(incident.status, 'Not assigned'),
+			isNull(incident.dispatcherUserId),
+			eq(routingLguId, actor.lguId!)
+		);
+		const totals = db
+			.select({
+				count: count(),
+				newestReferenceNumber: sql<string>`coalesce(cast(max(${incidentReference.number}) as text), '0')`
+			})
+			.from(incident)
+			.innerJoin(incidentReference, eq(incidentReference.incidentId, incident.id))
+			.leftJoin(incidentLgu, eq(incidentLgu.incidentId, incident.id))
+			.where(condition)
+			.get()!;
+		const oldest = db
+			.select({ id: incident.id, reference: incidentReferenceCode, startedAt: incident.startedAt })
+			.from(incident)
+			.innerJoin(incidentReference, eq(incidentReference.incidentId, incident.id))
+			.leftJoin(incidentLgu, eq(incidentLgu.incidentId, incident.id))
+			.where(condition)
+			.orderBy(asc(incident.startedAt), incidentReference.number)
+			.limit(1)
+			.get();
+		return {
+			...totals,
+			oldest: oldest ? { ...oldest, startedAt: oldest.startedAt.toISOString() } : null,
+			checkedAt: new Date().toISOString()
+		};
+	});
 }
 
 export function filteredIncidentReports(event: RequestEvent) {
