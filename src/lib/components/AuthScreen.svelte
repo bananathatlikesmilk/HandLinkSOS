@@ -2,16 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import {
-		ArrowRight,
-		ClipboardCheck,
-		Eye,
-		EyeOff,
-		HeartHandshake,
-		ShieldCheck,
-		Siren,
-		TriangleAlert
-	} from '@lucide/svelte';
+	import { ArrowRight, Eye, EyeOff, ShieldCheck } from '@lucide/svelte';
 	import AuthFrame from './AuthFrame.svelte';
 
 	import { onMount, tick } from 'svelte';
@@ -42,9 +33,8 @@
 	let code = $state('');
 	let showEmergencyMemo = $state(false);
 	let memoHeading = $state<HTMLHeadingElement>();
-	const title = $derived(
-		mode === 'recovery' ? 'Forgot password?' : showEmergencyMemo ? 'Emergency use only' : 'Log In'
-	);
+	let memoDialog = $state<HTMLDialogElement>();
+	const title = $derived(mode === 'recovery' ? 'Forgot password?' : 'Log In');
 	let recoveryStage = $state<'email' | 'code' | 'password' | 'success'>('email');
 	let recoveryCode = $state('');
 	let newPassword = $state('');
@@ -164,6 +154,7 @@
 		code = '';
 		showEmergencyMemo = true;
 		await tick();
+		memoDialog?.showModal();
 		memoHeading?.focus();
 	}
 
@@ -242,60 +233,36 @@
 </svelte:head>
 <AuthFrame>
 	<main class="auth-main" id="main-content">
-		<div class="auth-content" class:memo-active={showEmergencyMemo}>
+		<div class="auth-content">
 			<h1 id="auth-title">{title}</h1>
 			<p class="role-label">
-				{showEmergencyMemo
-					? 'Please read before you continue.'
-					: mode === 'login'
-						? 'User · Dispatcher · Admin'
-						: 'Account recovery'}
+				{mode === 'login' ? 'User · Dispatcher · Admin' : 'Account recovery'}
 			</p>
 			{#if showEmergencyMemo}
-				<section class="emergency-memo" aria-labelledby="emergency-memo-heading">
+				<dialog
+					class="emergency-memo"
+					bind:this={memoDialog}
+					aria-labelledby="emergency-memo-heading"
+					aria-describedby="emergency-memo-intro"
+					oncancel={(event) => event.preventDefault()}
+				>
 					<header class="memo-heading">
-						<span class="memo-emblem"><ShieldCheck size={28} aria-hidden="true" /></span>
+						<span class="memo-emblem"><ShieldCheck size={22} aria-hidden="true" /></span>
 						<div>
-							<p class="memo-eyebrow">USE WITH CARE</p>
+							<p class="memo-eyebrow">A QUICK REMINDER</p>
 							<h2 id="emergency-memo-heading" bind:this={memoHeading} tabindex="-1">
 								Important safety notice
 							</h2>
 						</div>
 					</header>
-					<p class="memo-intro">
-						<strong>HandLink is for real emergencies. It is not a game.</strong>
+					<p class="memo-intro" id="emergency-memo-intro">
+						Send SOS only for real emergencies, including when helping someone else.
 					</p>
 					<ul class="memo-rules">
-						<li>
-							<span class="memo-rule-icon"><Siren size={20} aria-hidden="true" /></span>
-							<div>
-								<strong>Real emergencies only</strong>
-								<p>Do not send prank SOS alerts, false reports, or test emergencies.</p>
-							</div>
-						</li>
-						<li>
-							<span class="memo-rule-icon"><ClipboardCheck size={20} aria-hidden="true" /></span>
-							<div>
-								<strong>Share accurate details</strong>
-								<p>
-									Give accurate information. Send SOS for others only when they need urgent help.
-								</p>
-							</div>
-						</li>
-						<li>
-							<span class="memo-rule-icon"><HeartHandshake size={20} aria-hidden="true" /></span>
-							<div>
-								<strong>Protect people who need help</strong>
-								<p>
-									False alerts waste emergency resources and can delay help for someone in danger.
-								</p>
-							</div>
-						</li>
+						<li>No pranks, false reports, or test alerts.</li>
+						<li>Share accurate information and location.</li>
 					</ul>
-					<div class="memo-reminder">
-						<TriangleAlert size={19} aria-hidden="true" />
-						<p>Use HandLink responsibly. Every alert must be taken seriously.</p>
-					</div>
+					<p class="memo-reminder">False alerts can delay help for someone in danger.</p>
 					{#if error}<p class="form-error" role="alert">{error}</p>{/if}
 					<button
 						class="memo-continue"
@@ -308,7 +275,7 @@
 							aria-hidden="true"
 						/>
 					</button>
-				</section>
+				</dialog>
 			{:else if mode === 'recovery'}
 				{#if !emailConfigured}
 					<p class="auth-subtitle" role="status">
@@ -508,40 +475,51 @@
 
 <style>
 	.emergency-memo {
-		--memo-bg: #151a17;
-		--memo-text: #edf5f0;
-		--memo-muted: #b6c7bd;
-		--memo-border: #39483e;
-		--memo-accent: #9ae1c0;
-		--memo-soft: #23372c;
-		--memo-button-text: #10291d;
-		--memo-warning-bg: #352c1c;
-		--memo-warning-text: #f3d79e;
-		--memo-warning-border: #5a4525;
-		display: grid;
-		gap: 18px;
-		padding: 24px;
+		--memo-bg: #171717;
+		--memo-text: #f5f5f5;
+		--memo-muted: #b8b8b8;
+		--memo-border: #383838;
+		--memo-accent: #f5f5f5;
+		--memo-button-text: #171717;
+		position: fixed;
+		inset: 0;
+		width: min(420px, calc(100vw - 32px));
+		max-height: calc(100dvh - 32px);
+		margin: auto;
+		padding: 28px;
+		overflow-y: auto;
 		border: 1px solid var(--memo-border);
-		border-top: 4px solid var(--memo-accent);
-		border-radius: 22px;
+		border-radius: 20px;
 		background: var(--memo-bg);
 		color: var(--memo-text);
-		box-shadow: 0 20px 60px #0005;
+		box-shadow: 0 24px 80px #0005;
 		font-size: 15px;
-		line-height: 1.55;
+		line-height: 1.6;
 		text-shadow: none;
 	}
-	.auth-content.memo-active {
-		width: min(100%, 480px);
-		text-shadow: none;
+	.emergency-memo[open] {
+		display: grid;
+		gap: 18px;
+		animation: memo-enter 180ms ease-out;
 	}
-	.memo-active h1 {
-		font-size: 30px;
-		font-weight: 600;
-		letter-spacing: -0.025em;
+	.emergency-memo::backdrop {
+		background: #0009;
+		backdrop-filter: blur(6px);
 	}
-	.memo-active .role-label {
-		margin: 10px 0 24px;
+	@keyframes memo-enter {
+		from {
+			opacity: 0;
+			transform: translateY(8px) scale(0.98);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0) scale(1);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.emergency-memo[open] {
+			animation: none;
+		}
 	}
 	.memo-heading {
 		display: flex;
@@ -554,23 +532,23 @@
 	.memo-emblem {
 		display: grid;
 		place-items: center;
-		flex: 0 0 48px;
-		height: 48px;
-		border-radius: 15px;
-		background: var(--memo-soft);
+		flex: 0 0 40px;
+		height: 40px;
+		border: 1px solid var(--memo-border);
+		border-radius: 12px;
 		color: var(--memo-accent);
 	}
 	.emergency-memo .memo-eyebrow {
 		margin-bottom: 3px;
 		font-size: 10px;
-		font-weight: 750;
+		font-weight: 600;
 		letter-spacing: 0.13em;
-		color: var(--memo-accent);
+		color: var(--memo-muted);
 	}
 	.emergency-memo h2 {
 		margin: 0;
-		font-size: 20px;
-		font-weight: 700;
+		font-size: 21px;
+		font-weight: 600;
 		line-height: 1.3;
 		letter-spacing: -0.02em;
 	}
@@ -579,53 +557,21 @@
 		margin: 0;
 	}
 	.memo-intro {
-		font-size: 16px;
+		color: var(--memo-text);
 	}
 	.emergency-memo .memo-rules {
-		padding: 0;
-		list-style: none;
-	}
-	.memo-rules li {
-		display: flex;
-		align-items: flex-start;
-		gap: 11px;
-		padding-block: 14px;
-		border-top: 1px solid var(--memo-border);
-	}
-	.memo-rules li:last-child {
-		padding-bottom: 0;
-	}
-	.memo-rule-icon {
-		display: grid;
-		place-items: center;
-		flex: 0 0 32px;
-		height: 32px;
-		border-radius: 10px;
-		background: var(--memo-soft);
-		color: var(--memo-accent);
-	}
-	.memo-rules strong {
-		font-size: 14px;
-		font-weight: 700;
-	}
-	.memo-rules p {
-		margin-top: 3px;
+		padding-left: 20px;
+		list-style: disc;
 		color: var(--memo-muted);
 	}
-	.memo-reminder {
-		display: flex;
-		align-items: flex-start;
-		gap: 10px;
-		padding: 12px;
-		border: 1px solid var(--memo-warning-border);
-		border-radius: 12px;
-		background: var(--memo-warning-bg);
-		color: var(--memo-warning-text);
-		font-size: 14px;
+	.memo-rules li {
+		padding-block: 3px;
 	}
-	.memo-reminder :global(svg) {
-		flex-shrink: 0;
-		margin-top: 2px;
+	.memo-reminder {
+		padding-top: 16px;
+		border-top: 1px solid var(--memo-border);
+		color: var(--memo-muted);
+		font-size: 13px;
 	}
 	.memo-continue {
 		display: flex;
@@ -656,16 +602,11 @@
 	}
 	:global(:root[data-appearance='light']) .emergency-memo {
 		--memo-bg: #fff;
-		--memo-text: #18382a;
-		--memo-muted: #4c6156;
-		--memo-border: #dae6de;
-		--memo-accent: #17654f;
-		--memo-soft: #edf6f0;
+		--memo-text: #202020;
+		--memo-muted: #5c5c5c;
+		--memo-border: #e2e2e2;
+		--memo-accent: #202020;
 		--memo-button-text: #fff;
-		--memo-warning-bg: #fff7e7;
-		--memo-warning-text: #80500e;
-		--memo-warning-border: #f0dfb8;
-		box-shadow: 0 16px 42px #123b281f;
 	}
 	.login-fields {
 		display: contents;

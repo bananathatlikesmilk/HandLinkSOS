@@ -147,18 +147,32 @@ test('one login page routes Users and protects staff destinations with MFA', asy
 	await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('type', 'text');
 	await expect(page.getByRole('heading', { name: 'Important safety notice' })).toHaveCount(0);
 	await page.getByRole('button', { name: 'Log In', exact: true }).click();
-	const memo = page.getByRole('region', { name: 'Important safety notice' });
-	await expect(memo).toContainText('HandLink is for real emergencies. It is not a game.');
+	const memo = page.getByRole('dialog', { name: 'Important safety notice' });
+	await expect(memo).toBeVisible();
 	await expect(memo).toContainText(
-		'Do not send prank SOS alerts, false reports, or test emergencies.'
+		'Send SOS only for real emergencies, including when helping someone else.'
 	);
+	await expect(memo).toContainText('No pranks, false reports, or test alerts.');
+	await expect(memo).toContainText('Share accurate information and location.');
+	await expect(memo).toContainText('False alerts can delay help for someone in danger.');
+	expect(await memo.evaluate((node) => node.matches(':modal'))).toBe(true);
 	await expect(page.getByRole('heading', { name: 'Important safety notice' })).toBeFocused();
+	await page.keyboard.press('Escape');
+	await expect(memo).toBeVisible();
+	await page.mouse.click(2, 2);
+	await expect(memo).toBeVisible();
+	await page.keyboard.press('Tab');
+	await expect(
+		memo.getByRole('button', { name: 'I understand. Continue', exact: true })
+	).toBeFocused();
 	await expect(page).toHaveURL('/login');
 	await expectLightSurface(memo);
 	await page.setViewportSize({ width: 390, height: 844 });
 	for (const theme of ['light', 'dark']) {
-		if (theme === 'dark')
-			await page.getByRole('button', { name: 'Switch to dark mode', exact: true }).click();
+		await page.evaluate(
+			(value) => document.documentElement.setAttribute('data-appearance', value),
+			theme
+		);
 		expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
 			true
 		);
@@ -168,6 +182,15 @@ test('one login page routes Users and protects staff destinations with MFA', asy
 			animations: 'disabled'
 		});
 	}
+	await page.setViewportSize({ width: 320, height: 568 });
+	const bounds = await memo.boundingBox();
+	expect(bounds).not.toBeNull();
+	expect(bounds!.x).toBeGreaterThanOrEqual(0);
+	expect(bounds!.y).toBeGreaterThanOrEqual(0);
+	expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(320);
+	expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(568);
+	await page.emulateMedia({ reducedMotion: 'reduce' });
+	await expect(memo).toHaveCSS('animation-name', 'none');
 	await page.getByRole('button', { name: 'I understand. Continue', exact: true }).click();
 	await expect(page).toHaveURL('/user/dashboard');
 	await page.request.post('/api/auth/sign-out', { headers, data: {} });
