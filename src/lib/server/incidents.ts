@@ -23,7 +23,7 @@ import {
 	user
 } from './db/schema.ts';
 import { requireStaff, requireUser } from './api.ts';
-import { incidentInput, incidentListInput } from './validation.ts';
+import { incidentInput, incidentListInput, ownIncidentListInput } from './validation.ts';
 import { latestIncidentNote } from './incident-notes.ts';
 import { getAiSummaryState } from './ai-summaries.ts';
 import { incidentReferenceCode } from './incident-references.ts';
@@ -216,14 +216,27 @@ export function getOwnIncident(event: RequestEvent, id: string) {
 
 export function listOwnIncidents(event: RequestEvent) {
 	const { identity } = requireUser(event);
-	return {
-		incidents: summaries()
-			.where(eq(incident.callerUserId, identity.id))
-			.orderBy(desc(incident.startedAt), incident.id)
-			.limit(50)
-			.all()
-			.map(serialize)
-	};
+	const parsed = ownIncidentListInput.safeParse(Object.fromEntries(event.url.searchParams));
+	if (!parsed.success) error(422, 'Invalid SOS history page.');
+	// Keep the existing recent-alert response size for SOS clients without a page parameter.
+	const pageSize = parsed.data.page === undefined ? 50 : 20;
+	return db.transaction((tx) => {
+		const condition = eq(incident.callerUserId, identity.id);
+		const total = tx.select({ n: count() }).from(incident).where(condition).get()!.n;
+		const page = Math.min(parsed.data.page ?? 1, Math.max(1, Math.ceil(total / pageSize)));
+		return {
+			incidents: summaries()
+				.where(condition)
+				.orderBy(desc(incident.startedAt), incident.id)
+				.limit(pageSize)
+				.offset((page - 1) * pageSize)
+				.all()
+				.map(serialize),
+			total,
+			page,
+			pageSize
+		};
+	});
 }
 
 export function createIncident(event: RequestEvent, input: z.output<typeof incidentInput>) {

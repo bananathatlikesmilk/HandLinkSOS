@@ -135,6 +135,9 @@ export const addendumInput = z.strictObject({
 	id: z.uuid(),
 	notes: z.string().trim().min(1).max(2000)
 });
+export const ownIncidentListInput = z.strictObject({
+	page: z.coerce.number().int().min(1).max(Number.MAX_SAFE_INTEGER).optional()
+});
 export const incidentListInput = z.strictObject({
 	coordination: z.enum(['all', 'provincial', 'municipal', 'accepted']).default('all'),
 	from: z.iso.date().optional(),

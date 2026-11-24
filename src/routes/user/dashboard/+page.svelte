@@ -6,11 +6,13 @@
 	import { getUserPreview } from '#lib/user/preview.svelte.ts';
 	import { incidentRequest, type SosTarget } from '#lib/user/incidents-client.ts';
 	import type { IncidentSummary } from '#lib/incidents.ts';
+	import SosHistoryList from '#lib/components/SosHistoryList.svelte';
 	const preview = getUserPreview();
 	let targets = $state<SosTarget[]>([]);
 	let incidents = $state<IncidentSummary[]>([]);
 	let loading = $state(true);
 	let error = $state('');
+	let historyError = $state('');
 	const self = $derived(targets.find((target) => target.id === preview.profile.id));
 	const trusted = $derived(targets.filter((target) => target.id !== preview.profile.id));
 	let search = $state('');
@@ -36,7 +38,7 @@
 		refreshing = true;
 		const revision = targetRevision;
 		try {
-			const [people, alerts] = await Promise.all([
+			const [people, alerts] = await Promise.allSettled([
 				incidentRequest<{ targets: SosTarget[] }>('/api/incidents/targets', {
 					signal: controller.signal
 				}),
@@ -44,9 +46,21 @@
 					signal: controller.signal
 				})
 			]);
-			if (revision === targetRevision && !savingFavorites.length) targets = people.targets;
-			incidents = alerts.incidents;
-			error = '';
+			if (controller.signal.aborted) return;
+			if (people.status === 'fulfilled') {
+				if (revision === targetRevision && !savingFavorites.length) targets = people.value.targets;
+				error = '';
+			} else {
+				error =
+					people.reason instanceof Error ? people.reason.message : 'Could not load SOS profiles.';
+			}
+			if (alerts.status === 'fulfilled') {
+				incidents = alerts.value.incidents;
+				historyError = '';
+			} else {
+				historyError =
+					alerts.reason instanceof Error ? alerts.reason.message : 'Could not load SOS history.';
+			}
 		} catch (cause) {
 			if (!controller.signal.aborted)
 				error = cause instanceof Error ? cause.message : 'Could not load SOS alerts.';
@@ -174,17 +188,20 @@
 		<p class="trusted-help">Send SOS for approved profiles. Star favorites to keep them on top.</p>
 	</section>
 	<section class="user-panel mt-6 space-y-3" aria-labelledby="recent-sos-title">
-		<h2 id="recent-sos-title">Your recent SOS alerts</h2>
-		{#each incidents.slice(0, 5) as incident (incident.id)}
-			<article class="border-t border-white/15 pt-3">
-				<strong>{incident.personName}</strong>
-				<p class="user-copy">{incident.status}</p>
-				<p class="user-copy break-all">Incident reference: {incident.reference}</p>
-				<p class="user-copy">{new Date(incident.startedAt).toLocaleString()}</p>
-			</article>
-		{:else}<p class="user-copy">
+		<div class="history-heading">
+			<h2 id="recent-sos-title">Your recent SOS alerts</h2>
+			<a class="btn btn-outline" href={resolve('/user/history')}>View full history</a>
+		</div>
+		{#if historyError}
+			<p class="user-error" role="alert">{historyError}</p>
+			<button class="btn btn-outline" onclick={refresh}>Retry history</button>
+			{#if incidents.length}<p class="user-copy">Showing previously loaded alerts.</p>{/if}
+		{/if}
+		{#if incidents.length}
+			<SosHistoryList incidents={incidents.slice(0, 5)} />
+		{:else if !historyError}<p class="user-copy">
 				{loading ? 'Loading alerts...' : 'No SOS alerts sent yet.'}
-			</p>{/each}
+			</p>{/if}
 	</section>
 	<div class="dashboard-actions">
 		<a class="share-link btn btn-outline" href={resolve('/user/sharing')}
@@ -197,6 +214,13 @@
 </div>
 
 <style>
+	.history-heading {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+	}
 	.trusted-section .stranger-sos {
 		color: #fff;
 		background: #b91c1c;

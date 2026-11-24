@@ -1,6 +1,14 @@
 # HandLink-SOS project context
 
-Last inspected: **8 November 2026, Asia/Manila**. Inspected baseline HEAD: `1eda7cb` (`loading animation`). Dispatcher unclaimed-alert warnings below are new local work; earlier changes were already present in this inspected baseline. Earlier inspections used the commits recorded in the historical notes below. No new GitHub synchronization or production deployment was verified.
+Last inspected: **24 November 2026, Asia/Manila**. Inspected baseline HEAD: `8c901b2` (`Dispatcher fix for alerts`). User SOS history changes below are new local work. Earlier inspections used the commits recorded in the historical notes below. No new GitHub synchronization or production deployment was verified.
+
+### User SOS history
+
+The User dashboard shows the five newest SOS alerts sent by the signed-in account and includes **View full history**. The full history route, `/user/history`, uses server-side pagination with 20 alerts per page, a total count, and Newer alerts/Older alerts navigation. It includes older records beyond the previous API limit of 50. History covers alerts the account sent for itself, trusted profiles, and strangers; it does not grant access to another account's sent alerts.
+
+Both views use [SosHistoryList.svelte](src/lib/components/SosHistoryList.svelte) for beneficiary name, SOS type, readable workflow status, incident reference, sent time, closure time when available, and pending cancellation review. Dates explicitly use Philippine time (PHT) to keep browser/server output consistent. Theme variables replace the former white-only row separators. Recent-history loading failures show their own error and retry action instead of an empty-history claim. Profile-list failures and history-list failures are handled independently; an already loaded list is labeled as previously loaded when its refresh fails.
+
+[listOwnIncidents](src/lib/server/incidents.ts) authenticates the current User and restricts both count and rows by caller account ID. `GET /api/incidents?page=N` returns `incidents`, `total`, `page`, and `pageSize`; invalid pages return 422 and pages past the end clamp to the last page. Requests without a page retain the previous 50-row recent response for existing SOS clients. The full-history server loader reuses this service; existing portal authentication and API helpers provide no-store responses. No migration or native APK change is required. Local verification and delivery limits are recorded in H074 of [CODEX_HISTORY.md](CODEX_HISTORY.md).
 
 ### Local Git authorship maintenance
 

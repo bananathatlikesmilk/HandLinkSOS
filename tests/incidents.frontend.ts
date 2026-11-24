@@ -11,6 +11,158 @@ import {
 	sos
 } from './incident-fixture';
 
+test('full SOS history reaches alerts older than fifty and stays private', async ({
+	page,
+	playwright
+}) => {
+	const caller = await provision();
+	const other = await provision();
+	const handler = await provision('dispatcher');
+	const ids: string[] = [];
+	const db = database();
+	try {
+		const insert = db.prepare(
+			'INSERT INTO incident (id,person_profile_id,caller_user_id,caller_name,idempotency_key,created_at,status,ended_at,latitude,longitude,dispatcher_user_id,confirmed_at) VALUES (?,?,?,?,?,?,?,?,14,121,?,?)'
+		);
+		for (let index = 0; index < 55; index++) {
+			const id = crypto.randomUUID();
+			ids.push(id);
+			const started = Date.now() - (index + 1) * 60000;
+			insert.run(
+				id,
+				caller.profileId,
+				caller.id,
+				'Synthetic caller',
+				crypto.randomUUID(),
+				started,
+				index === 54 ? 'Resolved' : 'Not assigned',
+				index === 54 ? started + 1000 : null,
+				index === 54 ? handler.id : null,
+				index === 54 ? started : null
+			);
+			db.prepare(
+				"INSERT INTO incident_lgu (incident_id,lgu_id,reason) VALUES (?,'provincial-intake','provincial_intake')"
+			).run(id);
+		}
+		insert.run(
+			crypto.randomUUID(),
+			other.profileId,
+			other.id,
+			'Other synthetic caller',
+			crypto.randomUUID(),
+			Date.now(),
+			'Not assigned',
+			null,
+			null,
+			null
+		);
+	} finally {
+		db.close();
+	}
+	const anonymous = await playwright.request.newContext({ baseURL: origin });
+	try {
+		expect((await anonymous.get('/api/incidents?page=1')).status()).toBe(401);
+	} finally {
+		await anonymous.dispose();
+	}
+	await login(page.request, caller);
+	const recent = await (await page.request.get('/api/incidents')).json();
+	expect(recent.incidents).toHaveLength(50);
+	expect(recent.total).toBe(55);
+	const allIds: string[] = [];
+	for (let number = 1; number <= 3; number++) {
+		const response = await page.request.get(`/api/incidents?page=${number}`);
+		expect(response.headers()['cache-control']).toContain('no-store');
+		const result = await response.json();
+		expect(result).toMatchObject({ total: 55, page: number, pageSize: 20 });
+		allIds.push(...result.incidents.map((entry: { id: string }) => entry.id));
+	}
+	expect(allIds).toEqual(ids);
+	expect((await (await page.request.get('/api/incidents?page=999')).json()).page).toBe(3);
+	for (const value of ['0', '-1', '1.5', 'wrong']) {
+		expect((await page.request.get(`/api/incidents?page=${value}`)).status()).toBe(422);
+	}
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/user/dashboard');
+	const recentPanel = page.getByRole('region', { name: 'Your recent SOS alerts' });
+	await expect(recentPanel.locator('article')).toHaveCount(5);
+	await expect(recentPanel).toContainText('Received');
+	await recentPanel.getByRole('link', { name: 'View full history' }).click();
+	const history = page.getByRole('region', { name: 'SOS history', exact: true });
+	await expect(history.locator('article')).toHaveCount(20);
+	await expect(page.getByText('Page 1 of 3')).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Newer alerts' })).toHaveCount(0);
+	await page.getByRole('link', { name: 'Older alerts' }).click();
+	await expect(page.getByText('Page 2 of 3')).toBeVisible();
+	await page.getByRole('link', { name: 'Older alerts' }).click();
+	await expect(page.getByText('Page 3 of 3')).toBeVisible();
+	await expect(history.locator('article')).toHaveCount(15);
+	await expect(history.locator('article').last()).toContainText('Resolved');
+	await expect(history.locator('article').last()).toContainText('Closed:');
+	await expect(page.getByRole('link', { name: 'Older alerts' })).toHaveCount(0);
+	for (const appearance of ['light', 'dark']) {
+		await page.evaluate(
+			(value) => document.documentElement.setAttribute('data-appearance', value),
+			appearance
+		);
+		const badge = history.locator('.history-status').first();
+		expect(
+			await badge.evaluate(
+				(node) => node.clientWidth >= node.scrollWidth && node.clientHeight >= node.scrollHeight
+			)
+		).toBe(true);
+		expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+			true
+		);
+		await page.locator('.history-screen').screenshot({
+			path: test.info().outputPath(`sos-history-${appearance}.png`),
+			animations: 'disabled'
+		});
+	}
+	await page.reload();
+	await expect(page.getByText('Page 3 of 3')).toBeVisible();
+	await page.getByRole('link', { name: 'Newer alerts' }).click();
+	await expect(page.getByText('Page 2 of 3')).toBeVisible();
+	await login(page.request, other);
+	const otherHistory = await (await page.request.get('/api/incidents?page=1')).json();
+	expect(otherHistory.total).toBe(1);
+	expect(allIds).not.toContain(otherHistory.incidents[0].id);
+});
+
+test('recent SOS history distinguishes failed loading from empty history and survives profile errors', async ({
+	page
+}) => {
+	const caller = await provision();
+	await login(page.request, caller);
+	await page.route('**/api/incidents', (route) =>
+		route.fulfill({
+			status: 503,
+			contentType: 'application/json',
+			body: JSON.stringify({ message: 'History temporarily unavailable.' })
+		})
+	);
+	await page.goto('/user/dashboard');
+	const recentPanel = page.getByRole('region', { name: 'Your recent SOS alerts' });
+	await expect(recentPanel.getByRole('alert')).toContainText('History temporarily unavailable.');
+	await expect(recentPanel.getByText('No SOS alerts sent yet.')).toHaveCount(0);
+	await page.unroute('**/api/incidents');
+	await page.route('**/api/incidents/targets', (route) =>
+		route.fulfill({
+			status: 503,
+			contentType: 'application/json',
+			body: JSON.stringify({ message: 'Profiles temporarily unavailable.' })
+		})
+	);
+	await recentPanel.getByRole('button', { name: 'Retry history' }).click();
+	await expect(recentPanel.getByText('No SOS alerts sent yet.')).toBeVisible();
+	await expect(recentPanel.getByRole('alert')).toHaveCount(0);
+	await recentPanel.getByRole('link', { name: 'View full history' }).click();
+	await expect(page.getByRole('region', { name: 'SOS history', exact: true })).toContainText(
+		'No SOS alerts sent yet.'
+	);
+	await expect(page.getByRole('navigation', { name: 'SOS history pages' })).toHaveCount(0);
+});
+
 test('SOS profiles can be searched and account favorites stay first after reload', async ({
 	page
 }) => {
