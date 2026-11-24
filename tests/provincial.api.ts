@@ -207,6 +207,27 @@ test('provincial handler keeps caller information, notes and confirmed external 
 			404
 		);
 		await page.goto('/dispatch/reports');
+		await page.setViewportSize({ width: 1280, height: 900 });
+		await expect(page.getByRole('button').filter({ hasText: incident.reference })).toBeVisible();
+		await expect(page.locator('.report-document')).toHaveCount(0);
+		await expect(page.locator('.report-grid')).toHaveClass(/archive-only/);
+		const archiveBounds = await page.locator('.report-archive').boundingBox();
+		const gridBounds = await page.locator('.report-grid').boundingBox();
+		expect(Math.abs(archiveBounds!.width - gridBounds!.width)).toBeLessThan(2);
+		for (const theme of ['light', 'dark']) {
+			await page.evaluate(
+				(value) => document.documentElement.setAttribute('data-appearance', value),
+				theme
+			);
+			await page.locator('.report-grid').screenshot({
+				path: test.info().outputPath(`full-report-list-${theme}.png`),
+				animations: 'disabled'
+			});
+		}
+		await page.getByRole('button').filter({ hasText: incident.reference }).click();
+		await expect(page.locator('.report-document')).toBeVisible();
+		await page.getByRole('button', { name: 'Back to all reports', exact: true }).click();
+		await expect(page.locator('.report-document')).toHaveCount(0);
 		await page.getByRole('button').filter({ hasText: incident.reference }).click();
 		const reportProgress = page.getByRole('region', {
 			name: 'Confirmed response updates',
@@ -261,6 +282,10 @@ test('provincial handler keeps caller information, notes and confirmed external 
 			animations: 'disabled'
 		});
 		await resolveButton.click();
+		await expect(page.locator('.report-document')).toHaveCount(0);
+		await expect(page.locator('.report-grid')).toHaveClass(/archive-only/);
+		await expect(page.getByText('Incident marked resolved.', { exact: true })).toBeVisible();
+		await page.getByRole('button').filter({ hasText: incident.reference }).click();
 		await expect(reportProgress).toContainText(
 			'Patient transported; municipal response completed and confirmed by telephone.'
 		);
@@ -282,6 +307,11 @@ test('provincial handler keeps caller information, notes and confirmed external 
 		).toBe(422);
 		const addendum = page.getByLabel('Addendum *', { exact: true });
 		await addendum.fill('Outcome confirmed; no full registered profile was forwarded.');
+		page.once('dialog', (dialog) => dialog.dismiss());
+		await page.getByRole('button', { name: 'Back to all reports', exact: true }).click();
+		await expect(addendum).toHaveValue(
+			'Outcome confirmed; no full registered profile was forwarded.'
+		);
 		await page.getByRole('button', { name: 'Save addendum', exact: true }).click();
 		await expect(
 			page.getByText('Outcome confirmed; no full registered profile was forwarded.', {

@@ -14,7 +14,7 @@ export function database() {
 	db.pragma('foreign_keys=ON');
 	return db;
 }
-export async function provision(role = 'user') {
+export async function provision(role = 'user', tutorialSeen = true) {
 	const id = crypto.randomUUID();
 	const profileId = crypto.randomUUID();
 	const email = `${id}@example.com`;
@@ -28,6 +28,12 @@ export async function provision(role = 'user') {
 			'INSERT INTO account (id,account_id,provider_id,user_id,password,updated_at) VALUES (?,?,?,?,?,?)'
 		).run(crypto.randomUUID(), id, 'credential', id, hash, Date.now());
 		if (role === 'user') {
+			// Existing feature tests start with onboarding complete; tutorial tests opt into first use.
+			if (tutorialSeen)
+				db.prepare('INSERT INTO user_tutorial (user_id,dismissed_at) VALUES (?,?)').run(
+					id,
+					Date.now()
+				);
 			db.prepare(
 				'INSERT INTO user_profile (id,user_id,first_name,last_name,birthday,sex,phone,updated_at) VALUES (?,?,?,?,?,?,?,?)'
 			).run(profileId, id, 'Casey', 'Reyes', '2000-01-01', 'Female', '+639171234567', Date.now());

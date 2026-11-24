@@ -24,6 +24,11 @@ const accountReference = (name: string) =>
 		.notNull()
 		.references(() => user.id, { onDelete: 'restrict' });
 
+export const userTutorial = sqliteTable('user_tutorial', {
+	userId: accountReference('user_id').primaryKey(),
+	dismissedAt: integer('dismissed_at', { mode: 'timestamp_ms' }).notNull()
+});
+
 export const lgu = sqliteTable('lgu', {
 	id: id(),
 	name: text('name').notNull().unique(),

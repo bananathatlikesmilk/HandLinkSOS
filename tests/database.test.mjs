@@ -39,6 +39,48 @@ function seed(client) {
 			.run(id, owner, 'First', 'Last', '2000-01-01', 'Female', '+639171234567', Date.now());
 }
 
+test('tutorial migration preserves existing accounts and supports transaction rollback', () => {
+	const client = new Database(':memory:');
+	client.pragma('foreign_keys=ON');
+	try {
+		const migrations = readMigrationFiles({ migrationsFolder: './drizzle' });
+		for (const migration of migrations.slice(0, 21))
+			for (const statement of migration.sql) client.exec(statement);
+		seed(client);
+		const before = client.prepare('SELECT * FROM user ORDER BY id').all();
+		const apply = () => {
+			for (const statement of migrations[21].sql) client.exec(statement);
+		};
+		assert.throws(
+			client.transaction(() => {
+				apply();
+				throw new Error('isolated tutorial rollback');
+			}),
+			/isolated tutorial rollback/
+		);
+		assert.equal(
+			client.prepare("SELECT count(*) AS n FROM sqlite_master WHERE name='user_tutorial'").get().n,
+			0
+		);
+		apply();
+		assert.deepEqual(client.prepare('SELECT * FROM user ORDER BY id').all(), before);
+		assert.equal(client.prepare('SELECT count(*) AS n FROM user_tutorial').get().n, 0);
+		client
+			.prepare('INSERT INTO user_tutorial (user_id,dismissed_at) VALUES (?,?)')
+			.run('owner', Date.now());
+		assert.throws(
+			() =>
+				client
+					.prepare('INSERT INTO user_tutorial (user_id,dismissed_at) VALUES (?,?)')
+					.run('missing', Date.now()),
+			/FOREIGN KEY/
+		);
+		assert.deepEqual(client.pragma('foreign_key_check'), []);
+	} finally {
+		client.close();
+	}
+});
+
 test('stranger migration preserves incident children and immutable references with atomic rollback', () => {
 	const client = new Database(':memory:');
 	client.pragma('foreign_keys=ON');

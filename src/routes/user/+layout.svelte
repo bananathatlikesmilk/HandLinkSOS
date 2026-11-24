@@ -134,6 +134,7 @@
 				{#each navigation as link (link.href)}
 					<a
 						href={resolve(link.href)}
+						data-tutorial={link.label.toLowerCase()}
 						class:current={page.url.pathname.startsWith(link.href)}
 						aria-current={page.url.pathname.startsWith(link.href) ? 'page' : undefined}
 						aria-label={link.label === 'Updates' && unreadCount > 0

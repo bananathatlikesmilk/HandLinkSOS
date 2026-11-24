@@ -1,6 +1,16 @@
 # HandLink-SOS project context
 
-Last inspected: **24 November 2026, Asia/Manila**. Inspected baseline HEAD: `67395f0` (`fix sos history`). The login safety popup below is new local work; the User SOS history implementation is present in this baseline. Earlier inspections used the commits recorded in the historical notes below. No new GitHub synchronization or production deployment was verified.
+Last inspected: **25 November 2026, Asia/Manila**. Inspected baseline HEAD: `56752fe` (`notice fix`). The report archive layout and first-use User tutorial below are local work; the login safety popup and User SOS history are present in this baseline. Earlier inspections used the commits recorded in the historical notes below. No new GitHub synchronization or production deployment was verified.
+
+### First-use User tutorial and replay
+
+[UserTutorial.svelte](src/lib/user/UserTutorial.svelte) provides nine short steps on the authenticated User dashboard: welcome, SOS for self, helping someone else, pressing Call in the phone dialer, profiles, location sharing, updates, Settings, and full SOS history. Relevant dashboard controls or navigation icons receive an outlined highlight; the guide scrolls and repositions for the target and viewport. The modal prevents clicks from activating background controls. Back, Next, Skip tutorial, Close, Escape, and Finish tutorial provide keyboard-accessible navigation. Closing returns focus and scroll to the dashboard; the guide never sends an SOS, opens the dialer, or requests permissions itself.
+
+For an interactive login, this appears after the existing proper-use popup and normal role-based routing. An account with no tutorial record also receives the guide on its next authenticated dashboard visit, including an existing saved session. Migration `0021_user_tutorial.sql` adds only `user_tutorial(user_id, dismissed_at)`. The server stores a single dismissal timestamp per User account when the guide is skipped or completed, so it normally appears once across devices. It does not store step analytics, medical details, or separate completion/skip classifications. Repeated writes are idempotent. `GET/POST /api/account/tutorial` uses the current authenticated User, no-store output, strict input validation, and same-origin checks for writes. A failed save does not trap the user: the guide closes immediately and offers a nonblocking retry warning; it may appear again until saved.
+
+Settings includes **Replay tutorial**, which opens `/user/dashboard?tutorial=replay` even for an account with a saved preference. Closing removes the replay query parameter. Admin/Dispatcher tutorials remain unimplemented. Existing test fixtures default to having completed onboarding; tutorial tests explicitly provision unseen accounts.
+
+**Rollout:** Apply the additive migration before serving the new code (`pnpm db:migrate`, or the existing container startup migration sequence). Existing account/incident rows are unchanged. Old code can run against the expanded database; rollback means reverting the application while retaining the harmless tutorial table and its records. Do not drop the table or rewrite existing data as a routine rollback. Local tests use isolated databases; no production migration or deployment is implied. See H077 in [CODEX_HISTORY.md](CODEX_HISTORY.md).
 
 ### User SOS history
 
@@ -9,6 +19,12 @@ The User dashboard shows the five newest SOS alerts sent by the signed-in accoun
 Both views use [SosHistoryList.svelte](src/lib/components/SosHistoryList.svelte) for beneficiary name, SOS type, readable workflow status, incident reference, sent time, closure time when available, and pending cancellation review. Dates explicitly use Philippine time (PHT) to keep browser/server output consistent. Theme variables replace the former white-only row separators. Recent-history loading failures show their own error and retry action instead of an empty-history claim. Profile-list failures and history-list failures are handled independently; an already loaded list is labeled as previously loaded when its refresh fails.
 
 [listOwnIncidents](src/lib/server/incidents.ts) authenticates the current User and restricts both count and rows by caller account ID. `GET /api/incidents?page=N` returns `incidents`, `total`, `page`, and `pageSize`; invalid pages return 422 and pages past the end clamp to the last page. Requests without a page retain the previous 50-row recent response for existing SOS clients. The full-history server loader reuses this service; existing portal authentication and API helpers provide no-store responses. No migration or native APK change is required. Local verification and delivery limits are recorded in H074 of [CODEX_HISTORY.md](CODEX_HISTORY.md).
+
+### Incident reports layout
+
+The shared [Reports.svelte](src/lib/components/Reports.svelte) used by Admin and Dispatcher report pages starts with the archive occupying the full content width. It no longer automatically selects the first case or reserves an empty details column. Filters use a responsive grid in this state; the incident list uses normal page scrolling. Selecting a report opens its details with the existing responsive split layout. Back to all reports clears the selection, aborts pending detail reads, and checks for an unsaved addendum before discarding it. Applying filters or changing archive pages also leaves the list unselected.
+
+When a selected active report becomes Resolved during a refresh, the page clears its selection and returns to the full archive with a resolution message. A saved resolved report can still be selected explicitly to read its original record, export it through existing controls, and add an authorized addendum. Closing the detail pane does not delete or modify an incident. Existing ownership, status-transition, notes, addendum, and PDF rules remain in their existing backend layers. See H076 in [CODEX_HISTORY.md](CODEX_HISTORY.md) for local verification and delivery status.
 
 ### Local Git authorship maintenance
 

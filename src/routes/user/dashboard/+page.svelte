@@ -7,6 +7,7 @@
 	import { incidentRequest, type SosTarget } from '#lib/user/incidents-client.ts';
 	import type { IncidentSummary } from '#lib/incidents.ts';
 	import SosHistoryList from '#lib/components/SosHistoryList.svelte';
+	import UserTutorial from '#lib/user/UserTutorial.svelte';
 	const preview = getUserPreview();
 	let targets = $state<SosTarget[]>([]);
 	let incidents = $state<IncidentSummary[]>([]);
@@ -112,6 +113,7 @@
 </script>
 
 <svelte:head><title>My SOS dashboard · HandLink</title></svelte:head>
+<UserTutorial />
 <div class="dashboard-screen">
 	<div class="dashboard-intro">
 		<p class="user-kicker">YOUR PERSONAL SAFETY SPACE</p>

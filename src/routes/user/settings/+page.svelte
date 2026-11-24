@@ -79,6 +79,15 @@
 	<div class="settings-list">
 		<div class="setting-row">
 			<div>
+				<strong>App tutorial</strong>
+				<p>A quick guide to SOS and the main buttons.</p>
+			</div>
+			<a class="btn btn-outline" href={resolve('/user/dashboard?tutorial=replay')}
+				>Replay tutorial</a
+			>
+		</div>
+		<div class="setting-row">
+			<div>
 				<strong>Privacy and security notes</strong>
 				<p>How your safety information is handled.</p>
 			</div>

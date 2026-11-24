@@ -79,7 +79,17 @@
 			const result = await request<IncidentReport>(resolve('/api/staff/reports/[id]', { id }), {
 				signal: controller.signal
 			});
-			if (!disposed && !controller.signal.aborted && selectedId === id) selected = result;
+			if (!disposed && !controller.signal.aborted && selectedId === id) {
+				if (
+					poll &&
+					selected &&
+					selected.incident.status !== 'Resolved' &&
+					result.incident.status === 'Resolved'
+				) {
+					selectReport('');
+					notice = 'Incident marked resolved.';
+				} else selected = result;
+			}
 		} catch (cause) {
 			if (!disposed && !controller.signal.aborted && selectedId === id) {
 				selected = null;
@@ -94,11 +104,14 @@
 		if (addendumDraft.trim() && !window.confirm('Discard your unsaved addendum?')) return;
 		selectedId = id;
 		selected = null;
+		detailController?.abort();
+		detailLoading = false;
+		detailError = '';
 		addendumDraft = '';
 		addendumRetry = undefined;
 		actionError = '';
 		notice = '';
-		void loadDetail(id);
+		if (id) void loadDetail(id);
 	}
 	async function loadQueue(nextPage = page, keepSelection = false, poll = false) {
 		if (busy || (poll && (queueController || detailLoading))) return;
@@ -147,7 +160,6 @@
 			pageSize = result.pageSize;
 			currentUserId = result.currentUserId;
 			if (keepSelection && selectedId) await loadDetail(selectedId, true);
-			else if (incidents.length) selectReport(incidents[0].id);
 		} catch (cause) {
 			if (!disposed && !controller.signal.aborted) {
 				incidents = [];
@@ -308,7 +320,7 @@
 	</header>
 	{#if notice}<p class="alert" role="status"><Check size={17} />{notice}</p>{/if}
 	{#if actionError}<p class="alert alert-error" role="alert">{actionError}</p>{/if}
-	<div class="report-grid">
+	<div class="report-grid" class:archive-only={!selectedId}>
 		<section class="panel report-archive" aria-busy={loading}>
 			<div class="archive-heading">
 				<Archive size={21} aria-hidden="true" />
@@ -448,202 +460,211 @@
 				>
 			</div>
 		</section>
-		<article class="panel report-document" aria-busy={detailLoading}>
-			{#if detailError}<p role="alert">{detailError}</p>
-				<button class="btn mt-4 btn-outline" disabled={busy} onclick={() => loadDetail(selectedId)}
-					>Retry report</button
+		{#if selectedId}
+			<article class="panel report-document" aria-busy={detailLoading}>
+				<button class="btn mb-5 btn-outline" disabled={busy} onclick={() => selectReport('')}
+					>Back to all reports</button
 				>
-			{:else if detailLoading}<p role="status">Loading report…</p>
-			{:else if selected}
-				<div class="document-heading">
-					<div>
-						<p class="document-label"><FileText size={19} aria-hidden="true" /> INCIDENT REPORT</p>
-						<h2 class="mt-2 text-2xl font-semibold tracking-tight break-all">
-							{selected.incident.reference}
-						</h2>
-						<p class="muted mt-1 text-sm">{date(selected.incident.startedAt)}</p>
-					</div>
-					<span class="badge" class:badge-success={selected.incident.status === 'Resolved'}
-						>{selected.cancellation?.decision === 'approved'
-							? 'Cancellation approved'
-							: incidentStatusLabel(selected.incident)}</span
+				{#if detailError}<p role="alert">{detailError}</p>
+					<button
+						class="btn mt-4 btn-outline"
+						disabled={busy}
+						onclick={() => loadDetail(selectedId)}>Retry report</button
 					>
-				</div>
-				<table class="report-fields">
-					<tbody>
-						<tr>
-							<th scope="row">Person in distress</th>
-							<td>{selected.incident.personName}</td>
-						</tr>
-						<tr>
-							<th scope="row">Dispatcher</th>
-							<td>{selected.incident.dispatcherName ?? 'Unavailable'}</td>
-						</tr>
-						<tr>
-							<th scope="row">Time started</th>
-							<td>{date(selected.incident.startedAt)}</td>
-						</tr>
-						<tr>
-							<th scope="row">Time ended</th>
-							<td>{date(selected.incident.endedAt)}</td>
-						</tr>
-						<tr>
-							<th scope="row">Caller name</th>
-							<td>{selected.incident.callerName}</td>
-						</tr>
-						<tr>
-							<th scope="row">Caller phone</th>
-							<td>{selected.incident.callerPhone}</td>
-						</tr>
-						<tr>
-							<th scope="row">Caller relationship</th>
-							<td>{selected.callerRelationship || 'Self'}</td>
-						</tr>
-						<tr>
-							<th scope="row">Response duration</th>
-							<td>{incidentDuration(selected.incident.startedAt, selected.incident.endedAt)}</td>
-						</tr>
-					</tbody>
-				</table>
-				<p class="muted">
-					LGU: {selected.incident.lguName ?? 'Unrouted — central review'} · Routing: {routingDescription(
-						selected.incident.routingReason
-					)}
-				</p>
-				{#key selected.incident.id}
-					{#if selected.incident.isStranger}<section class="my-4 alert">
-							<div>
-								<strong
-									>{selected.incident.emergencyDescription
-										? 'Unregistered person — caller-reported details'
-										: 'Unregistered person — confirm details by phone'}</strong
-								>
-								<p class="whitespace-pre-wrap">
-									{selected.incident.emergencyDescription ||
-										'No description was entered. Details must be confirmed with the caller by phone.'}
-								</p>
-								<p>Identity and details require confirmation.</p>
-							</div>
-						</section>{/if}
-					<IncidentLocation
-						personLocation={selected.personLocation}
-						reporter={selected}
-						isForSomeoneElse={selected.incident.isForSomeoneElse}
-						isStranger={selected.incident.isStranger}
-						locationSource={selected.incident.locationSource}
-					/>
-					<IncidentCancellationReview
-						incidentId={selected.incident.id}
-						cancellation={selected.cancellation}
-						canReview={ownIncident && selected.incident.status !== 'Resolved'}
-						disabled={busy || !!detailError}
-						onBusyChange={cancellationBusy}
-						onReviewed={async () => {
-							if (!disposed) await loadQueue(page, true);
-						}}
-					/>
-				{/key}
-				<h3 class="section-heading record-section-heading">Response notes</h3>
-				<p class="notes-copy whitespace-pre-wrap">
-					{selected.notes || 'No additional information recorded.'}
-				</p>
-				<section class="addenda-section" aria-labelledby="addenda-heading">
-					<h3 id="addenda-heading" class="section-heading record-section-heading">
-						Report addenda
-					</h3>
-					{#each selected.addenda as addendum (addendum.id)}
-						<article class="addendum-entry">
-							<p class="muted text-sm">{addendum.authorName} · {date(addendum.createdAt)}</p>
-							<p class="notes-copy whitespace-pre-wrap">{addendum.notes}</p>
-						</article>
-					{:else}<p class="muted">No addenda.</p>{/each}
-					{#if ownIncident && selected.incident.status === 'Resolved'}
-						<form
-							class="mt-4 space-y-3"
-							onsubmit={(event) => {
-								event.preventDefault();
-								void saveAddendum();
-							}}
-						>
-							<label class="field-label" for="report-addendum">Addendum *</label>
-							<textarea
-								id="report-addendum"
-								class="textarea min-h-32 w-full"
-								maxlength="2000"
-								required
-								bind:value={addendumDraft}
-								disabled={busy}></textarea>
-							<p class="muted text-sm">
-								Add a correction or update. Original notes stay unchanged.
+				{:else if detailLoading}<p role="status">Loading report…</p>
+				{:else if selected}
+					<div class="document-heading">
+						<div>
+							<p class="document-label">
+								<FileText size={19} aria-hidden="true" /> INCIDENT REPORT
 							</p>
-							<button class="btn btn-primary" disabled={busy || !addendumDraft.trim()}
-								>Save addendum</button
-							>
-						</form>
-					{/if}
-				</section>
-				{#key `${route.data.account?.id}:${selected.incident.id}`}
-					<AiReportSummary
-						incidentId={selected.incident.id}
-						ai={selected.ai}
-						canManage={ownIncident}
-						disabled={busy || !!detailError}
-						onBusyChange={cancellationBusy}
-						onChanged={async () => {
-							if (!disposed) await loadQueue(page, true, true);
-						}}
-					/>
-				{/key}
-				{#if selected.incident.provincialWorkflow}
-					{#key selected.incident.id}<IncidentProgress
-							incident={selected.incident}
-							updates={selected.responseUpdates}
-							canUpdate={ownIncident}
+							<h2 class="mt-2 text-2xl font-semibold tracking-tight break-all">
+								{selected.incident.reference}
+							</h2>
+							<p class="muted mt-1 text-sm">{date(selected.incident.startedAt)}</p>
+						</div>
+						<span class="badge" class:badge-success={selected.incident.status === 'Resolved'}
+							>{selected.cancellation?.decision === 'approved'
+								? 'Cancellation approved'
+								: incidentStatusLabel(selected.incident)}</span
+						>
+					</div>
+					<table class="report-fields">
+						<tbody>
+							<tr>
+								<th scope="row">Person in distress</th>
+								<td>{selected.incident.personName}</td>
+							</tr>
+							<tr>
+								<th scope="row">Dispatcher</th>
+								<td>{selected.incident.dispatcherName ?? 'Unavailable'}</td>
+							</tr>
+							<tr>
+								<th scope="row">Time started</th>
+								<td>{date(selected.incident.startedAt)}</td>
+							</tr>
+							<tr>
+								<th scope="row">Time ended</th>
+								<td>{date(selected.incident.endedAt)}</td>
+							</tr>
+							<tr>
+								<th scope="row">Caller name</th>
+								<td>{selected.incident.callerName}</td>
+							</tr>
+							<tr>
+								<th scope="row">Caller phone</th>
+								<td>{selected.incident.callerPhone}</td>
+							</tr>
+							<tr>
+								<th scope="row">Caller relationship</th>
+								<td>{selected.callerRelationship || 'Self'}</td>
+							</tr>
+							<tr>
+								<th scope="row">Response duration</th>
+								<td>{incidentDuration(selected.incident.startedAt, selected.incident.endedAt)}</td>
+							</tr>
+						</tbody>
+					</table>
+					<p class="muted">
+						LGU: {selected.incident.lguName ?? 'Unrouted — central review'} · Routing: {routingDescription(
+							selected.incident.routingReason
+						)}
+					</p>
+					{#key selected.incident.id}
+						{#if selected.incident.isStranger}<section class="my-4 alert">
+								<div>
+									<strong
+										>{selected.incident.emergencyDescription
+											? 'Unregistered person — caller-reported details'
+											: 'Unregistered person — confirm details by phone'}</strong
+									>
+									<p class="whitespace-pre-wrap">
+										{selected.incident.emergencyDescription ||
+											'No description was entered. Details must be confirmed with the caller by phone.'}
+									</p>
+									<p>Identity and details require confirmation.</p>
+								</div>
+							</section>{/if}
+						<IncidentLocation
+							personLocation={selected.personLocation}
+							reporter={selected}
+							isForSomeoneElse={selected.incident.isForSomeoneElse}
+							isStranger={selected.incident.isStranger}
+							locationSource={selected.incident.locationSource}
+						/>
+						<IncidentCancellationReview
+							incidentId={selected.incident.id}
+							cancellation={selected.cancellation}
+							canReview={ownIncident && selected.incident.status !== 'Resolved'}
 							disabled={busy || !!detailError}
 							onBusyChange={cancellationBusy}
-							onSaved={async () => {
-								await loadQueue(page, true, true);
+							onReviewed={async () => {
+								if (!disposed) await loadQueue(page, true);
 							}}
-						/>{/key}
-				{/if}
-				{#if ownIncident && !selected.incident.provincialWorkflow}
-					<div class="legacy-status-actions" aria-label="Update incident status">
-						<section class="status-action">
-							<h3 class="section-heading">Responder departure</h3>
-							<p class="muted">Keep the incident open while responders travel.</p>
-							<button
-								class="btn btn-primary"
-								disabled={busy || selected.incident.status !== 'In progress'}
-								onclick={() => changeStatus('On route')}>Mark on route</button
+						/>
+					{/key}
+					<h3 class="section-heading record-section-heading">Response notes</h3>
+					<p class="notes-copy whitespace-pre-wrap">
+						{selected.notes || 'No additional information recorded.'}
+					</p>
+					<section class="addenda-section" aria-labelledby="addenda-heading">
+						<h3 id="addenda-heading" class="section-heading record-section-heading">
+							Report addenda
+						</h3>
+						{#each selected.addenda as addendum (addendum.id)}
+							<article class="addendum-entry">
+								<p class="muted text-sm">{addendum.authorName} · {date(addendum.createdAt)}</p>
+								<p class="notes-copy whitespace-pre-wrap">{addendum.notes}</p>
+							</article>
+						{:else}<p class="muted">No addenda.</p>{/each}
+						{#if ownIncident && selected.incident.status === 'Resolved'}
+							<form
+								class="mt-4 space-y-3"
+								onsubmit={(event) => {
+									event.preventDefault();
+									void saveAddendum();
+								}}
 							>
-						</section>
-						{#if selected.incident.status === 'On route'}
-							<section class="status-action resolution-action">
-								<h3 class="section-heading">Close incident</h3>
-								<p class="muted">
-									Resolve only after confirming the final outcome. Original notes will be locked.
+								<label class="field-label" for="report-addendum">Addendum *</label>
+								<textarea
+									id="report-addendum"
+									class="textarea min-h-32 w-full"
+									maxlength="2000"
+									required
+									bind:value={addendumDraft}
+									disabled={busy}></textarea>
+								<p class="muted text-sm">
+									Add a correction or update. Original notes stay unchanged.
 								</p>
+								<button class="btn btn-primary" disabled={busy || !addendumDraft.trim()}
+									>Save addendum</button
+								>
+							</form>
+						{/if}
+					</section>
+					{#key `${route.data.account?.id}:${selected.incident.id}`}
+						<AiReportSummary
+							incidentId={selected.incident.id}
+							ai={selected.ai}
+							canManage={ownIncident}
+							disabled={busy || !!detailError}
+							onBusyChange={cancellationBusy}
+							onChanged={async () => {
+								if (!disposed) await loadQueue(page, true, true);
+							}}
+						/>
+					{/key}
+					{#if selected.incident.provincialWorkflow}
+						{#key selected.incident.id}<IncidentProgress
+								incident={selected.incident}
+								updates={selected.responseUpdates}
+								canUpdate={ownIncident}
+								disabled={busy || !!detailError}
+								onBusyChange={cancellationBusy}
+								onSaved={async () => {
+									await loadQueue(page, true, true);
+								}}
+							/>{/key}
+					{/if}
+					{#if ownIncident && !selected.incident.provincialWorkflow}
+						<div class="legacy-status-actions" aria-label="Update incident status">
+							<section class="status-action">
+								<h3 class="section-heading">Responder departure</h3>
+								<p class="muted">Keep the incident open while responders travel.</p>
 								<button
 									class="btn btn-primary"
-									disabled={busy ||
-										selected.incident.status !== 'On route' ||
-										selected.cancellation?.decision === 'pending'}
-									onclick={() => changeStatus('Resolved')}>Mark resolved</button
+									disabled={busy || selected.incident.status !== 'In progress'}
+									onclick={() => changeStatus('On route')}>Mark on route</button
 								>
 							</section>
-						{/if}
-					</div>
-				{/if}
-				<p class="report-footer">
-					<FileText size={14} /> Saved incident record{route.data.account?.role === 'admin'
-						? ' · Read-only admin view'
-						: ''}
-				</p>
-			{:else}<div class="empty-report">
-					<FileText size={23} />
-					<p>Select a report to view its saved details.</p>
-				</div>{/if}
-		</article>
+							{#if selected.incident.status === 'On route'}
+								<section class="status-action resolution-action">
+									<h3 class="section-heading">Close incident</h3>
+									<p class="muted">
+										Resolve only after confirming the final outcome. Original notes will be locked.
+									</p>
+									<button
+										class="btn btn-primary"
+										disabled={busy ||
+											selected.incident.status !== 'On route' ||
+											selected.cancellation?.decision === 'pending'}
+										onclick={() => changeStatus('Resolved')}>Mark resolved</button
+									>
+								</section>
+							{/if}
+						</div>
+					{/if}
+					<p class="report-footer">
+						<FileText size={14} /> Saved incident record{route.data.account?.role === 'admin'
+							? ' · Read-only admin view'
+							: ''}
+					</p>
+				{:else}<div class="empty-report">
+						<FileText size={23} />
+						<p>Select a report to view its saved details.</p>
+					</div>{/if}
+			</article>
+		{/if}
 	</div>
 </div>
 
@@ -730,6 +751,25 @@
 		grid-template-columns: minmax(260px, 0.7fr) minmax(0, 1.3fr);
 		gap: 22px;
 		align-items: start;
+	}
+	.report-grid.archive-only {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.report-grid.archive-only .report-choices {
+		max-height: none;
+		overflow: visible;
+	}
+	.report-grid.archive-only form {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+		gap: 12px;
+	}
+	.report-grid.archive-only form > * {
+		margin-block: 0;
+	}
+	.report-grid.archive-only form > :first-child,
+	.report-grid.archive-only form > p {
+		grid-column: 1 / -1;
 	}
 	.reports-workspace .report-choice {
 		display: flex;

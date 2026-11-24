@@ -441,6 +441,7 @@ test('cancel sends nothing; a real SOS reaches dispatcher confirmation and resol
 		await expect(
 			staff.getByRole('heading', { name: 'Incident reports', exact: true })
 		).toBeVisible();
+		await staff.getByRole('button').filter({ hasText: reference }).click();
 		await expect(staff.getByText('Caller reports chest pain.', { exact: true })).toBeVisible();
 		staff.once('dialog', (dialog) => dialog.dismiss());
 		await expect(staff.getByRole('button', { name: 'Mark resolved', exact: true })).toHaveCount(0);
@@ -459,7 +460,10 @@ test('cancel sends nothing; a real SOS reaches dispatcher confirmation and resol
 		staff.once('dialog', (dialog) => dialog.accept());
 		await staff.getByRole('button', { name: 'Mark resolved', exact: true }).click();
 		await expect(staff.getByText('Incident marked resolved.', { exact: true })).toBeVisible();
+		await expect(staff.locator('.report-document')).toHaveCount(0);
 		await staff.reload();
+		await expect(staff.locator('.report-document')).toHaveCount(0);
+		await staff.getByRole('button').filter({ hasText: reference }).click();
 		await expect(staff.getByText('Caller reports chest pain.', { exact: true })).toBeVisible();
 		await expect(staff.getByRole('button', { name: 'Mark on route', exact: true })).toBeDisabled();
 		await expect(staff.getByRole('button', { name: 'Mark resolved', exact: true })).toHaveCount(0);
@@ -574,6 +578,7 @@ test('dispatcher autosave preserves newer typing, rejects stale edits and flushe
 	await notes.fill('Final note before navigating.');
 	await page.getByRole('link', { name: 'Incident reports', exact: true }).click();
 	await expect(page).toHaveURL('/dispatch/reports');
+	await page.locator('.report-choice').first().click();
 	await expect(page.getByText('Final note before navigating.', { exact: true })).toBeVisible();
 });
 

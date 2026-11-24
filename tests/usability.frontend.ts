@@ -1,7 +1,192 @@
-import { expect, test, type Locator } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { headers, login, password, provision } from './incident-fixture';
 import { enrollStaffMfa, totp } from './mfa-fixture';
 import { latestEligibleBirthday } from '../src/lib/birthday';
+import { origin } from './incident-fixture';
+import { installNativeBridge, type NativeTestState } from './native-fixture';
+
+async function submitLogin(page: Page) {
+	for (let attempt = 0; ; attempt++) {
+		const responsePromise = page.waitForResponse((response) =>
+			response.url().endsWith('/api/auth/sign-in/email')
+		);
+		await page.getByRole('button', { name: 'Log In', exact: true }).click();
+		const response = await responsePromise;
+		if (response.status() !== 429 || attempt >= 2) break;
+		const seconds = Number(response.headers()['retry-after']);
+		await new Promise((resolve) =>
+			setTimeout(resolve, (Number.isFinite(seconds) && seconds > 0 ? seconds : 10) * 1000 + 100)
+		);
+	}
+}
+
+test('first User login offers a safe tutorial and remembers it across devices', async ({
+	page,
+	browser
+}) => {
+	test.setTimeout(90000);
+	const account = await provision('user', false);
+	await installNativeBridge(page);
+	await page.setViewportSize({ width: 390, height: 844 });
+	let sosRequests = 0;
+	page.on('request', (request) => {
+		if (request.method() === 'POST' && request.url().endsWith('/api/incidents')) sosRequests++;
+	});
+	await page.goto('/login');
+	await page.getByLabel('Email', { exact: true }).fill(account.email);
+	await page.getByLabel('Password', { exact: true }).fill(password);
+	await submitLogin(page);
+	await expect(page.getByRole('dialog', { name: 'Important safety notice' })).toBeVisible();
+	await expect(page.getByRole('dialog', { name: 'Welcome to HandLink' })).toHaveCount(0);
+	await page.getByRole('button', { name: 'I understand. Continue', exact: true }).click();
+	const guide = page.locator('dialog.user-tutorial');
+	await expect(guide).toBeVisible();
+	await expect(guide.getByRole('heading', { name: 'Welcome to HandLink' })).toBeFocused();
+	expect(await guide.evaluate((node) => node.matches(':modal'))).toBe(true);
+	const initialPermissions = await page.evaluate(
+		() =>
+			(globalThis as unknown as { __handlinkNativeTest: NativeTestState }).__handlinkNativeTest
+				.initialRequests
+	);
+	await guide.getByRole('button', { name: 'Next', exact: true }).click();
+	await expect(guide.getByRole('heading', { name: 'SOS for me', exact: true })).toBeFocused();
+	await expect(guide.locator('.tutorial-highlight')).toBeVisible();
+	const target = await page.locator('.self-sos').boundingBox();
+	await page.mouse.click(target!.x + target!.width / 2, target!.y + target!.height / 2);
+	await expect(page).toHaveURL('/user/dashboard');
+	for (const theme of ['light', 'dark']) {
+		await page.evaluate(
+			(value) => document.documentElement.setAttribute('data-appearance', value),
+			theme
+		);
+		expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+			true
+		);
+		await page.screenshot({
+			path: test.info().outputPath(`user-tutorial-${theme}.png`),
+			animations: 'disabled'
+		});
+	}
+	await guide.getByRole('button', { name: 'Previous tutorial step', exact: true }).click();
+	await expect(guide.getByRole('heading', { name: 'Welcome to HandLink' })).toBeVisible();
+	for (const title of [
+		'SOS for me',
+		'Help someone else',
+		'You press Call',
+		'Manage your profiles',
+		'Share your location',
+		'Check your updates',
+		'Settings and permissions',
+		'Find your SOS history'
+	]) {
+		await guide.getByRole('button', { name: 'Next', exact: true }).click();
+		await expect(guide.getByRole('heading', { name: title, exact: true })).toBeFocused();
+		if (title === 'Manage your profiles') {
+			await expect(guide.locator('.tutorial-highlight')).toBeVisible();
+			await page.setViewportSize({ width: 320, height: 568 });
+			const card = await guide.locator('.tutorial-card').boundingBox();
+			expect(card!.x).toBeGreaterThanOrEqual(0);
+			expect(card!.y + card!.height).toBeLessThanOrEqual(568);
+			await page.setViewportSize({ width: 390, height: 844 });
+		}
+	}
+	const saved = page.waitForResponse(
+		(response) =>
+			response.url().endsWith('/api/account/tutorial') && response.request().method() === 'POST'
+	);
+	await guide.getByRole('button', { name: 'Finish tutorial', exact: true }).click();
+	expect((await saved).status()).toBe(200);
+	await expect(guide).not.toBeVisible();
+	await expect(page.locator('.self-sos')).toBeEnabled();
+	expect(sosRequests).toBe(0);
+	const native = await page.evaluate(
+		() => (globalThis as unknown as { __handlinkNativeTest: NativeTestState }).__handlinkNativeTest
+	);
+	expect(native.dialerAttempts).toBe(0);
+	expect(native.initialRequests).toBe(initialPermissions);
+	await page.reload();
+	await expect(guide).not.toBeVisible();
+	const secondDevice = await browser.newContext({ baseURL: origin });
+	try {
+		await login(secondDevice.request, account);
+		const secondPage = await secondDevice.newPage();
+		await secondPage.goto('/user/dashboard');
+		await expect(secondPage.locator('.self-sos')).toBeEnabled();
+		await expect(secondPage.locator('dialog.user-tutorial')).not.toBeVisible();
+	} finally {
+		await secondDevice.close();
+	}
+});
+
+test('tutorial can be skipped during a save failure and replayed from Settings', async ({
+	page
+}) => {
+	const account = await provision('user', false);
+	await login(page.request, account);
+	await page.route('**/api/account/tutorial', (route) =>
+		route.fulfill({
+			status: 503,
+			contentType: 'application/json',
+			body: JSON.stringify({ message: 'Unavailable' })
+		})
+	);
+	await page.goto('/user/dashboard');
+	const guide = page.locator('dialog.user-tutorial');
+	await expect(guide).toBeVisible();
+	await guide.getByRole('button', { name: 'Skip tutorial', exact: true }).click();
+	await expect(guide).not.toBeVisible();
+	await expect(
+		page.getByText('Tutorial closed. Your preference could not be saved, so it may appear again.')
+	).toBeVisible();
+	await expect(page.locator('.self-sos')).toBeEnabled();
+	await page.unroute('**/api/account/tutorial');
+	const saved = page.waitForResponse(
+		(response) =>
+			response.url().endsWith('/api/account/tutorial') && response.request().method() === 'POST'
+	);
+	await page.getByRole('button', { name: 'Retry saving tutorial preference' }).click();
+	expect((await saved).status()).toBe(200);
+	await page.getByRole('link', { name: 'Settings', exact: true }).click();
+	await page.getByRole('link', { name: 'Replay tutorial', exact: true }).click();
+	await expect(guide).toBeVisible();
+	await expect(guide.getByRole('heading', { name: 'Welcome to HandLink' })).toBeVisible();
+	await page.keyboard.press('Escape');
+	await expect(guide).not.toBeVisible();
+	await expect(page).toHaveURL('/user/dashboard');
+	await page.reload();
+	await expect(guide).not.toBeVisible();
+});
+
+test('tutorial preference requires the current User and rejects forged writes', async ({
+	request,
+	playwright
+}) => {
+	expect((await request.get('/api/account/tutorial')).status()).toBe(401);
+	const first = await provision('user', false);
+	await login(request, first);
+	expect(await (await request.get('/api/account/tutorial')).json()).toEqual({ seen: false });
+	expect((await request.post('/api/account/tutorial', { data: {} })).status()).toBe(403);
+	expect(
+		(
+			await request.post('/api/account/tutorial', { headers, data: { userId: 'another-account' } })
+		).status()
+	).toBe(422);
+	for (let attempt = 0; attempt < 2; attempt++)
+		expect((await request.post('/api/account/tutorial', { headers, data: {} })).status()).toBe(200);
+	const response = await request.get('/api/account/tutorial');
+	expect(response.headers()['cache-control']).toContain('no-store');
+	expect(await response.json()).toEqual({ seen: true });
+	const other = await playwright.request.newContext({ baseURL: origin });
+	try {
+		await login(other, await provision('user', false));
+		expect(await (await other.get('/api/account/tutorial')).json()).toEqual({ seen: false });
+		await login(other, await provision('dispatcher'), false);
+		expect((await other.get('/api/account/tutorial')).status()).toBe(403);
+		expect((await other.post('/api/account/tutorial', { headers, data: {} })).status()).toBe(403);
+	} finally {
+		await other.dispose();
+	}
+});
 
 test('welcome and registration share the login animation and readable mobile light theme', async ({
 	page
@@ -146,7 +331,7 @@ test('one login page routes Users and protects staff destinations with MFA', asy
 	await page.getByRole('button', { name: 'Show password', exact: true }).click();
 	await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('type', 'text');
 	await expect(page.getByRole('heading', { name: 'Important safety notice' })).toHaveCount(0);
-	await page.getByRole('button', { name: 'Log In', exact: true }).click();
+	await submitLogin(page);
 	const memo = page.getByRole('dialog', { name: 'Important safety notice' });
 	await expect(memo).toBeVisible();
 	await expect(memo).toContainText(
@@ -206,18 +391,7 @@ test('one login page routes Users and protects staff destinations with MFA', asy
 		await page.getByLabel('Email', { exact: true }).fill(staff.email);
 		await page.getByLabel('Password', { exact: true }).fill(password);
 		// Preview shares one IP bucket across accounts. Honor the real limiter without disabling it.
-		for (let attempt = 0; ; attempt++) {
-			const responsePromise = page.waitForResponse((response) =>
-				response.url().endsWith('/api/auth/sign-in/email')
-			);
-			await page.getByRole('button', { name: 'Log In', exact: true }).click();
-			const response = await responsePromise;
-			if (response.status() !== 429 || attempt >= 2) break;
-			const seconds = Number(response.headers()['retry-after']);
-			await new Promise((resolve) =>
-				setTimeout(resolve, (Number.isFinite(seconds) && seconds > 0 ? seconds : 10) * 1000 + 100)
-			);
-		}
+		await submitLogin(page);
 		await expect(page.getByLabel('Authenticator code', { exact: true })).toBeVisible();
 		await expect(page.getByRole('heading', { name: 'Important safety notice' })).toHaveCount(0);
 		await expect(page).toHaveURL('/login');
