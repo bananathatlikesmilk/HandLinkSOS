@@ -2,7 +2,8 @@ import { error, redirect } from '@sveltejs/kit';
 import { resolve } from '$app/paths';
 import { eq } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
-import { emergencyContact, medicalProfile, profile, userTutorial } from '#lib/server/db/schema.ts';
+import { emergencyContact, medicalProfile, profile } from '#lib/server/db/schema.ts';
+import { hasSeenTutorial } from '#lib/server/tutorial.ts';
 import { portalAccount } from '#lib/server/portal.ts';
 import { emailConfigured } from '#lib/server/email.ts';
 import type { LayoutServerLoad } from './$types';
@@ -31,7 +32,7 @@ export const load: LayoutServerLoad = (event) => {
 		: [];
 	return {
 		account,
-		tutorialSeen: !!db.select().from(userTutorial).where(eq(userTutorial.userId, account.id)).get(),
+		tutorialSeen: hasSeenTutorial(account.id),
 		emailConfigured,
 		accountProfile: {
 			id: saved?.id ?? '',

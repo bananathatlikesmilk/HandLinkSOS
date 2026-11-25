@@ -109,6 +109,7 @@
 		{#each links as link (link.href)}
 			<a
 				href={resolve(link.href)}
+				data-tutorial-link={link.href}
 				class:active={active(link.href)}
 				aria-current={active(link.href) ? 'page' : undefined}
 				onclick={closeNavigation}

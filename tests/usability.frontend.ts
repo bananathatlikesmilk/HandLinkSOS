@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { headers, login, password, provision } from './incident-fixture';
+import { database, headers, login, password, provision } from './incident-fixture';
 import { enrollStaffMfa, totp } from './mfa-fixture';
 import { latestEligibleBirthday } from '../src/lib/birthday';
 import { origin } from './incident-fixture';
@@ -18,6 +18,118 @@ async function submitLogin(page: Page) {
 			setTimeout(resolve, (Number.isFinite(seconds) && seconds > 0 ? seconds : 10) * 1000 + 100)
 		);
 	}
+}
+
+for (const scenario of [
+	{ role: 'admin', office: 'central', steps: 10 },
+	{ role: 'admin', office: 'legacy', steps: 7 },
+	{ role: 'dispatcher', office: 'provincial-intake', steps: 10 },
+	{ role: 'dispatcher', office: 'legacy', steps: 10 }
+] as const) {
+	test(`${scenario.office} ${scenario.role} tutorial respects scope, persists and replays safely`, async ({
+		page
+	}) => {
+		test.setTimeout(90000);
+		const actor = await provision(scenario.role, false);
+		if (scenario.office !== 'central') {
+			const db = database();
+			try {
+				db.prepare('INSERT INTO staff_lgu (user_id,lgu_id) VALUES (?,?)').run(
+					actor.id,
+					scenario.office
+				);
+			} finally {
+				db.close();
+			}
+		}
+		await login(page.request, actor, false);
+		expect((await page.request.get('/api/account/tutorial')).status()).toBe(403);
+		expect((await page.request.post('/api/account/tutorial', { headers, data: {} })).status()).toBe(
+			403
+		);
+		const home = scenario.role === 'admin' ? '/admin' : '/dispatch';
+		await page.goto(home);
+		await expect(page).toHaveURL(`${home}/security`);
+		await expect(page.locator('dialog.guided-tutorial')).toHaveCount(0);
+		await enrollStaffMfa(page.request, password);
+		expect(await (await page.request.get('/api/account/tutorial')).json()).toEqual({ seen: false });
+		let mutations = 0;
+		page.on('request', (request) => {
+			if (
+				['POST', 'PATCH', 'PUT', 'DELETE'].includes(request.method()) &&
+				!request.url().endsWith('/api/account/tutorial')
+			)
+				mutations++;
+		});
+		await page.setViewportSize({ width: 1280, height: 900 });
+		await page.goto(home);
+		const guide = page.locator('dialog.guided-tutorial');
+		await expect(guide).toBeVisible();
+		const title = scenario.role === 'admin' ? 'Welcome, Administrator' : 'Welcome, Dispatcher';
+		await expect(guide.getByRole('heading', { name: title, exact: true })).toBeFocused();
+		if (scenario.office === 'central') await expect(guide).toContainText('across LGUs');
+		if (scenario.office === 'legacy') await expect(guide).toContainText('assigned LGU');
+		const titles: string[] = [];
+		for (let index = 0; index < scenario.steps; index++) {
+			titles.push(await guide.locator('h2').innerText());
+			if (index === 2) {
+				await expect(guide.locator('.tutorial-highlight')).toBeVisible();
+				await page.setViewportSize({ width: 390, height: 844 });
+				await expect(guide.locator('.tutorial-highlight')).toBeVisible();
+				if (scenario.role === 'admin') {
+					await expect
+						.poll(async () => {
+							const menu = await page.locator('.mobile-menu').boundingBox();
+							const highlight = await guide.locator('.tutorial-highlight').boundingBox();
+							return (
+								!!menu &&
+								!!highlight &&
+								Math.abs(highlight.y - menu.y) <= 6 &&
+								Math.abs(highlight.width - menu.width - 10) <= 2
+							);
+						})
+						.toBe(true);
+				}
+				for (const theme of ['light', 'dark']) {
+					await page.evaluate(
+						(value) => document.documentElement.setAttribute('data-appearance', value),
+						theme
+					);
+					expect(
+						await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)
+					).toBe(true);
+					await page.screenshot({
+						path: test.info().outputPath(`${scenario.office}-${scenario.role}-${theme}.png`),
+						animations: 'disabled'
+					});
+				}
+			}
+			if (index < scenario.steps - 1)
+				await guide.getByRole('button', { name: 'Next', exact: true }).click();
+		}
+		if (scenario.role === 'admin') {
+			expect(titles.includes('LGUs and routing')).toBe(scenario.office === 'central');
+			expect(titles.includes('Choose the AI provider')).toBe(scenario.office === 'central');
+			expect(titles.includes('Set the SOS hotline')).toBe(scenario.office === 'central');
+		} else expect(titles).toContain('Confirm response progress');
+		const saved = page.waitForResponse(
+			(response) =>
+				response.url().endsWith('/api/account/tutorial') && response.request().method() === 'POST'
+		);
+		await guide.getByRole('button', { name: 'Finish tutorial', exact: true }).click();
+		expect((await saved).status()).toBe(200);
+		await expect(guide).not.toBeVisible();
+		await page.reload();
+		await expect(guide).not.toBeVisible();
+		await page.goto(`${home}/profile`);
+		await page.getByRole('link', { name: 'Replay tutorial', exact: true }).click();
+		await expect(guide).toBeVisible();
+		await expect(guide.getByRole('heading', { name: title, exact: true })).toBeVisible();
+		await guide.getByRole('button', { name: 'Skip tutorial', exact: true }).click();
+		await expect(guide).not.toBeVisible();
+		await expect(page).toHaveURL(home);
+		expect(mutations).toBe(0);
+	});
 }
 
 test('first User login offers a safe tutorial and remembers it across devices', async ({
@@ -39,7 +151,7 @@ test('first User login offers a safe tutorial and remembers it across devices', 
 	await expect(page.getByRole('dialog', { name: 'Important safety notice' })).toBeVisible();
 	await expect(page.getByRole('dialog', { name: 'Welcome to HandLink' })).toHaveCount(0);
 	await page.getByRole('button', { name: 'I understand. Continue', exact: true }).click();
-	const guide = page.locator('dialog.user-tutorial');
+	const guide = page.locator('dialog.guided-tutorial');
 	await expect(guide).toBeVisible();
 	await expect(guide.getByRole('heading', { name: 'Welcome to HandLink' })).toBeFocused();
 	expect(await guide.evaluate((node) => node.matches(':modal'))).toBe(true);
@@ -112,7 +224,7 @@ test('first User login offers a safe tutorial and remembers it across devices', 
 		const secondPage = await secondDevice.newPage();
 		await secondPage.goto('/user/dashboard');
 		await expect(secondPage.locator('.self-sos')).toBeEnabled();
-		await expect(secondPage.locator('dialog.user-tutorial')).not.toBeVisible();
+		await expect(secondPage.locator('dialog.guided-tutorial')).not.toBeVisible();
 	} finally {
 		await secondDevice.close();
 	}
@@ -131,7 +243,7 @@ test('tutorial can be skipped during a save failure and replayed from Settings',
 		})
 	);
 	await page.goto('/user/dashboard');
-	const guide = page.locator('dialog.user-tutorial');
+	const guide = page.locator('dialog.guided-tutorial');
 	await expect(guide).toBeVisible();
 	await guide.getByRole('button', { name: 'Skip tutorial', exact: true }).click();
 	await expect(guide).not.toBeVisible();

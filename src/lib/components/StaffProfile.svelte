@@ -23,6 +23,18 @@
 			<p class="muted mt-2">Your signed-in staff account details.</p>
 		</div>
 	</header>
+	<div class="panel mb-6 flex flex-wrap items-center justify-between gap-4">
+		<div>
+			<h2 class="text-lg font-semibold">App tutorial</h2>
+			<p class="muted mt-2 text-sm">A quick guide to your workspace and responsibilities.</p>
+		</div>
+		<a
+			class="btn btn-outline"
+			href={resolve(
+				account.role === 'admin' ? '/admin?tutorial=replay' : '/dispatch?tutorial=replay'
+			)}>Replay tutorial</a
+		>
+	</div>
 
 	<div class="panel">
 		<h2 class="text-lg font-semibold">Account information</h2>

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
+	import StaffTutorial from '#lib/components/StaffTutorial.svelte';
 	import {
 		Users,
 		Headset,
@@ -100,6 +101,8 @@
 		};
 	});
 </script>
+
+<StaffTutorial role="admin" />
 
 <svelte:head><title>Admin dashboard | HandLink</title></svelte:head>
 
